@@ -1,6 +1,7 @@
 # The checks a host runs on every pull request and every change to main, with no firmware: the build held to
 # packs/built.json, the tree's own tests, the install page's three checks, and the part of the check before a commit
 # that needs no firmware.
+# The checks that need no compiler also run on a Linux machine, where the Linux helper's tests run.
 #
 # A green run is not the whole check. The check for anything of the firmware in a file needs the maintainer's own copy
 # of the firmware, which a host never gets: it runs on the maintainer's computer before every commit
@@ -71,3 +72,28 @@ jobs:
 
       - name: The part of the check before a commit that needs no firmware
         run: python -I tools/publish_check.py --forms-only .github builder catalog docs examples hooks linker module packs pictures profiles tools AGENTS.md CLAUDE.md CONTRIBUTING.md LICENSE NOTICE.md README.md THIRD-PARTY.md build.json
+
+  # The Linux helper (builder/open-field-helper.py) is tested only here: its tests run on Linux alone. The page's checks
+  # need no compiler, so they are held on a second system too. The build stays on the Windows job.
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: The tree's own tests, with the Linux helper's
+        run: python -I -m unittest discover -s tools/tests
+
+      - name: The unit's check over USB MIDI, against a made-up bootloader
+        run: node builder/validate-devmode.mjs
+
+      - name: The install's plan
+        run: node builder/validate-install.mjs

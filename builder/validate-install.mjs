@@ -2,8 +2,9 @@
 //
 //   node builder/validate-install.mjs
 //
-// And plays the page's part on a folder the Windows helper works in, so that the helper can be run whole without a
-// unit and without a browser (open-field-helper.ps1 -Source <a folder standing for the unit's disk> -Folder <folder>):
+// And plays the page's part on a folder a helper works in, so that the helper can be run whole without a
+// unit and without a browser (open-field-helper.ps1 -Source <a folder standing for the unit's disk> -Folder <folder>,
+// or open-field-helper.py --source <a folder standing for the unit's disk> --folder <folder>):
 //
 //   node builder/validate-install.mjs --play <folder> --stock <your own os.ldr>
 //

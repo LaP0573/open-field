@@ -1,6 +1,6 @@
 // open-field: the install's plan, made once, from the helper's listing of the unit's disk.
 //
-// The page and the Windows helper (open-field-helper.ps1) share one folder on the computer. The helper takes the
+// The page and the helper (open-field-helper.ps1 on Windows, open-field-helper.py on Linux) share one folder on the computer. The helper takes the
 // owner's own firmware file and the log files off the unit, lists the disk, and waits. This module, run by the page,
 // builds the new firmware file, decides with placement.mjs whether the write lands or needs a pad file, and writes
 // the plan: every file to put on the unit, and the whole listing the disk must show afterwards, row for row. The

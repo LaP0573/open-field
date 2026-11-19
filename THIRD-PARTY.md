@@ -8,6 +8,7 @@ Two projects' work is reused here, each under the MIT licence. Their licence tex
 | --- | --- | --- | --- |
 | **Ferret**, by Bag of Waffles (https://github.com/bagofwaffles/ferret) | The code that talks to the bootloader over USB MIDI to switch its developer menu on and off, by way of open-xy's adaptation of it | `builder/ferret.mjs` | `builder/ferret.LICENSE` |
 | **open-xy**, by the Open-XY contributors (https://github.com/etcetc000/open-xy) | The handling of the firmware file's format, ported to JavaScript; the compiler settings | `builder/ldr.mjs`, parts of `builder/patch.mjs`, the flags in `tools/module_build.py` | `builder/open-xy.LICENSE` |
+| **open-xy**, by the Open-XY contributors (https://github.com/etcetc000/open-xy) | The Linux helper's USB transport (MTP through libusb), ported from `tooling/usbmtp.py` at commit f10f6bd; the stand-in unit of its tests, from `tests/test_usbmtp.py` at the same commit | `builder/open-field-helper.py`, the section "The unit over USB"; `tools/tests/test_linux_helper_usb.py` | `builder/open-xy.LICENSE` |
 
 The build tools also use, without copying it, one file of open-xy (`tooling/formats.py`) and the compiler toolchain that project provides. [docs/build.md](docs/build.md) says how to get them. They are not part of this repository.
 
