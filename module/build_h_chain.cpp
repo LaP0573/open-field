@@ -332,6 +332,7 @@ static int keep_h5_presets;                                    // H6b: the H5 pr
 static Json h5_presets;
 enum { JSON_ARRAY_KIND = 6 };                                  // the kind byte (json + 4) of an array: the list walk of the size getter's table (H1g; H1f had learnt 0, the null a fresh value starts as)
 static u8 initialised[HOSTS][SLOTS];
+static u8 held_off[HOSTS][SLOTS][WAGONS];                      // a wagon a turn switched off for the ceiling: a later turn that fits switches it back on (memory only)
 static u8 bypass_mask[HOSTS][SLOTS];                           // H3: the couplings shift + T3 parked, 1 << knob; always 0 since H5 (a file's mask re-couples at the load)
 static struct {                                                // H6: the presets store, one slot per file user/fx/NN.json, shared by both hosts
     u8 used[PRESETS];                                          // the slot's file holds a preset
@@ -1005,6 +1006,7 @@ static void dedupe(int host, u32 slot, int keep_knob, int type) {
         Wagon* w = &wagons[host][slot][k];
         if (conflicts(w->type, type)) {
             remember(host, slot, k, w);
+            held_off[host][slot][k] = 0;
             w->type = NONE;
             for (int i = 0; i < PARAMS; ++i) w->params[i] = 0;
             if (st.current_slot[host] == (int)slot) { st.pending_type[host][k] = NONE; st.pending_since[host][k] = (int)st.frames - REST_FRAMES; }
@@ -1055,7 +1057,9 @@ static void mirror_push(int host, u32 slot) {
     if (w->type >= 0) {
         if (slot_type(host, slot) == w->type) {
             slot_read_params(host, slot, w->params);
-            w->coupled = RD8(HOST[host].fx_active + slot) ? 1 : 0;
+            int on = RD8(HOST[host].fx_active + slot) ? 1 : 0;
+            if (on != w->coupled) held_off[host][slot][knob] = 0;
+            w->coupled = on;
         } else {
             WR32(HOST[host].type_array + 4u * slot, w->type);
             slot_write_params(host, slot, w->params);
@@ -1098,9 +1102,39 @@ static int order_index_of(int type) {
     return 0;
 }
 
-// A turn of the wagon's knob: the next or previous effect in the browser's order, skipping the picks over the ceiling
-// (and, without the regions of H4, the types another wagon carries); the label changes at once, the instance after
-// the knob's rest.
+// A refused pick or coupling: the page sags the wagon and names the effect in red for a second (H3).
+static void refuse(int host, int knob, int type) {
+    ++st.refusals;
+    st.flash_until[host] = (int)st.frames + FLASH_FRAMES;
+    st.refused_knob[host] = knob;
+    st.refused_type[host] = type;
+}
+
+// Switches a wagon on or off, a hold's and a turn's alike, and clears its mark. The mirrored wagon's fx_active byte and
+// document follow at once, except for a coupling while stock's slot still runs another effect: the push at the knob's
+// rest brings the effect and its byte together. Another wagon coupled while its instance is of another effect loses
+// that instance until the rest builds its own. Either way no effect runs that the ceiling did not count.
+static void couple(int host, u32 slot, int knob, int coupled) {
+    Wagon* w = &wagons[host][slot][knob];
+    w->coupled = coupled ? 1 : 0;
+    held_off[host][slot][knob] = 0;
+    if (knob == mirror[host][slot]) {
+        if (!coupled || w->type < 0 || slot_type(host, slot) == w->type) {
+            int active = w->type >= 0 && w->coupled;                        // an empty mirror wagon is an inactive effect to stock
+            WR8(HOST[host].fx_active + slot, active);
+            STOCK_SET_ACTIVE_DOC((void*)patch_record(host, slot), active);
+        }
+    } else if (coupled && live[host][knob].type != w->type) {
+        live[host][knob].obj = 0;
+        live[host][knob].type = NONE;
+    }
+}
+
+// A turn of the wagon's knob: the next or previous effect in the browser's order (without the regions of H4, going on
+// past the types another wagon carries). The label changes at once, the instance after the knob's rest. An effect
+// over the ceiling with this wagon on is shown refused: a wagon that was on, or that a turn had switched off for the
+// ceiling, goes off and is marked; one the owner switched off stays off. A marked wagon landing on an effect that
+// fits, or on none, goes back on.
 static void pick(int host, int knob, int delta) {
     u32 slot = gui_slot(host);
     Wagon* w = &wagons[host][slot][knob];
@@ -1111,13 +1145,8 @@ static void pick(int host, int knob, int delta) {
         if (index < 0 || index >= KNOB_ORDER_COUNT) return;                 // the ends of the list
         int type = KNOB_ORDER[index];
         if (type >= 0 && type_in_use(host, slot, type, knob)) continue;
-        if (type >= 0 && chain_cost(host, slot, knob, type) > CEILING_CYCLES) {
-            ++st.refusals;
-            st.flash_until[host] = (int)st.frames + FLASH_FRAMES;
-            st.refused_knob[host] = knob;                                        // the page sags this wagon and names the pick in red (H3)
-            st.refused_type[host] = type;
-            return;
-        }
+        int over = type >= 0 && chain_cost(host, slot, knob, type) > CEILING_CYCLES;
+        int was_on = w->coupled || held_off[host][slot][knob];
         remember(host, slot, knob, w);
         w->type = type;
         if (type >= 0) {
@@ -1129,6 +1158,12 @@ static void pick(int host, int knob, int delta) {
         st.pending_type[host][knob] = type;
         st.pending_since[host][knob] = (int)st.frames;
         if (knob == mirror[host][slot]) st.push_pending[host] = 1;
+        if (over) refuse(host, knob, type);
+        else if (st.refused_knob[host] == knob) st.flash_until[host] = (int)st.frames;   // this wagon's refusal is over: the red name goes at once
+        if (was_on) {
+            if (w->coupled != !over) couple(host, slot, knob, !over);
+            held_off[host][slot][knob] = (u8)over;
+        }
         ++st.picks;
         mark_dirty(host);
         return;
@@ -1152,14 +1187,17 @@ static void move_wagon(int host, int knob, int delta) {
     mark_dirty(host);
 }
 
+// A hold of the wagon's knob couples or uncouples it. Coupling a wagon that carries an effect is held to the ceiling
+// as a pick is: over it, the wagon stays uncoupled, nothing reaches stock's slot, and the refusal is shown.
+// Uncoupling and coupling an empty wagon always go through.
 static void set_coupled(int host, int knob, int coupled) {
     u32 slot = gui_slot(host);
     Wagon* w = &wagons[host][slot][knob];
-    w->coupled = coupled ? 1 : 0;
-    if (knob == mirror[host][slot]) {
-        WR8(HOST[host].fx_active + slot, w->coupled);
-        STOCK_SET_ACTIVE_DOC((void*)patch_record(host, slot), w->coupled);
+    if (coupled && !w->coupled && w->type >= 0 && w->type < TYPES && chain_cost(host, slot, knob, w->type) > CEILING_CYCLES) {
+        refuse(host, knob, w->type);
+        return;
     }
+    couple(host, slot, knob, coupled);
     mark_dirty(host);
 }
 
@@ -1751,6 +1789,7 @@ static void chain_from_values(int host, u32 slot, const int* values) {       // 
         }
         w->type = type;
         w->coupled = (u8)coupled;
+        held_off[host][slot][k] = 0;
         for (int i = 0; i < PARAMS; ++i) w->params[i] = type >= 0 ? word_of(clamp_param(host, slot, k, type, i, stored[i])) : 0;
     }
     int seen = 0;
@@ -2567,6 +2606,7 @@ static void chain_defaults(int host, u32 slot, void* doc, int dt) {
         Wagon* w = &wagons[host][slot][k];
         w->type = NONE;
         w->coupled = 1;
+        held_off[host][slot][k] = 0;
         for (int i = 0; i < PARAMS; ++i) w->params[i] = 0;
     }
     int knobs[WAGONS] = { 0, 1, 2, 3 };
@@ -2661,6 +2701,7 @@ static void reconcile(int host, u32 slot, const char* why) {
         remember(host, slot, m, mw);
         mw->type = dt;
         mw->coupled = doc_fx_active(doc);
+        held_off[host][slot][m] = 0;
         if (dt >= 0) doc_fx_params(doc, mw->params); else for (int i = 0; i < PARAMS; ++i) mw->params[i] = 0;
         dedupe(host, slot, m, dt);
         doc_type[host][slot] = dt;
@@ -2841,6 +2882,7 @@ static void frame_host(int host) {
                 ++st.follows;
                 STOCK_LOG(3, LOG_FILE, 9, "chain follow: %s s%u knob %d fx_active %d under the module, the wagon %s", host ? "drum" : "synth", slot, m, active, mw->coupled ? "coupled" : "uncoupled");
                 mw->coupled = active;
+                held_off[host][slot][m] = 0;
                 mark_dirty(host);
             }
         }
@@ -2861,8 +2903,8 @@ static void frame_host(int host) {
             if (st.press_shift[host][k]) reset_params(host, k);
             else {
                 ++st.holds;
-                int coupled = !wagons[host][slot][k].coupled;
-                set_coupled(host, k, coupled);
+                set_coupled(host, k, !wagons[host][slot][k].coupled);
+                int coupled = wagons[host][slot][k].coupled;                      // as it stands: a coupling over the ceiling is refused
                 int gap = st.press_ms[host][k] - st.last_turn_ms[host][k];         // H3b: every hold logged with the turn before it, for the read-out (H4b: in ms)
                 STOCK_LOG(3, LOG_FILE, 8, "chain hold: knob %d %s, the last turn %d ms before the press", k, coupled ? "coupled" : "uncoupled", gap > 99999 ? 99999 : gap);
             }
