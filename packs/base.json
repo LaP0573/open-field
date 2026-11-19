@@ -1,7 +1,7 @@
 {
   "about": "The base: the shared pack every other pack relies on, the file base.pack, which every unit with open-field needs. What the four features share (the frame hook, the audio wrapper, the picture loader that puts a screen's picture together on the unit, the disk mode's folders, the page both the effect train and the LFOs show on, the presets' screens, a line on the log for what a frame costs), and the interface for packs by anyone: a pack's card, read at levels 1 to 3 (docs/base.md). Its release, `release`, is what the start screen shows behind the words open-field. Not named on the start screen.",
   "name": "base",
-  "version": 17,
+  "version": 18,
   "release": "0.3",
   "interface": 2,
   "build": "build_m3_base",

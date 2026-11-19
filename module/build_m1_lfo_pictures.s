@@ -9,7 +9,7 @@
 .global op1f_art_lfo
 .type op1f_art_lfo, STT_OBJECT
 op1f_art_lfo:
-    .long 0x31545241, 3, 337582, 8
+    .long 0x31545241, 3, 338672, 9
     .ascii "lfo"
     .fill 13, 1, 0
 .global op1f_art_lfo_path
@@ -18,11 +18,11 @@ op1f_art_lfo_path:
     .fill 48, 1, 0
     .ascii "fxtrain.svg"
     .fill 13, 1, 0
-    .long 0, 322331, 0x975dbb0e    /* pictures/train/fxtrain.svg.make */
+    .long 0, 323421, 0x16ec7a2d    /* pictures/train/fxtrain.svg.make */
     .ascii "fxpresets.svg"
     .fill 11, 1, 0
-    .long 322331, 13403, 0x886c4296    /* pictures/train/fxpresets.svg.make */
+    .long 323421, 13403, 0x886c4296    /* pictures/train/fxpresets.svg.make */
     .ascii "fxsave.svg"
     .fill 14, 1, 0
-    .long 335734, 1848, 0x88ad9aec    /* pictures/train/fxsave.svg.make */
+    .long 336824, 1848, 0x88ad9aec    /* pictures/train/fxsave.svg.make */
 .size op1f_art_lfo, .-op1f_art_lfo

@@ -126,6 +126,7 @@
 #include "build_i_lfo4.h"
 #include "build_i_patch.h"
 #include "build_q_quiet.h"
+#include "op1f_wagon.h"
 
 typedef unsigned int u32;
 typedef unsigned short u16;
@@ -308,6 +309,40 @@ static const short DEFAULTS[TYPES][PARAMS] = {                                  
     { 500, 0, 10500, 16000, 0, 0, 0, 0 }, { 5000, 8192, 16384, 32767, 0, 0, 0, 0 }, { 16384, 16384, 16384, 11253, 0, 0, 0, 0 },
     { 18203, 13235, 8091, 32767, 0, 0, 0, 0 }, { 7802, 20560, 9322, 21695, 0, 0, 0, 0 } };
 
+// Wagons offered by other packs (op1f_wagon.h): each under an optional name of this list, one line a wagon. The ones
+// that are there are the types TYPES + their place in the list, at the end of every knob's list. The files keep such a
+// wagon by its name (wagon_code): an fx train that does not know it, or one whose pack is away, reads an empty wagon.
+extern "C" const Op1fWagon __attribute__((weak)) op1f_wagon_autotune asm("op1f_wagon_autotune");
+extern "C" const Op1fWagon __attribute__((weak)) op1f_wagon_juneaux asm("op1f_wagon_juneaux");
+extern "C" const Op1fWagon __attribute__((weak)) op1f_wagon_tape asm("op1f_wagon_tape");
+extern "C" const Op1fWagon __attribute__((weak)) op1f_wagon_gate asm("op1f_wagon_gate");
+extern "C" const Op1fWagon __attribute__((weak)) op1f_wagon_freeze asm("op1f_wagon_freeze");
+static const Op1fWagon* const OFFERED[] = { &op1f_wagon_autotune, &op1f_wagon_juneaux, &op1f_wagon_tape, &op1f_wagon_gate, &op1f_wagon_freeze };
+enum { PLUGS = sizeof(OFFERED) / sizeof(OFFERED[0]), ALL_TYPES = TYPES + PLUGS };
+
+static const Op1fWagon* wagon_of(int type) {                     // the offered wagon of a type, or 0 (a stock type, none, a pack away)
+    if (type < TYPES || type >= ALL_TYPES) return 0;
+    const Op1fWagon* w = OFFERED[type - TYPES];
+    return w && w->magic == OP1F_WAGON_MAGIC && (w->version == 1 || w->version == OP1F_WAGON_VERSION) && w->name && w->process && w->bytes <= REGION_BYTES ? w : 0;
+}
+
+static int wagon_code(const char* name) {                         // the name's first four characters as one integer: above every stock type
+    u32 c = 0;
+    for (int i = 0; i < 4; ++i) { c = c << 8 | (u8)*name; if (*name) ++name; }
+    return (int)c;
+}
+
+static int type_stored(int type) { const Op1fWagon* w = wagon_of(type); return w ? wagon_code(w->name) : type; }
+
+static int type_loaded(int value) {                               // a stored type: a stock one, an offered wagon's code, else none
+    if (value >= 0 && value < TYPES) return value;
+    for (int t = TYPES; t < ALL_TYPES; ++t) if (wagon_of(t) && wagon_code(wagon_of(t)->name) == value) return t;
+    return NONE;
+}
+
+static int default_param(int type, int i) { const Op1fWagon* w = wagon_of(type); return w ? w->defaults[i] : DEFAULTS[type][i]; }
+static u32 cost_of(int type) { const Op1fWagon* w = wagon_of(type); return w ? w->cost : (type >= 0 && type < TYPES ? COST_MAX[type] : 0u); }
+
 struct Wagon { i32 type; i32 coupled; u32 params[PARAMS]; };
 struct Stat { u32 sum, count, max; };
 struct Live {                                                  // a module-built instance, one per host and knob
@@ -362,8 +397,8 @@ static struct {                                                // H5: the list's
 } ls;
 static volatile u32 bus_peak[HOSTS];                           // H3: the instrument bus's largest sample since the frame last read it (the audio thread writes, the frame clears)
 static i32 stock_type_seen[HOSTS][SLOTS];                      // the slot's type word at the last look
-static u32 memory[HOSTS][SLOTS][WAGONS][TYPES][PARAMS];         // each wagon's parameters per effect it carried
-static u8 memory_set[HOSTS][SLOTS][WAGONS][TYPES];
+static u32 memory[HOSTS][SLOTS][WAGONS][ALL_TYPES][PARAMS];     // each wagon's parameters per effect it carried
+static u8 memory_set[HOSTS][SLOTS][WAGONS][ALL_TYPES];
 static Live live[HOSTS][WAGONS];
 static u8* region_pool;                                        // H4: the heap-0 block the regions are cut from (0 when refused)
 static int regions_ready;
@@ -457,7 +492,7 @@ static char* put_u32(char* p, u32 v) {
 
 static const char* fx_name(int type) {
     if (type < 0) return "none";
-    if (type >= TYPES) return "?";
+    if (type >= TYPES) return wagon_of(type) ? wagon_of(type)->name : "?";
     return *(const char* const*)(FX_NAME_TABLE + 8u * (u32)type);
 }
 
@@ -485,7 +520,29 @@ static int conflicts(int a, int b) {                            // the H1 rule: 
 
 // ---------------------------------------------------------------- the instances
 
-static void construct(void* storage, int type) {
+// An offered wagon's instance, in the shape the run calls every instance: a table whose [2] is process and [3] init,
+// then the wagon and its state (the Live's region).
+static void plug_process(void* obj, int* left, int* right, void* ctx) {
+    u32* o = (u32*)obj;
+    ((const Op1fWagon*)o[1])->process((void*)o[2], left, right, (const volatile unsigned*)ctx);
+}
+
+static void plug_init(void* obj, int) {
+    u32* o = (u32*)obj;
+    const Op1fWagon* w = (const Op1fWagon*)o[1];
+    if (w->init) w->init((void*)o[2]);
+}
+
+static const struct { void* none[2]; ProcessFn process; InitFn init; } PLUG_TABLE = { { 0, 0 }, plug_process, plug_init };
+
+static void construct(void* storage, int type, u8* region) {
+    if (const Op1fWagon* w = wagon_of(type)) {
+        u32* o = (u32*)storage;
+        o[0] = (u32)&PLUG_TABLE;
+        o[1] = (u32)w;
+        o[2] = (u32)region;
+        return;
+    }
     if (type == TYPE_TERMINAL) {                               // the factory's own sequence (producer_factory.cpp)
         u8* b = (u8*)storage;
         *(u32*)b = 0x840ae684u;
@@ -499,7 +556,7 @@ static void construct(void* storage, int type) {
     ((CtorFn)CTOR[type])(storage);
 }
 
-static int buildable(int type) { return type >= 0 && type < TYPES && (CTOR[type] != 0 || type == TYPE_TERMINAL); }
+static int buildable(int type) { return type >= 0 && (type < TYPES ? CTOR[type] != 0 || type == TYPE_TERMINAL : wagon_of(type) && regions_ready); }
 
 // Builds the wagon's instance of `type` in the spare buffer and publishes it; anything else unpublishes. H4: an
 // instance whose type keeps state outside its object gets the Live's private region first (cleared over the bytes the
@@ -519,10 +576,11 @@ static void build_live(int host, int knob, int type) {
         l->type = NONE;                                            // the pending type differs from NONE: the caller comes back next frame
         return;
     }
-    int kind = regions_ready ? STATE_KIND[type] : STATE_NONE;
-    if (kind != STATE_NONE) {
+    int kind = regions_ready && type < TYPES ? STATE_KIND[type] : STATE_NONE;
+    const Op1fWagon* plug = wagon_of(type);
+    if (kind != STATE_NONE || plug) {                              // an offered wagon's state is its region, cleared over the bytes it asked for
         u32* r = (u32*)l->region;
-        u32 words = REGION_USED[type] / 4;
+        u32 words = (plug ? plug->bytes + 3u : REGION_USED[type]) / 4;
         for (u32 i = 0; i < words; ++i) r[i] = 0;
         if (kind == STATE_BASE_MOTHER) ((RegionCtorFn)MOTHER_REGION_CTOR)(l->region);
         for (int i = 0; i < NITRO_STATIC_WORDS; ++i) l->nitro_state[i] = 0;
@@ -530,7 +588,7 @@ static void build_live(int host, int knob, int type) {
     u32 which = l->which ^ 1u;
     u32* buf = l->buf[which];
     for (int i = 0; i < OBJECT_BYTES / 4; ++i) buf[i] = 0;
-    construct(buf, type);
+    construct(buf, type, l->region);
     u32* vtable = *(u32**)buf;
     ((InitFn)vtable[3])(buf, 0);
     l->which = which;
@@ -975,7 +1033,7 @@ extern "C" void op1f_fx_chain_run(int host) {
 // ---------------------------------------------------------------- the wagons' values
 
 static void params_default(int type, u32* out) {
-    for (int i = 0; i < PARAMS; ++i) out[i] = type >= 0 ? word_of(DEFAULTS[type][i]) : 0;
+    for (int i = 0; i < PARAMS; ++i) out[i] = type >= 0 ? word_of(default_param(type, i)) : 0;
 }
 
 static void remember(int host, u32 slot, int knob, const Wagon* w) {
@@ -1082,7 +1140,7 @@ static u32 chain_cost(int host, u32 slot, int except_knob, int with_type) {
         const Wagon* w = &wagons[host][slot][k];
         int type = (k == except_knob) ? with_type : w->type;
         int coupled = (k == except_knob) ? 1 : w->coupled;
-        if (type >= 0 && type < TYPES && coupled) sum += COST_MAX[type];
+        if (type >= 0 && coupled) sum += cost_of(type);
     }
     return sum;
 }
@@ -1093,8 +1151,10 @@ static int type_in_use(int host, u32 slot, int type, int except_knob) {
     return 0;
 }
 
+static int order_type(int i) { return i < KNOB_ORDER_COUNT ? KNOB_ORDER[i] : TYPES + (i - KNOB_ORDER_COUNT); }   // the offered wagons after stock's list
+
 static int order_index_of(int type) {
-    for (int i = 0; i < KNOB_ORDER_COUNT; ++i) if (KNOB_ORDER[i] == type) return i;
+    for (int i = 0; i < KNOB_ORDER_COUNT + PLUGS; ++i) if (order_type(i) == type) return i;
     return 0;
 }
 
@@ -1106,10 +1166,11 @@ static void pick(int host, int knob, int delta) {
     Wagon* w = &wagons[host][slot][knob];
     int index = order_index_of(w->type);
     int step = delta > 0 ? 1 : -1;
-    for (int tries = 0; tries < KNOB_ORDER_COUNT; ++tries) {
+    for (int tries = 0; tries < KNOB_ORDER_COUNT + PLUGS; ++tries) {
         index += step;
-        if (index < 0 || index >= KNOB_ORDER_COUNT) return;                 // the ends of the list
-        int type = KNOB_ORDER[index];
+        if (index < 0 || index >= KNOB_ORDER_COUNT + PLUGS) return;         // the ends of the list
+        int type = order_type(index);
+        if (type >= TYPES && (!buildable(type) || knob == mirror[host][slot])) continue;   // an offered wagon that is there, never under the lamp
         if (type >= 0 && type_in_use(host, slot, type, knob)) continue;
         if (type >= 0 && chain_cost(host, slot, knob, type) > CEILING_CYCLES) {
             ++st.refusals;
@@ -1185,7 +1246,7 @@ static void apply_params(int host, int knob) {
 static void randomize(int host, int knob) {
     u32 slot = gui_slot(host);
     Wagon* w = &wagons[host][slot][knob];
-    if (w->type < 0) return;
+    if (w->type < 0 || w->type >= TYPES) return;                            // stock's random values are for stock's effects
     for (int i = 0; i < PARAMS; ++i) {
         int value = i < 4 ? (int)(short)STOCK_RANDOM_PARAM(w->type, i, 0) : DEFAULTS[w->type][i];
         w->params[i] = word_of(value);
@@ -1206,6 +1267,14 @@ static void reset_params(int host, int knob) {
 // The tap: the wagon becomes the mirror and stock shows its page (the browser for an empty wagon).
 static void open_wagon_page(void* self, int host, int knob) {
     u32 slot = gui_slot(host);
+    if (const Op1fWagon* plug = wagon_of(wagons[host][slot][knob].type)) {   // an offered wagon: its own page, the lamp stays
+        if (plug->page) {
+            st.train_open[host] = 0;
+            ++st.page_opens;
+            plug->page(wagons[host][slot][knob].params);
+        }
+        return;
+    }
     int old = mirror[host][slot];
     if (old != knob) {
         mirror[host][slot] = (u8)knob;
@@ -1693,7 +1762,7 @@ static void chain_values(int host, u32 slot, int* values) {                // CH
     for (int p = 0; p < WAGONS; ++p) values[n++] = knob_at(host, slot, p);
     for (int k = 0; k < WAGONS; ++k) {
         const Wagon* w = &wagons[host][slot][k];
-        values[n++] = w->type;
+        values[n++] = type_stored(w->type);                                   // an offered wagon by its name
         values[n++] = w->coupled;
         for (int i = 0; i < PARAMS; ++i) values[n++] = int_of(w->params[i]);
     }
@@ -1714,7 +1783,7 @@ static int ghost_delay(int type, int coupled, const int* params) {
 // initialiser, and a knob turn clamps to them; a delay time above 11264 crashed the delay in H1b). The four knob
 // parameters only: the other four words are not a knob's. An entry not filled (the image has 0, 0 there) holds nothing.
 static int clamp_param(int host, u32 slot, int knob, int type, int i, int value) {
-    if (i >= 4) return value;
+    if (i >= 4 || type >= TYPES) return value;
     u32 e = FX_DESCRIPTORS + 48u * (u32)type + 6u * (u32)i;
     int lo = (int)(short)RD16(e), hi = (int)(short)RD16(e + 2u);
     if (hi <= lo || (value >= lo && value <= hi)) return value;
@@ -1739,7 +1808,7 @@ static void chain_from_values(int host, u32 slot, const int* values) {       // 
         int coupled = values[n++] ? 1 : 0;
         const int* stored = values + n;
         n += PARAMS;
-        type = (type >= 0 && type < TYPES) ? type : NONE;
+        type = type_loaded(type);
         if (ghost_delay(type, coupled, stored)) {                           // H6j
             type = NONE;
             coupled = 1;
@@ -1760,6 +1829,9 @@ static void chain_from_values(int host, u32 slot, const int* values) {       // 
     u32 parked = (u32)values[CHAIN_INTS] & 0xfu;                            // H3's bypass parked these: back on the line (H5 has no bypass key)
     if (parked) for (int k = 0; k < WAGONS; ++k) if ((parked & (1u << k)) && wagons[host][slot][k].type >= 0) wagons[host][slot][k].coupled = 1;
     bypass_mask[host][slot] = 0;
+    for (int p = 0; p < WAGONS && wagon_of(wagons[host][slot][mirror[host][slot]].type); ++p)   // the lamp off an offered wagon, onto the first that can carry it
+        if (!wagon_of(wagons[host][slot][knob_at(host, slot, p)].type)) mirror[host][slot] = (u8)knob_at(host, slot, p);
+    if (wagon_of(wagons[host][slot][mirror[host][slot]].type)) wagons[host][slot][mirror[host][slot]].type = NONE;   // four of them: the lamp's is emptied
 }
 
 static void load_file() {
@@ -2001,7 +2073,7 @@ static int json_fx_type(void* entry) {
     if (!entry || *((u8*)entry + 4) != JSON_STRING_KIND) return NONE;
     char name[16];
     json_text(entry, name, 15);
-    for (int type = 0; type < TYPES; ++type) if (text_equal(name, fx_name(type))) return type;
+    for (int type = 0; type < ALL_TYPES; ++type) if ((type < TYPES || wagon_of(type)) && text_equal(name, fx_name(type))) return type;
     return NONE;
 }
 
@@ -2063,7 +2135,7 @@ static int fx_write_slot(int slot) {
         for (int k = 0; k < WAGONS; ++k) {
             const int* wv = v + 3 + WAGONS + k * (2 + PARAMS);
             STOCK_JSON_CTOR(&w, JSON_OBJECT_KIND);
-            set_text(&w, KEY_FX, wv[0] >= 0 && wv[0] < TYPES ? fx_name(wv[0]) : "none");
+            set_text(&w, KEY_FX, fx_name(type_loaded(wv[0])));
             set_bool(&w, KEY_ON, wv[1]);
             set_ints(&w, KEY_PARAMS, wv + 2, PARAMS);
             STOCK_JSON_PUSH(&wagons, &w);
@@ -2121,10 +2193,10 @@ static void fx_read_slot(int slot) {
                     if (STOCK_JSON_HAS(w, KEY_FX)) type = json_fx_type(STOCK_JSON_GET(w, KEY_FX));
                     if (STOCK_JSON_HAS(w, KEY_ON)) on = json_truth(STOCK_JSON_GET(w, KEY_ON));
                 }
-                wv[0] = type;
+                wv[0] = type_stored(type);
                 wv[1] = type >= 0 ? (on ? 1 : 0) : 1;                          // H6j: an empty wagon is coupled, as a fresh chain's: a later pick sounds at once
                 if (type >= 0) {
-                    for (int i = 0; i < PARAMS; ++i) wv[2 + i] = DEFAULTS[type][i];
+                    for (int i = 0; i < PARAMS; ++i) wv[2 + i] = default_param(type, i);
                     if (STOCK_JSON_HAS(w, KEY_PARAMS)) {
                         void* params = STOCK_JSON_GET(w, KEY_PARAMS);
                         if (is_array(params)) {
@@ -2284,7 +2356,7 @@ static void preset_load(int host, int row) {
     if (wagons[host][slot][mirror[host][slot]].type < 0) {                        // H6g: a file whose wagons leave the mirrored knob empty (a two- or three-effect chain made on the PC fills the
         for (int p = 0; p < WAGONS; ++p) {                                        // blue, ochre and grey knobs): the mirror moves to the first effect in signal order, so stock's page shows an
             int k = knob_at(host, slot, p);                                        // effect of the chain, on, instead of the previous effect switched off (the owner's first listen)
-            if (wagons[host][slot][k].type >= 0) { moved_from = mirror[host][slot]; mirror[host][slot] = (u8)k; ++ls.mirror_moves; break; }
+            if (wagons[host][slot][k].type >= 0 && !wagon_of(wagons[host][slot][k].type)) { moved_from = mirror[host][slot]; mirror[host][slot] = (u8)k; ++ls.mirror_moves; break; }
         }
     }
     st.push_pending[host] = 0;
@@ -2507,10 +2579,10 @@ extern "C" void op1f_presets_view(int host, Op1fPresetsView* out) {
     }
     const int* v = presets.count ? presets.values[presets.order[ls.cursor[host] < presets.count ? ls.cursor[host] : 0]] : 0;
     for (int k = 0; k < WAGONS; ++k) {
-        int type = v ? v[3 + WAGONS + k * (2 + PARAMS)] : NONE;
+        int type = v ? type_loaded(v[3 + WAGONS + k * (2 + PARAMS)]) : NONE;
         int coupled = v ? v[3 + WAGONS + k * (2 + PARAMS) + 1] : 1;
         char* p = ls.wagon_text[k];
-        if (type >= 0 && type < TYPES) {
+        if (type >= 0) {
             p = put_text(p, fx_name(type));                                    // stock's own lowercase names
             if (!coupled) p = put_text(p, " off");
         } else {
@@ -2750,6 +2822,14 @@ extern "C" void op1f_chain_instrument(int host, int slot) {
 
 // ---------------------------------------------------------------- the frame
 
+// An offered wagon's name for the train's label (build_h_train.cpp), or 0 for a stock type and none.
+extern "C" const char* op1f_chain_wagon_name(int type) asm("op1f_chain_wagon_name");
+extern "C" const char* op1f_chain_wagon_name(int type) { return wagon_of(type) ? wagon_of(type)->name : 0; }
+
+// Its picture for the train (version 2), or 0: build_h_train.cpp asks once, when it makes the train's picture.
+extern "C" const char* op1f_chain_wagon_art(int type) asm("op1f_chain_wagon_art");
+extern "C" const char* op1f_chain_wagon_art(int type) { const Op1fWagon* w = wagon_of(type); return w && w->version >= 2 ? w->art : 0; }
+
 // The page's view of the chain (H2): build_h_train.cpp dresses the train screen from it every frame.
 extern "C" void op1f_chain_view(int host, Op1fChainView* out) {
     u32 slot = gui_slot(host);
@@ -2853,6 +2933,14 @@ static void frame_host(int host) {
             build_live(host, k, type);
             for (int i = 0; i < PARAMS; ++i) live[host][k].ctx[i] = wagons[host][slot][k].params[i];
         }
+    }
+    // an offered wagon's page writes its values into the wagon (the key thread): the instance follows, and the file
+    for (int k = 0; k < WAGONS; ++k) {
+        Wagon* w = &wagons[host][slot][k];
+        if (k == m || !wagon_of(w->type) || live[host][k].type != w->type) continue;
+        int changed = 0;
+        for (int i = 0; i < PARAMS; ++i) if (live[host][k].ctx[i] != w->params[i]) { live[host][k].ctx[i] = w->params[i]; changed = 1; }
+        if (changed) mark_dirty(host);
     }
     // the holds
     for (int k = 0; k < WAGONS; ++k) {

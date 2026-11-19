@@ -13,7 +13,7 @@ struct Op1fChainView {
     int known;                             // the current slot's chain is the module's own (initialised)
     int slot;                              // the GUI's current sound slot
     int order[OP1F_CHAIN_WAGONS];          // the knob (0..3) at each position, left to right
-    int type[OP1F_CHAIN_WAGONS];           // per knob: the wagon's effect type (0..10, the firmware's enumeration) or -1 for none
+    int type[OP1F_CHAIN_WAGONS];           // per knob: the wagon's effect type (0..10, the firmware's enumeration; 11 and up a wagon of another pack, op1f_chain_wagon_name) or -1 for none
     int coupled[OP1F_CHAIN_WAGONS];        // per knob: the effect runs (a wagon on the line); 0 on the siding
     int mirror;                            // the knob whose wagon stock's slot shows (T3 opens its page; the lamp)
     int full;                              // the refusal flash is on (a pick over the ceiling)

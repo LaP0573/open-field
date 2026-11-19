@@ -583,6 +583,72 @@ static char* __attribute__((noinline)) make2(const char* name, const ArtDir* dir
 }
 
 // A pack's instructions, read and checked by from_file: the picture made, parsed, and both buffers given back.
+// The drawings of other packs' wagons (module/op1f_wagon.h), added to the train's picture for build_h_train.cpp: each
+// four times as it is and four times dim (every colour the dim grey, the near-black fills black), as the groups
+// fxpcar<i>_<copy> and fxpdim<i>_<copy>, just before the lamp so that they stand where the train's own characters
+// stand. Only while op1f_svg_train asks; a picture without the lamp is left as it is.
+static const char* const* wagon_art;
+static u32 wagon_arts;
+static const char WAGON_ANCHOR[] = "<g id=\"fxlamp\"";
+
+static u32 text_length(const char* t) { u32 n = 0; while (t[n]) ++n; return n; }
+
+// A drawing with an arc in a path is left out: the firmware's reader of pictures has no arcs, and one hangs the unit
+// at the start (docs/base.md, "What a picture may hold"). Only the path data is looked at: d="..." with an A or a.
+static int has_arc(const char* t) {
+    for (; *t; ++t) {
+        if (t[0] != ' ' || t[1] != 'd' || t[2] != '=' || t[3] != '"') continue;
+        for (t += 4; *t && *t != '"'; ++t) if (*t == 'A' || *t == 'a') return 1;
+        if (!*t) return 0;
+    }
+    return 0;
+}
+
+static char* put_group(char* p, const char* kind, u32 i, u32 copy, const char* art, int dim) {
+    const char* h = "<g id=\"fxp";
+    while (*h) *p++ = *h++;
+    while (*kind) *p++ = *kind++;
+    *p++ = (char)('0' + i); *p++ = '_'; *p++ = (char)('0' + copy); *p++ = '"'; *p++ = '>';
+    for (const char* a = art; *a; ++a) {
+        if (dim && a[0] == '#' && a[1] && a[2] && a[3] && a[4] && a[5] && a[6]) {   // #rrggbb: near-black stays black, the rest dim grey
+            const int dark = a[1] == '0' && (a[2] == '0' || a[2] == 'E' || a[2] == 'e');
+            const char* c = dark ? "#000005" : "#5B6670";
+            for (int k = 0; k < 7; ++k) *p++ = c[k];
+            a += 6;
+            continue;
+        }
+        *p++ = *a;
+    }
+    *p++ = '<'; *p++ = '/'; *p++ = 'g'; *p++ = '>';
+    return p;
+}
+
+static char* with_wagons(char* text, u32* length) {
+    if (wagon_arts == 0) return text;
+    char* at = 0;
+    for (char* p = text; *p && !at; ++p) {
+        u32 k = 0;
+        while (WAGON_ANCHOR[k] && p[k] == WAGON_ANCHOR[k]) ++k;
+        if (!WAGON_ANCHOR[k]) at = p;
+    }
+    if (at == 0) return text;
+    u32 extra = 0;
+    for (u32 i = 0; i < wagon_arts; ++i) if (wagon_art[i] && !has_arc(wagon_art[i])) extra += 8u * (text_length(wagon_art[i]) + 24u);
+    char* out = (char*)STOCK_ALLOC(*length + extra + 1);
+    if (out == 0) return text;
+    char* p = out;
+    for (char* q = text; q < at; ++q) *p++ = *q;
+    for (u32 i = 0; i < wagon_arts; ++i) {
+        if (!wagon_art[i] || has_arc(wagon_art[i])) continue;
+        for (u32 c = 0; c < 4; ++c) p = put_group(p, "car", i, c, wagon_art[i], 0);
+        for (u32 c = 0; c < 4; ++c) p = put_group(p, "dim", i, c, wagon_art[i], 1);
+    }
+    for (char* q = at; q < text + *length; ++q) *p++ = *q;
+    STOCK_FREE(text);
+    *length = (u32)(p - out);
+    return out;
+}
+
 static void* made_from(const char* name, const ArtDir* dir, const ArtEntry* e, char* text, u32 started, int kind) {
     u32 length = 0, own = 0, taken = 1;
     char* picture = kind == 2 ? make2(name, dir, text, e->bytes, &length, &own, &taken) : make(name, dir, text, e->bytes, &length, &own);
@@ -590,6 +656,7 @@ static void* made_from(const char* name, const ArtDir* dir, const ArtEntry* e, c
     if (picture == 0) return 0;
     u32 made_cycles = cycles() - started;
     picture[length] = 0;
+    picture = with_wagons(picture, &length);
     void* document = STOCK_PARSE_SVG(picture);
     STOCK_FREE(picture);
     if (document == 0) return refused(name, dir, "the picture made here did not parse", length, own);
@@ -643,6 +710,8 @@ static void* from_file(const char* name, const ArtDir* dir, const ArtEntry* e) {
     if (kind) return made_from(name, dir, e, buffer, started, kind);                           // P1, P2: the picture is made here
     u32 read_cycles = cycles() - started;
     buffer[e->bytes] = 0;
+    u32 length = e->bytes;
+    buffer = with_wagons(buffer, &length);
     void* document = STOCK_PARSE_SVG(buffer);
     STOCK_FREE(buffer);
     if (document == 0) return refused(name, dir, "it did not parse", e->bytes, 0);
@@ -683,6 +752,16 @@ extern "C" void* op1f_svg_embedded(const char* name) {
     }
     if (found) return from_file(name, dir, entry);
     return 0;
+}
+
+// The train's picture with the wagons of other packs drawn in (up to ten; 0 for one without a drawing). Display thread.
+extern "C" void* op1f_svg_train(const char* const* arts, u32 count) asm("op1f_svg_train");
+extern "C" void* op1f_svg_train(const char* const* arts, u32 count) {
+    wagon_art = arts;
+    wagon_arts = count > 10 ? 10 : count;
+    void* document = op1f_svg_embedded("fxtrain.svg");
+    wagon_arts = 0;
+    return document;
 }
 
 // Step M1: a pack's own picture, for a page of its own. It is looked for in the directory of that card's pack alone

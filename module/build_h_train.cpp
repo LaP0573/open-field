@@ -73,6 +73,8 @@ typedef void* (*FindNodeFn)(void* screen, const char* id, int optional);   // 0x
 typedef void (*ApplyMatrixFn)(void* node, const u32* matrix);               // 0x8c03dbbe
 typedef int (*ShiftFn)();                                                   // 0x8fc24ca4: non-zero while shift is held
 typedef int (*ScreenIdFn)(void* self);                                      // the controllers' screen-id virtuals
+typedef void* (*LabelFromNodeFn)(void* screen, void* node, int kind);       // 0x8fc25abc: the node replaced by a label object (build_h_presets.cpp)
+typedef void (*LabelTextFn)(void* label, const char* text, int max_width); // 0x8fc3aa3c: the label's text laid out
 
 #define STOCK_LOG ((LogFn)0x8c053a20u)
 #define STOCK_SCREEN_CTOR ((ScreenCtorFn)0x8fc26398u)
@@ -81,6 +83,8 @@ typedef int (*ScreenIdFn)(void* self);                                      // t
 #define STOCK_SHIFT ((ShiftFn)0x8fc24ca4u)
 #define STOCK_SYNTH_SCREEN_ID ((ScreenIdFn)0x8c0d5b24u)
 #define STOCK_DRUM_SCREEN_ID ((ScreenIdFn)0x8c0b6d3cu)
+#define STOCK_LABEL_FROM_NODE ((LabelFromNodeFn)0x8fc25abcu)
+#define STOCK_LABEL_TEXT ((LabelTextFn)0x8fc3aa3cu)
 #define RD32(a) (*(volatile u32*)(a))
 
 // I6 (analysis/lfo_train_study.md section 18): the LFO train on T4 is this screen with other cargo; build_i_lfo4.cpp says what its wagons carry
@@ -95,6 +99,9 @@ extern "C" int __attribute__((weak)) op1f_lfopresets_screen_wanted() asm("op1f_l
 extern "C" void __attribute__((weak)) op1f_chain_view(int host, Op1fChainView* out) asm("op1f_chain_view");
 extern "C" int __attribute__((weak)) op1f_chain_train_open(int host) asm("op1f_chain_train_open");
 extern "C" int __attribute__((weak)) op1f_chain_screen_wanted(int host) asm("op1f_chain_screen_wanted");
+extern "C" const char* __attribute__((weak)) op1f_chain_wagon_name(int type) asm("op1f_chain_wagon_name");   // a wagon of another pack (module/op1f_wagon.h): its name, for its label
+extern "C" const char* __attribute__((weak)) op1f_chain_wagon_art(int type) asm("op1f_chain_wagon_art");     // and its drawing, or 0
+extern "C" void* op1f_svg_train(const char* const* arts, u32 count) asm("op1f_svg_train");                    // build_m3_art.cpp: the train's picture with those drawings
 
 static const char LOG_FILE[] = "../src/main/op1f_train.cpp";
 static const u32 MODE_GUI = 0x84d21088u;
@@ -158,6 +165,16 @@ static u8* n_car_none[COPIES];
 static u8* n_dim[TYPES][COPIES];
 static u8* n_label[CARGOS][LABEL_VARIANTS];        // the four knob colours, their dark steps (a parked wagon's), red
 static u8* n_label_none;
+// A wagon of another pack has no drawn label: its name is a label object made from a placeholder, one a knob in the
+// knob's colour and one in its dark step (parked), drawn right of the screen (an older base leaves them there) and
+// moved onto the wagon, where the drawn labels stand (x 10). Its drawing, when it has one, is added to the picture
+// four times lit and four times dim (op1f_svg_train), and handed out as a stock character's copies are.
+enum { PLUG_DX = -490, PLUG_ARTS = 10 };
+static u8* n_plug[WAGONS][2];
+static void* l_plug[WAGONS][2];
+static const char* plug_text[WAGONS][2];
+static u8* n_pcar[PLUG_ARTS][COPIES];
+static u8* n_pdim[PLUG_ARTS][COPIES];
 static u8* n_siding[WAGONS];
 static u8* n_sag[WAGONS];
 static u8* n_link[WAGONS];
@@ -356,6 +373,20 @@ static void find_nodes() {
         n_weed[c] = find_copy(s, "fxweed", 0, -1, 0, c);
     }
     n_label_none = find(s, "fxlabel_none_dim");
+    for (int k = 0; k < WAGONS; ++k) {
+        for (int d = 0; d < 2; ++d) {
+            n_plug[k][d] = find_fmt(s, "fxplug", 0, k + 1, d ? "d" : 0);
+            u8* t = find_fmt(s, "fxplug", 0, k + 1, d ? "dt" : "t");
+            l_plug[k][d] = t ? STOCK_LABEL_FROM_NODE(s, t, 0) : 0;
+        }
+    }
+    for (int i = 0; i < PLUG_ARTS; ++i)
+        for (int c = 0; c < COPIES; ++c) {
+            char id[12] = { 'f', 'x', 'p', 'c', 'a', 'r', (char)('0' + i), '_', (char)('0' + c), 0 };
+            n_pcar[i][c] = (u8*)STOCK_FIND_NODE(s, id, 1);
+            id[3] = 'd'; id[4] = 'i'; id[5] = 'm';
+            n_pdim[i][c] = (u8*)STOCK_FIND_NODE(s, id, 1);
+        }
     n_lamp = find(s, "fxlamp");
     n_beam = find(s, "fxbeam");
     n_smoke = find(s, "fxsmoke");
@@ -406,8 +437,9 @@ static void find_nodes() {
 static void hide_wagons() {
     for (int k = 0; k < WAGONS; ++k) {
         show(n_chassis[k], 0); show(n_chassisdim[k], 0); show(n_chassissq[k], 0); show(n_siding[k], 0); show(n_sag[k], 0);
-        show(n_link[k], 0); show(n_hint[k], 0);
+        show(n_link[k], 0); show(n_hint[k], 0); show(n_plug[k][0], 0); show(n_plug[k][1], 0);
     }
+    for (int i = 0; i < PLUG_ARTS; ++i) for (int c = 0; c < COPIES; ++c) { show(n_pcar[i][c], 0); show(n_pdim[i][c], 0); }
     for (int c = 0; c < COPIES; ++c) show(n_car_none[c], 0);
     for (int t = 0; t < CARGOS; ++t) {
         for (int c = 0; t < TYPES && c < COPIES; ++c) { show(n_car[t][c], 0); show(n_dim[t][c], 0); }
@@ -431,7 +463,11 @@ static void build_screen() {
     if (screen_built || screen_failed) return;
     for (int i = 0; i < 16; ++i) screen_object[i] = 0;
     STOCK_SCREEN_CTOR(screen_object, TRAIN_SCREEN_ID, 0);          // registered at once; the slot is free in 1.7.0 ("ignoring screen 77" at every boot)
-    void* document = op1f_svg_embedded("fxtrain.svg");
+    const char* arts[PLUG_ARTS];                                    // other packs' wagons drawn in; a drawing that does not parse leaves the picture as it was
+    u32 drawn = 0;
+    for (int i = 0; i < PLUG_ARTS; ++i) { arts[i] = &op1f_chain_wagon_art != 0 ? op1f_chain_wagon_art(TYPES + i) : 0; if (arts[i]) drawn = (u32)i + 1; }
+    void* document = drawn ? op1f_svg_train(arts, drawn) : 0;
+    if (document == 0) document = op1f_svg_embedded("fxtrain.svg");
     if (document == 0) {                                            // the screen stays registered with no document: the base render draws nothing for it
         screen_failed = 1;
         STOCK_LOG(1, LOG_FILE, 1, "train art: fxtrain.svg did not parse, the train stays off (T3 runs stock)");
@@ -834,7 +870,8 @@ static void dress(int host, const Op1fChainView& v, int running) {
     int shown_car[CARGOS][COPIES], shown_dim[CARGOS][COPIES], shown_none[COPIES], used[CARGOS], used_none = 0;   // H4: a type's copies handed out in position order
     for (int t = 0; t < CARGOS; ++t) { used[t] = 0; for (int c = 0; c < COPIES; ++c) { shown_car[t][c] = 0; shown_dim[t][c] = 0; } }
     for (int c = 0; c < COPIES; ++c) shown_none[c] = 0;
-    int shown_none_label = 0, links = 0, lamp_placed = 0;
+    int shown_none_label = 0, links = 0, lamp_placed = 0, shown_plug = 0, used_plug[PLUG_ARTS], shown_pcar[PLUG_ARTS][COPIES][2];
+    for (int i = 0; i < PLUG_ARTS; ++i) { used_plug[i] = 0; for (int c = 0; c < COPIES; ++c) shown_pcar[i][c][0] = shown_pcar[i][c][1] = 0; }
     if (!positions_seeded) {                                                       // the first frame starts the wagons where they stand
         for (int p = 0; p < WAGONS; ++p) { int k = v.order[p] & 3; ax[k] = (FIRST_X + PITCH * p) * Q; ay[k] = 0; last_target_x[k] = FIRST_X + PITCH * p; }
         positions_seeded = 1;
@@ -845,7 +882,8 @@ static void dress(int host, const Op1fChainView& v, int running) {
         int k = v.order[p] & 3;
         int t = v.type[k];
         int has = t >= 0 && t < TYPES;
-        int off = has && !v.coupled[k];
+        const char* plug = !has && t >= 0 && &op1f_chain_wagon_name != 0 ? op1f_chain_wagon_name(t) : 0;
+        int off = (has || plug) && !v.coupled[k];
         int refused = v.full && v.refused_knob == k && v.refused_type >= 0 && v.refused_type < TYPES;
         i32 target_x = FIRST_X + PITCH * p;
         i32 target_y = off ? SIDING_DY : (refused ? SAG_DY : 0);
@@ -876,10 +914,15 @@ static void dress(int host, const Op1fChainView& v, int running) {
             rotate_about(n_wheeld[k][w], wheel_deg, cx_q, WHEEL_Y_Q, 0, 0);
         }
         // the character: the effect's, dim on the siding, the tumbleweed on an empty wagon
+        int art = plug && t - TYPES < PLUG_ARTS && n_pcar[t - TYPES][0] ? t - TYPES : -1;   // another pack's wagon with a drawing
         if (has) {
             int c = used[t] < COPIES ? used[t]++ : COPIES - 1;
             if (off) { place(n_dim[t][c], x, y); shown_dim[t][c] = 1; }
             else { place(n_car[t][c], x, y); shown_car[t][c] = 1; }
+        } else if (art >= 0) {
+            int c = used_plug[art] < COPIES ? used_plug[art]++ : COPIES - 1;
+            place(off ? n_pdim[art][c] : n_pcar[art][c], x, y);
+            shown_pcar[art][c][off] = 1;
         } else {
             int c = used_none < COPIES ? used_none++ : COPIES - 1;
             place(n_car_none[c], x, y);
@@ -893,6 +936,10 @@ static void dress(int host, const Op1fChainView& v, int running) {
             int colour = off ? LABEL_DARK0 + k : k;
             place(n_label[t][colour], x, hop_q);
             shown_label[t][colour] = 1;
+        } else if (plug && l_plug[k][off]) {
+            if (plug != plug_text[k][off]) { STOCK_LABEL_TEXT(l_plug[k][off], plug, WAGON_W); plug_text[k][off] = plug; }
+            place(n_plug[k][off], x + PLUG_DX * Q, hop_q);
+            shown_plug |= 1 << (2 * k + off);
         } else {
             place(n_label_none, x, hop_q);
             shown_none_label = 1;
@@ -918,6 +965,8 @@ static void dress(int host, const Op1fChainView& v, int running) {
         for (int c = 0; c < LABEL_VARIANTS; ++c) show(n_label[t][c], shown_label[t][c]);
     }
     show(n_label_none, shown_none_label);
+    for (int k = 0; k < WAGONS; ++k) for (int d = 0; d < 2; ++d) show(n_plug[k][d], (shown_plug >> (2 * k + d)) & 1);
+    for (int i = 0; i < PLUG_ARTS; ++i) for (int c = 0; c < COPIES; ++c) { show(n_pcar[i][c], shown_pcar[i][c][0]); show(n_pdim[i][c], shown_pcar[i][c][1]); }
     show(n_lamp, lamp_placed);
     // the dial: the needle from the stop at the left (0 %) to the stop at the right (100 % of the ceiling)
     int pct = v.cost_percent < 0 ? 0 : (v.cost_percent > 100 ? 100 : v.cost_percent);
@@ -929,7 +978,7 @@ static void dress(int host, const Op1fChainView& v, int running) {
     show(n_needle, !v.full);
     show(n_needlered, v.full);
     show(n_full, v.full);
-    dress_card(v.turn_knob, v.turn_age, v.turn_knob >= 0 && v.turn_knob < WAGONS && v.type[v.turn_knob] >= 0 && v.type[v.turn_knob] < TYPES ? v.type[v.turn_knob] : NONE_INDEX);
+    dress_card(v.turn_knob, v.turn_age, v.turn_knob >= 0 && v.turn_knob < WAGONS && v.type[v.turn_knob] >= TYPES ? -1 : v.turn_knob >= 0 && v.turn_knob < WAGONS && v.type[v.turn_knob] >= 0 ? v.type[v.turn_knob] : NONE_INDEX);   // another pack's wagon: the card without a value
     dress_world(running);
     dress_characters();
 }
