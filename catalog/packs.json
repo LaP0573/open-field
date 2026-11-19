@@ -144,6 +144,24 @@
       "needs": [],
       "level": 3,
       "folders": [{"name": "list", "place": "list"}]
+    },
+    {
+      "id": "cherd",
+      "author": "hasis",
+      "status": "listed",
+      "categories": ["sequencing"],
+      "description": "CHERD: a chord sequencer as an eighth sequencer. Roots in the right hand, flavors in the left, genres incl. django.",
+      "repository": "https://github.com/hasis/cherd",
+      "commit": "94bad47d7a761d20e9ef73ad42c913c4d441f8ce",
+      "path": "field/cherd.pack",
+      "sha256": "e1f55606384781d483bbbb8d81412adcc0da0526b4eb0984cab52f6a5f2c93e3",
+      "bytes": 128112,
+      "version": 20,
+      "firmware": "1.7.3",
+      "places": 13,
+      "needs": [],
+      "level": 3,
+      "folders": [{"name": "cherd", "place": "cherd"}]
     }
   ]
 }
