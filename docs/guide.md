@@ -112,6 +112,7 @@ Delete its file from `packs` in the disk mode, and switch the unit off and on. K
 - **8 tracks.** Hold the tape key and press track key 1 to 4 to select tracks 5 to 8. Hold the mixer key for the mixer's page of tracks 5 to 8. Everything else works on eight tracks as it did on four, undo included. In the disk mode each tape's folder shows eight track files.
 - **sidechain.** Shift + the mixer key opens its page. A track can be turned down each time another track, or the beat, hits. The four knobs set the source, the amount, the hold and the release.
 - **fx train.** On a synth or drum sound, T3 opens the train: four wagons, each can carry an effect. Turn a knob to choose a wagon's effect, press it briefly to open that effect's page, hold it to switch the wagon off or on, shift + turn to move it. Shift + T3: tap for the list of saved trains, hold to save one.
+- **engines.** Hosts the synth engines that other packs bring: with an engine's pack on the unit, its name stands in the engine list beside the stock ones, with its own faceplate, and its presets appear from the second start. The example `drone` is one.
 - **lfo.** On a synth sound, T4 opens four LFOs. The knobs work as on the train. Shift + T4: tap for the list of saved sets, hold to save one.
 
 Saved trains and LFO sets are files. The disk mode shows them in the folders `fx` and `lfo`, so you can keep copies on the computer or pass your own on.

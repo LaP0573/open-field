@@ -17,11 +17,12 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORMS = {"word": "a word of data", "call": "a call", "jump": "a jump", "load": "the load of an address"}
-PARTS = ("loader", "base", "8 tracks", "fx train", "lfo", "sidechain")
+PARTS = ("loader", "base", "8 tracks", "engines", "fx train", "lfo", "sidechain")
 ABOUT = {
     "loader": "The loader's own three changes: the loader is our small piece inside the firmware file. It makes them at every start that runs at least one pack.",
     "base": "The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).",
     "8 tracks": "The pack `8 tracks`: tape tracks 5 to 8, and tapes the original firmware still reads.",
+    "engines": "The pack `engines`: new synth engines as packs of their own (module/op1f_engine.h). Its last three changes are made only when `cherd` is away, which hands notes and the screen on itself.",
     "fx train": "The pack `fx train`: up to four effects on an instrument, their presets, and an instrument that keeps its effects.",
     "lfo": "The pack `lfo`: four LFOs on a synth sound, their page and their presets.",
     "sidechain": "The pack `sidechain`: one tape track turned down by another, or by the beat.",

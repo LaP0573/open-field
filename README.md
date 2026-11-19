@@ -17,6 +17,7 @@ Extra features for the OP-1 Field, added to the firmware that is already on your
 | Feature file | What it adds |
 | --- | --- |
 | `8 tracks.pack` | Tape tracks 5 to 8, with everything tracks 1 to 4 do. The original firmware can still read your tapes. |
+| `engines.pack` | New synth engines as packs of their own: each engine's pack puts it into the engine list, with its faceplate and presets. |
 | `fx train.pack` | Up to four effects on an instrument, their presets, and instruments that keep their effects. |
 | `lfo.pack` | Four LFOs on a synth sound, with presets. |
 | `sidechain.pack` | One tape track turned down by another, or by the beat. |
@@ -78,7 +79,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 | `.github/` | The checks a host runs on every change, the templates for a report and for a change, and the publishing of the install page on the host's pages. |
 | `module/` | The sources of the loader, of the base and of the features: C++ and assembly for the Blackfin processor. |
 | `packs/` | One recipe for `base.pack` and for each feature file: what it is built from. |
-| `examples/` | Small packs that build, as models for one of your own: `wink`, `yoyo` and `list`, one for each level of the base, and `trampolines`, which changes places of the firmware. |
+| `examples/` | Small packs that build, as models for one of your own: `wink`, `yoyo` and `list`, one for each level of the base, `drone`, a synth engine for the pack `engines`, and `trampolines`, which changes places of the firmware. |
 | `pictures/` | Instructions by which the unit puts our screens together from its own pictures. |
 | `profiles/` | Where the firmware is changed: addresses, lengths and checksums. No bytes of the firmware. |
 | `linker/` | The linker scripts. |

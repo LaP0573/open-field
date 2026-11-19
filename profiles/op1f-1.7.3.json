@@ -937,6 +937,76 @@
    "sum": "0xc9f1010d",
    "group": "sidechain",
    "name": "A word in the signal flow controller's table: its knob handler."
+  },
+  {
+   "address": "0x8fca7c24",
+   "length": 8,
+   "sum": "0x3bfdafca",
+   "group": "engines",
+   "name": "The entry of the firmware's lookup of a synth engine's type by its name."
+  },
+  {
+   "address": "0x8fca7cb8",
+   "length": 8,
+   "sum": "0x7ff213a4",
+   "group": "engines",
+   "name": "The entry of the firmware's check that a synth engine's name is one it knows."
+  },
+  {
+   "address": "0x8d4f7354",
+   "length": 8,
+   "sum": "0x6fa014bd",
+   "group": "engines",
+   "name": "In set-patch: the call of the lookup of the patch's engine by its name (the patch in R5)."
+  },
+  {
+   "address": "0x8d4f0f1e",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "engines",
+   "name": "In the start-up load of the content: the call that reads content/op1_factory.json."
+  },
+  {
+   "address": "0x8d4f2ea8",
+   "length": 8,
+   "sum": "0x613e3b1a",
+   "group": "engines",
+   "name": "In the save of changed content: the call that writes content/op1_factory.json."
+  },
+  {
+   "address": "0x11a0476e",
+   "length": 8,
+   "sum": "0xd9c57c36",
+   "group": "engines",
+   "name": "In the synth's voice loop, in L1: the loads before the call of a voice's render."
+  },
+  {
+   "address": "0x11a052a2",
+   "length": 8,
+   "sum": "0x5cc76e86",
+   "group": "engines",
+   "name": "In the synth's audio stage, in L1, the voices summed onto the bus: the load before the effect stage's call."
+  },
+  {
+   "address": "0x8f008388",
+   "length": 8,
+   "sum": "0x911f04ae",
+   "group": "engines",
+   "name": "The entry of the funnel every synth note-on goes through."
+  },
+  {
+   "address": "0x8f008518",
+   "length": 8,
+   "sum": "0x1de0691a",
+   "group": "engines",
+   "name": "The entry of the funnel every synth note-off goes through."
+  },
+  {
+   "address": "0x8c0b193e",
+   "length": 8,
+   "sum": "0x420d32d0",
+   "group": "engines",
+   "name": "Right before the display commit: the load of the frame buffer's address."
   }
  ],
  "image": [
@@ -1891,6 +1961,85 @@
      "form": "word",
      "target": "op1f_duck_encoder",
      "does": "Ours: the knobs set the sidechain's source, amount, hold and release, and four more values with shift."
+    }
+   ]
+  },
+  {
+   "file": "module/build_l3_engines_table.s",
+   "part": "engines",
+   "symbol": "op1f_boot_table",
+   "entries": [
+    {
+     "address": "0x8fca7c24",
+     "form": "jump",
+     "target": "_eng_name_to_type",
+     "room": "_eng_orig_name_to_type",
+     "copies": 8,
+     "does": "A jump to ours: an engine's name answers the stock engine it rides on; every other name goes on in the firmware's function, through a trampoline."
+    },
+    {
+     "address": "0x8fca7cb8",
+     "form": "jump",
+     "target": "_eng_is_valid",
+     "room": "_eng_orig_is_valid",
+     "copies": 8,
+     "does": "A jump to ours: an engine's name is valid; every other name goes on in the firmware's function."
+    },
+    {
+     "address": "0x8d4f7354",
+     "form": "call",
+     "target": "_eng_set_type_entry",
+     "does": "A call to our stub, which notes which synth slot's patch is which engine's and answers the type."
+    },
+    {
+     "address": "0x8d4f0f1e",
+     "form": "call",
+     "target": "_eng_factory_load",
+     "does": "A call to ours, which lets the firmware read the file and then adds a synth_types entry for each engine that is there."
+    },
+    {
+     "address": "0x8d4f2ea8",
+     "form": "call",
+     "target": "_eng_factory_save",
+     "does": "A call to ours, which hands the firmware a copy without our entries to write, so the file on the disk stays stock."
+    },
+    {
+     "address": "0x11a0476e",
+     "form": "jump",
+     "target": "_eng_voice_entry",
+     "room": "_eng_orig_voice",
+     "copies": 8,
+     "does": "A jump to our stub: a voice of the host engine on an engine's slot renders through the engine; every other voice, the firmware's own render."
+    },
+    {
+     "address": "0x11a052a2",
+     "form": "jump",
+     "target": "_eng_bus_entry",
+     "room": "_eng_orig_bus",
+     "copies": 8,
+     "does": "A jump to our stub: a bus engine adds its block to the synth bus, before the T3 effect and fx train; then the firmware's load, through a trampoline."
+    },
+    {
+     "address": "0x8f008388",
+     "form": "jump",
+     "target": "_eng_on",
+     "room": "_eng_orig_on",
+     "copies": 8,
+     "does": "A jump to ours, which hands the note to the slot's engine and then runs the firmware's funnel. Marked away for cherd, which hands notes on itself."
+    },
+    {
+     "address": "0x8f008518",
+     "form": "jump",
+     "target": "_eng_off",
+     "room": "_eng_orig_off",
+     "copies": 8,
+     "does": "A jump to ours, which hands the note-off to the slot's engine and then runs the firmware's funnel. Marked away for cherd."
+    },
+    {
+     "address": "0x8c0b193e",
+     "form": "call",
+     "target": "_eng_draw_entry",
+     "does": "A call to our stub, which draws the slot's engine's faceplate over the host's screen and then does the load. Marked away for cherd, which draws it itself."
     }
    ]
   }

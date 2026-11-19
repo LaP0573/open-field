@@ -1,0 +1,69 @@
+{
+  "about": "New synth engines as packs of their own (module/op1f_engine.h): it owns the places of the firmware every engine needs (the engine lookups by name, set-patch, the factory file's engine list, the voice loop and the synth bus in L1, the note funnels and the display commit) and hands them to the engine packs that are there. It writes each engine's missing presets into user/synth_presets/<engine>/ at its first frame. examples/drone is an engine to start from. module/build_n_engines.cpp.",
+  "name": "engines",
+  "version": 1,
+  "interface": 1,
+  "build": "build_n_engines",
+  "sources": [
+    "module/build_n_engines.cpp",
+    "module/build_n_engines.s",
+    "module/build_l3_engines_table.s",
+    "module/build_m1_engines_card.s",
+    "module/build_m1_engines_pictures.s"
+  ],
+  "works_with": [
+    {
+      "name": "base",
+      "interface": 2,
+      "needed": true
+    },
+    {
+      "name": "cherd",
+      "interface": 1,
+      "needed": false
+    },
+    {
+      "name": "autotune",
+      "interface": 1,
+      "needed": false
+    }
+  ],
+  "serves": [],
+  "exports": [
+    "op1f_engines_note",
+    "op1f_engines_face"
+  ],
+  "pictures": [
+    {
+      "name": "dsynth.svg",
+      "file": "pictures/engines/dsynth.svg.make"
+    },
+    {
+      "name": "slump.svg",
+      "file": "pictures/engines/slump.svg.make"
+    }
+  ],
+  "card": {
+    "level": 1,
+    "frame": "engines_frame",
+    "pick": null,
+    "pictures": true
+  },
+  "marks": [
+    {
+      "site": "0x8f008388",
+      "away": "cherd"
+    },
+    {
+      "site": "0x8f008518",
+      "away": "cherd"
+    },
+    {
+      "site": "0x8c0b193e",
+      "away": "cherd"
+    }
+  ],
+  "named": true,
+  "sum": true,
+  "path": null
+}
