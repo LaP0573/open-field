@@ -19,5 +19,6 @@ No code was taken for these. The ideas were.
 
 - **open-xy** showed the way this whole project works: a builder that adds to the firmware file an owner copies off their own unit, so that no firmware is ever passed on; a list of the places that are changed, kept apart from the code; and an install through the bootloader's own menu, with no key.
 - **Ferret** showed that the bootloader's developer menu can be switched on over USB.
+- **Juno60**, by pendragon-andyh (https://github.com/pendragon-andyh/Juno60), measured the Juno-60 chorus: the rates, sweeps and balance of its modes, which `examples/juneaux` uses.
 
 If your work helped and is not named here, that is an oversight. Open an issue and it will be put right.

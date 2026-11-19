@@ -78,7 +78,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 | `.github/` | The checks a host runs on every change, the templates for a report and for a change, and the publishing of the install page on the host's pages. |
 | `module/` | The sources of the loader, of the base and of the features: C++ and assembly for the Blackfin processor. |
 | `packs/` | One recipe for `base.pack` and for each feature file: what it is built from. |
-| `examples/` | Small packs that build, as models for one of your own: `wink`, `yoyo` and `list`, one for each level of the base, and `trampolines`, which changes places of the firmware. |
+| `examples/` | Small packs that build, as models for one of your own: `wink`, `yoyo` and `list`, one for each level of the base, `juneaux`, a wagon for fx train, and `trampolines`, which changes places of the firmware. |
 | `pictures/` | Instructions by which the unit puts our screens together from its own pictures. |
 | `profiles/` | Where the firmware is changed: addresses, lengths and checksums. No bytes of the firmware. |
 | `linker/` | The linker scripts. |

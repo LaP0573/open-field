@@ -44,6 +44,10 @@
   "examples/yoyo.pack": {
    "bytes": 4381,
    "sha256": "e0b949f11b525a880582617c00c6491e3703dd3d9ce1444fafb47fa4aee7ef54"
+  },
+  "examples/juneaux.pack": {
+   "bytes": 52867,
+   "sha256": "345759faec201292376783ca73f9c5d87ac3b9388e171003afb94b24335e3f2a"
   }
  }
 }

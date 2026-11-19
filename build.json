@@ -25,6 +25,10 @@
   "blob": "loader-1.7.3-v1.bin",
   "examples": [
     {
+      "name": "juneaux",
+      "recipe": "examples/juneaux/recipe.json"
+    },
+    {
       "name": "list",
       "recipe": "examples/list/recipe.json"
     },

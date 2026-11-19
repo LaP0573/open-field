@@ -67,6 +67,7 @@ A pack with a card needs no entry for the base in its recipe's `works_with`: the
 | [`wink`](../examples/wink/README.md) | 1 | A call every frame and one picture: a red dot of ours on the tempo screen, blinking | Press the metronome key |
 | [`yoyo`](../examples/yoyo/README.md) | 2 | A page of its own, with keys and a knob | Shift and the metronome key; the blue knob moves the yoyo |
 | [`list`](../examples/list/README.md) | 3 | One folder of its own, shown in the disk mode, and words on its page | Shift and the help key; the blue knob scrolls |
+| [`juneaux`](../examples/juneaux/README.md) | 3 | A wagon for fx train: an effect on every knob of the train, its own drawing there and its own faceplate as its page | T3, a knob past the train's own effects; tap it |
 
 Each changes no place of the firmware and names no address of it. `python -I tools/build_all.py` builds them into `out/examples/`, and each folder's page gives the command that builds it alone. [A first pack](first-pack.md) goes through `wink` step by step.
 
