@@ -20,7 +20,7 @@
       "categories": ["library"],
       "description": "The shared pack every other pack relies on. Every unit with open-field needs it.",
       "path": "builder/base.pack",
-      "sha256": "9bf5eed8c4f142f797cb60f32793c6a731ad7d9eb3629628aa2d77d3dab713d8",
+      "sha256": "e96a036cdcf642a165e97a20091fc0dd23f0ecb6d18b34d1d9fefd33d7c450e1",
       "bytes": 110940,
       "version": 18,
       "firmware": "1.7.3",

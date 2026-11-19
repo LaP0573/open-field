@@ -7,15 +7,15 @@
   },
   "base.pack": {
    "bytes": 110940,
-   "sha256": "9bf5eed8c4f142f797cb60f32793c6a731ad7d9eb3629628aa2d77d3dab713d8"
+   "sha256": "e96a036cdcf642a165e97a20091fc0dd23f0ecb6d18b34d1d9fefd33d7c450e1"
   },
   "fx train.pack": {
-   "bytes": 429372,
-   "sha256": "a7502c4b6562a4a54817e262850b4c663447051d2fe69094b5c51a4077685405"
+   "bytes": 429424,
+   "sha256": "cdd3bcb68f5f849c0ce88ea6c939cc2b832933923eb8630a85373df7c61a6cbe"
   },
   "lfo.pack": {
    "bytes": 376512,
-   "sha256": "f89a4467efbd5f3162bbd8eec59742b90c62a79d217c14d0aa9551ff41cceff4"
+   "sha256": "fb1e8a87bd4014b155c44ec5fe0678f65e57bf58356f9a49fd7913f843433d02"
   },
   "sidechain.pack": {
    "bytes": 104062,
