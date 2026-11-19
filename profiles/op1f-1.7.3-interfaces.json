@@ -40,6 +40,10 @@
   "keys": {
    "title": "Keys and the screen that is shown",
    "about": ""
+  },
+  "synth": {
+   "title": "The synth",
+   "about": "What the pack `engines` needs to tell an engine's patch by its name and to know which of the eight synth slots a patch belongs to."
   }
  },
  "functions": {
@@ -324,6 +328,18 @@
    "group": "keys",
    "what": "Not 0 while the shift key is held.",
    "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8fca7a38": {
+   "name": "string_is",
+   "group": "memory",
+   "what": "Compares a text object of the firmware with a C text. 0 when they hold the same letters, as `strcmp` answers. The firmware's lookups of a synth engine by its name ask it.",
+   "thread": "Any thread but the audio thread. Ours: the main thread, when a patch is loaded."
+  },
+  "0x8d4f3d6c": {
+   "name": "patch_slot",
+   "group": "synth",
+   "what": "The synth slot, 0 to 7, that a patch object belongs to. Set-patch asks it of the patch it is loading.",
+   "thread": "The main thread, while a patch is loaded."
   }
  }
 }

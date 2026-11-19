@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 159 functions bound in the sources. 47 are described below, by subject. The other 112 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 161 functions bound in the sources. 49 are described below, by subject. The other 112 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -84,6 +84,7 @@ Our code has no library of its own: no `malloc`, no `memcpy`, no division by a v
 | `0x8fcc6c30` | `void free(void* block)` | Gives back a block got with `alloc` at `0x8fcc5744`. | As `alloc`. |
 | `0x8fcc5a68` | `void* heap_malloc(int heap_index, u32 size)` | A block of one of two large heaps that the firmware itself hardly uses, by the heap's number, 0 or 1. Our code takes large blocks there once and keeps them: the tape's cache for tracks 5 to 8 from heap 1, the effect train's private regions from heap 0. Gives back 0 when the heap has no room. | Not the audio thread. Ours: the tape's set-up at the start, and the display thread. |
 | `0x8fcc51fc` | `u32 heap_free(int heap_index)` | How many bytes of such a heap are not in use, by the heap's number. | Ours: the display thread. |
+| `0x8fca7a38` | `int string_is(const void* string, const char* text)` | Compares a text object of the firmware with a C text. 0 when they hold the same letters, as `strcmp` answers. The firmware's lookups of a synth engine by its name ask it. | Any thread but the audio thread. Ours: the main thread, when a patch is loaded. |
 
 ## Screens, pictures and texts
 
@@ -105,6 +106,14 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | --- | --- | --- | --- |
 | `0x8c0b2554` | `void request_screen(void)` | Asks the firmware to show the screen the present mode wants now. The firmware does this itself after every key; our code calls it after a change that no key press follows, such as a timer running out. It takes no argument. From the display thread, call it with interrupts masked for the length of the call: the firmware stops when two threads are inside it at once. | Ours: the key thread, and the display thread with interrupts masked. |
 | `0x8fc24ca4` | `int shift(void)` | Not 0 while the shift key is held. | Ours: the key thread, the display thread. |
+
+## The synth
+
+What the pack `engines` needs to tell an engine's patch by its name and to know which of the eight synth slots a patch belongs to.
+
+| Address | The call | What the caller hands over and gets back | Called from |
+| --- | --- | --- | --- |
+| `0x8d4f3d6c` | `int patch_slot(void* patch)` | The synth slot, 0 to 7, that a patch object belongs to. Set-patch asks it of the patch it is loading. | The main thread, while a patch is loaded. |
 
 ## Bound in the sources, not described yet
 

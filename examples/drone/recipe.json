@@ -1,0 +1,26 @@
+{
+  "about": "The example of an engine (module/op1f_engine.h): DRONE, two saws a little apart, a third a fifth above, one low-pass and a slow drift, picked in the engine list like a stock engine, with its own faceplate and two presets. It needs the pack engines and changes no place of the firmware. tools/build_all.py builds it into out/examples/.",
+  "name": "drone",
+  "version": 1,
+  "interface": 1,
+  "build": "build_n_drone",
+  "sources": [
+    "examples/drone/drone.cpp"
+  ],
+  "works_with": [
+    {
+      "name": "engines",
+      "interface": 1,
+      "needed": true
+    }
+  ],
+  "serves": [],
+  "exports": [
+    "op1f_engine_drone"
+  ],
+  "pictures": [],
+  "marks": [],
+  "named": true,
+  "sum": true,
+  "path": null
+}

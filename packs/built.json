@@ -44,6 +44,14 @@
   "examples/yoyo.pack": {
    "bytes": 4381,
    "sha256": "e0b949f11b525a880582617c00c6491e3703dd3d9ce1444fafb47fa4aee7ef54"
+  },
+  "engines.pack": {
+   "bytes": 7189,
+   "sha256": "de63a5bd0e215e1c844a1bed35c57bf7556bcb873be4b2a48f94b5fc0dd272a8"
+  },
+  "examples/drone.pack": {
+   "bytes": 1760,
+   "sha256": "76d17b2c44d45b194275c51814da33f648a6419e3381a7842a93895c35234a15"
   }
  }
 }

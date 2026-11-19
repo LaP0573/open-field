@@ -4,7 +4,7 @@ Every place where open-field changes OS 1.7.3+0 of the OP-1 Field, and nothing e
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 131 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 138 changes in 7 tables. A place that two packs can use is listed under each.
+There are 141 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 148 changes in 8 tables. A place that two packs can use is listed under each.
 
 ## In the firmware file, by the builder
 
@@ -127,6 +127,23 @@ The pack `8 tracks`: tape tracks 5 to 8, and tapes the original firmware still r
 | `0x8c0d6cd0` | a call | `op1f_clips_load` | In the loading of a tape: the call that loads the tape's clips. | A call to ours, which makes the firmware's call and then loads our own list of the clips of tracks 5 to 8. |
 | `0x8c0d6ea0` | a call | `op1f_tape_seconds` | In the tape list: the call that asks how long the highlighted tape is. | A call to ours, which counts the clips of all eight tracks. |
 | `0x8c0d84ae` | a call | `op1f_tape_clone` | In the tape list's copy of a tape: the call that copies the tape. | A call to ours, which makes the firmware's call and then copies tracks 5 to 8. |
+
+### `engines` (10)
+
+The pack `engines`: new synth engines as packs of their own (module/op1f_engine.h). Its last three changes are made only when `cherd` is away, which hands notes and the screen on itself.
+
+| Address | Change | Function of ours | What stands there | What ours does |
+| --- | --- | --- | --- | --- |
+| `0x8fca7c24` | a jump, with a trampoline of 8 bytes | `_eng_name_to_type` | The entry of the firmware's lookup of a synth engine's type by its name. | A jump to ours: an engine's name answers the stock engine it rides on; every other name goes on in the firmware's function, through a trampoline. |
+| `0x8fca7cb8` | a jump, with a trampoline of 8 bytes | `_eng_is_valid` | The entry of the firmware's check that a synth engine's name is one it knows. | A jump to ours: an engine's name is valid; every other name goes on in the firmware's function. |
+| `0x8d4f7354` | a call | `_eng_set_type_entry` | In set-patch: the call of the lookup of the patch's engine by its name (the patch in R5). | A call to our stub, which notes which synth slot's patch is which engine's and answers the type. |
+| `0x8d4f0f1e` | a call | `_eng_factory_load` | In the start-up load of the content: the call that reads content/op1_factory.json. | A call to ours, which lets the firmware read the file and then adds a synth_types entry for each engine that is there. |
+| `0x8d4f2ea8` | a call | `_eng_factory_save` | In the save of changed content: the call that writes content/op1_factory.json. | A call to ours, which hands the firmware a copy without our entries to write, so the file on the disk stays stock. |
+| `0x11a0476e` | a jump, with a trampoline of 8 bytes | `_eng_voice_entry` | In the synth's voice loop, in L1: the loads before the call of a voice's render. | A jump to our stub: a voice of the host engine on an engine's slot renders through the engine; every other voice, the firmware's own render. |
+| `0x11a052a2` | a jump, with a trampoline of 8 bytes | `_eng_bus_entry` | In the synth's audio stage, in L1, the voices summed onto the bus: the load before the effect stage's call. | A jump to our stub: a bus engine adds its block to the synth bus, before the T3 effect and fx train; then the firmware's load, through a trampoline. |
+| `0x8f008388` | a jump, with a trampoline of 8 bytes | `_eng_on` | The entry of the funnel every synth note-on goes through. | A jump to ours, which hands the note to the slot's engine and then runs the firmware's funnel. Marked away for cherd, which hands notes on itself. |
+| `0x8f008518` | a jump, with a trampoline of 8 bytes | `_eng_off` | The entry of the funnel every synth note-off goes through. | A jump to ours, which hands the note-off to the slot's engine and then runs the firmware's funnel. Marked away for cherd. |
+| `0x8c0b193e` | a call | `_eng_draw_entry` | Right before the display commit: the load of the frame buffer's address. | A call to our stub, which draws the slot's engine's faceplate over the host's screen and then does the load. Marked away for cherd, which draws it itself. |
 
 ### `fx train` (30)
 
