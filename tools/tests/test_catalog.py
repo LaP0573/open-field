@@ -519,6 +519,10 @@ class TheListingHeldToBuiltFiles(unittest.TestCase):
     def test_every_entry_with_a_file_is_the_file_a_build_gives(self):
         with open(check.CATALOG, encoding="utf-8") as f:
             the_listing = json.load(f)
+        # Only open-field's own entries come out of this tree's build: an entry of another author's repository is held
+        # to its file by the listing job, which downloads it.
+        ours = the_listing.get("ours", [])
+        the_listing["packs"] = [e for e in the_listing["packs"] if e["status"] == "bundled" or e.get("repository") in ours]
         said, in_order = run(copy.deepcopy(the_listing), folders=built_folders())
         self.assertTrue(in_order, said)
         self.assertEqual(said.count("its file held"), sum(1 for e in the_listing["packs"] if e.get("sha256") and e["status"] != "retired"))
