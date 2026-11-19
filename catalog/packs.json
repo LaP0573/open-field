@@ -3,6 +3,7 @@
   "categories": {
     "tape": "tape",
     "effects": "effects",
+    "instruments": "instruments",
     "modulation": "modulation",
     "sequencing": "sequencing",
     "mixer": "mixer",
@@ -144,6 +145,30 @@
       "needs": [],
       "level": 3,
       "folders": [{"name": "list", "place": "list"}]
+    },
+    {
+      "id": "engines",
+      "author": "open-field",
+      "status": "reserved",
+      "categories": ["instruments", "library"],
+      "description": "New synth engines as packs of their own: hosts the engine packs that are there (open-field PR #4)."
+    },
+    {
+      "id": "lilith",
+      "author": "hasis",
+      "status": "listed",
+      "categories": ["instruments"],
+      "description": "Lilith: two oscillators through a ladder low-pass, polyphonic, an animated phoenix faceplate, ten presets. Needs engines.",
+      "repository": "https://github.com/hasis/lilith",
+      "commit": "2a5f2968ac49afdd0e8184b8fc9c4a8116179a1d",
+      "path": "field/lilith.pack",
+      "sha256": "6c980c883621793ac2b6792529e49632f83873ca086eb4de3d5db48d90277f2b",
+      "bytes": 59380,
+      "version": 4,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": ["engines"],
+      "folders": []
     }
   ]
 }
