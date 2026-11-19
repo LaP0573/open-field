@@ -1,5 +1,5 @@
 op1f picture 2
-size 491384
+size 490296
 from op_font_34.svg 31151 060b80b6
 from param_popup.svg 5670 35d24d08
 from undo_popup.svg 1570 0bc49e37
@@ -10786,7 +10786,7 @@ m 0 23233 127 550 385138 70750
 a 6
 CDD0C2
 m 0 23366 99 550 385138 70750
-a 1104
-</g></g><g id="fxplug1"><g id="fxplug1t"><path fill="none" stroke="#3C6087" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug2"><g id="fxplug2t"><path fill="none" stroke="#8A653C" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug3"><g id="fxplug3t"><path fill="none" stroke="#A2A4A6" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug4"><g id="fxplug4t"><path fill="none" stroke="#CC1F00" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug1d"><g id="fxplug1dt"><path fill="none" stroke="#2B4261" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug2d"><g id="fxplug2dt"><path fill="none" stroke="#5E554B" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug3d"><g id="fxplug3dt"><path fill="none" stroke="#5B6670" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g><g id="fxplug4d"><g id="fxplug4dt"><path fill="none" stroke="#BF0020" stroke-width="1.3" stroke-linecap="square" d="M500,88V78"/></g></g>
+a 16
+</g></g>
 </svg>
 

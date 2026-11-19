@@ -590,6 +590,10 @@ static char* __attribute__((noinline)) make2(const char* name, const ArtDir* dir
 static const char* const* wagon_art;
 static u32 wagon_arts;
 static const char WAGON_ANCHOR[] = "<g id=\"fxlamp\"";
+// The name tags of other packs' wagons, one for each knob, as it is and dim ("fxplug<k>", "fxplug<k>d", each with its
+// label "...t"), added at the end of the train's picture with the wagons' drawings, so that the picture file stays as it was.
+static const char WAGON_PLUGS[] = "<g id=\"fxplug1\"><g id=\"fxplug1t\"><path fill=\"none\" stroke=\"#3C6087\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug2\"><g id=\"fxplug2t\"><path fill=\"none\" stroke=\"#8A653C\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug3\"><g id=\"fxplug3t\"><path fill=\"none\" stroke=\"#A2A4A6\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug4\"><g id=\"fxplug4t\"><path fill=\"none\" stroke=\"#CC1F00\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug1d\"><g id=\"fxplug1dt\"><path fill=\"none\" stroke=\"#2B4261\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug2d\"><g id=\"fxplug2dt\"><path fill=\"none\" stroke=\"#5E554B\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug3d\"><g id=\"fxplug3dt\"><path fill=\"none\" stroke=\"#5B6670\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g><g id=\"fxplug4d\"><g id=\"fxplug4dt\"><path fill=\"none\" stroke=\"#BF0020\" stroke-width=\"1.3\" stroke-linecap=\"square\" d=\"M500,88V78\"/></g></g>";
+static const char SVG_END[] = "</svg>";
 
 static u32 text_length(const char* t) { u32 n = 0; while (t[n]) ++n; return n; }
 
@@ -632,7 +636,14 @@ static char* with_wagons(char* text, u32* length) {
         if (!WAGON_ANCHOR[k]) at = p;
     }
     if (at == 0) return text;
-    u32 extra = 0;
+    char* end = 0;                                          // the last </svg>: the tags go just before it
+    for (char* p = at; *p; ++p) {
+        u32 k = 0;
+        while (SVG_END[k] && p[k] == SVG_END[k]) ++k;
+        if (!SVG_END[k]) end = p;
+    }
+    if (end == 0) return text;
+    u32 extra = sizeof(WAGON_PLUGS);
     for (u32 i = 0; i < wagon_arts; ++i) if (wagon_art[i] && !has_arc(wagon_art[i])) extra += 8u * (text_length(wagon_art[i]) + 24u);
     char* out = (char*)STOCK_ALLOC(*length + extra + 1);
     if (out == 0) return text;
@@ -643,7 +654,9 @@ static char* with_wagons(char* text, u32* length) {
         for (u32 c = 0; c < 4; ++c) p = put_group(p, "car", i, c, wagon_art[i], 0);
         for (u32 c = 0; c < 4; ++c) p = put_group(p, "dim", i, c, wagon_art[i], 1);
     }
-    for (char* q = at; q < text + *length; ++q) *p++ = *q;
+    for (char* q = at; q < end; ++q) *p++ = *q;
+    for (const char* q = WAGON_PLUGS; *q; ++q) *p++ = *q;
+    for (char* q = end; q < text + *length; ++q) *p++ = *q;
     STOCK_FREE(text);
     *length = (u32)(p - out);
     return out;

@@ -1,7 +1,7 @@
 {
   "about": "Four LFOs on a synth sound, their page and their presets as files. Needs the base (base.pack) and nothing else. With the effect train there, an LFO can turn any wagon; without it, the sound's one effect.",
   "name": "lfo",
-  "version": 9,
+  "version": 8,
   "interface": 1,
   "build": "build_m1_lfo",
   "sources": [
