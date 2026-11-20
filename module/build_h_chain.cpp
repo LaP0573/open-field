@@ -207,6 +207,8 @@ enum { CHAIN_INTS = 3 + WAGONS + WAGONS * (2 + PARAMS) };                  // 47
 enum { CHAIN_INTS_V2 = CHAIN_INTS + 1 };                                   // 48: H3 adds the bypass's remembered couplings (the tag 92)
 enum { BUS_SAMPLES = 64 };
 enum { KEY_T1 = 6, KEY_T3 = 8, KEY_CLICK0 = 54, KEY_PRESS0 = 61, PAGE_FX = 2, PAGE_LFO = 3 };
+enum { SCREEN_TRAIN = 77 };                                    // the train's screen, which the base lends a pack's page too (build_h_train.cpp, build_m3_cards.cpp)
+static const u32 SCREEN_GUI = 0x848d2540u;                     // the id of the screen the GUI shows (build_m3_cards.cpp: CURRENT_SCREEN)
 // H6h (analysis/lfo_train_study.md 5.5): the LFO's type words and parameter blocks beside the effect's, and the two descriptor
 // tables the converter 0x8d510b64 reads as (min, max, step), six bytes per parameter, 48 per type; the static tables read as
 // (0, 0, step) for every knob parameter, which the knobs' behaviour contradicts, so every knob turn on the effect and LFO pages
@@ -410,6 +412,8 @@ static struct {
     u32 frames;
     int print_countdown;
     int train_open[HOSTS];
+    int plug_page[HOSTS];                                      // version 12: a pack's wagon page was opened from the train; the 1st knob's click on it comes back, as T3
+    int stock_page[HOSTS];                                     // version 13: a stock effect's page was opened from the train; the 1st knob's click on it comes back too
     int current_slot[HOSTS];                                   // the slot whose chain is live, or -1
     u32 ms, last_cycles, cycle_acc;                            // H4b: milliseconds of the core clock since the first frame, from the CYCLES deltas between frames
     u32 frames_at_clock, ms_at_clock;                          // H4b: the last `chain clock:` line's frame count and time
@@ -1270,6 +1274,7 @@ static void open_wagon_page(void* self, int host, int knob) {
     if (const Op1fWagon* plug = wagon_of(wagons[host][slot][knob].type)) {   // an offered wagon: its own page, the lamp stays
         if (plug->page) {
             st.train_open[host] = 0;
+            st.plug_page[host] = 1;
             ++st.page_opens;
             plug->page(wagons[host][slot][knob].params);
         }
@@ -1297,6 +1302,18 @@ static void open_wagon_page(void* self, int host, int knob) {
     if (*page_of(self) == PAGE_FX) *page_of(self) = 0;                       // T3 on page 2 would toggle; from another page it shows the effect
     int event[4] = { KEY_T3, 0, 0, 0 };
     ((KeyEventFn)HOST[host].key_down)(self, event);
+    st.stock_page[host] = 1;
+}
+
+// Version 13: the 1st knob's click on a stock effect's page opened from the train goes back to the train, as on a
+// pack's wagon page and as a click closes a plate on the tape train. Only while that page (page 2) is up.
+static int stock_page_back(void* self, int host, int key) {
+    if (key != KEY_CLICK0 || !st.stock_page[host] || *page_of(self) != PAGE_FX) return 0;
+    if (&op1f_train_available != 0 && !op1f_train_available()) return 0;
+    st.stock_page[host] = 0;
+    st.train_open[host] = 1;
+    ++st.train_opens;
+    return 1;
 }
 
 // ---------------------------------------------------------------- the handlers (vtable words)
@@ -1343,6 +1360,20 @@ static int knob_click(void* self, int host, int knob, int shifted) {
     return 1;
 }
 
+// Version 12: the 1st knob's click on a pack's wagon page opened from the train goes back to the train, as T3 does
+// (the wagon's pack leaves that click alone; the base closes the page when the train opens over it). Only while a
+// pack's page is what the GUI shows (the screen 77 with the train closed), so the click on the firmware's own pages
+// stays the firmware's.
+// ponytail: another pack's page opened over the wagon's reads the same until the mode changes; its pack takes its own clicks.
+static int plug_page_back(int host, int key) {
+    if (key != KEY_CLICK0 || !st.plug_page[host] || RD32(SCREEN_GUI) != (u32)SCREEN_TRAIN) return 0;
+    if (&op1f_train_available != 0 && !op1f_train_available()) return 0;
+    st.plug_page[host] = 0;
+    st.train_open[host] = 1;
+    ++st.train_opens;
+    return 1;
+}
+
 extern "C" int op1f_fx_key_down(void* self, const int* event) asm("op1f_fx_key_down");
 extern "C" int op1f_fx_key_down(void* self, const int* event) {
     int host = host_of(self);
@@ -1352,8 +1383,11 @@ extern "C" int op1f_fx_key_down(void* self, const int* event) {
         if (taken >= 0) return taken;
     }
     if (!st.train_open[host]) {
+        if (plug_page_back(host, key) || stock_page_back(self, host, key)) return 1;
+        if (key >= KEY_T1 && key < KEY_T1 + 4) st.stock_page[host] = 0;    // another page: a click is the firmware's again
         if (key == KEY_T3 && (&op1f_train_available == 0 || op1f_train_available())) {   // no page to show: T3 runs stock
             st.train_open[host] = 1;
+            st.plug_page[host] = 0;
             ++st.train_opens;
             return 1;
         }
@@ -1378,7 +1412,7 @@ extern "C" int op1f_fx_key_shift(void* self, const int* event) {
         int taken = op1f_lfotrain_key_down(self, event, 1);
         if (taken >= 0) return taken;
     }
-    if (!st.train_open[host]) return ((KeyEventFn)HOST[host].key_shift)(self, event);
+    if (!st.train_open[host]) return plug_page_back(host, key) || stock_page_back(self, host, key) ? 1 : ((KeyEventFn)HOST[host].key_shift)(self, event);
     if (ls.open[host]) return list_key_down(self, host, event, 1);         // H5
     if (key >= KEY_PRESS0 && key < KEY_PRESS0 + WAGONS) { knob_press(host, key - KEY_PRESS0, 1); return 1; }
     if (key >= KEY_CLICK0 && key < KEY_CLICK0 + WAGONS) return knob_click(self, host, key - KEY_CLICK0, 1);
@@ -3129,6 +3163,7 @@ extern "C" void op1f_chain_frame(u16* fb) {
         for (u32 s = 0; s < SLOTS; ++s) if (!initialised[h][s]) init_slot(h, s);
     int mode = (int)RD32(MODE_GUI);
     for (int host = 0; host < HOSTS; ++host) {
+        if (mode != host) st.plug_page[host] = st.stock_page[host] = 0;                  // the base closes a pack's page when the mode changes
         if (st.train_open[host] && mode != host) { st.train_open[host] = 0; list_close(host); if (ls.save_host == host) ls.save_state = SAVE_NONE; }
         frame_host(host);
         list_frame(host);                                          // H5: the T3 hold, the red hold, the flash

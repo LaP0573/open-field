@@ -107,8 +107,8 @@ extern "C" int juneaux_input(const Op1fInput* e) {
         return 1;
     }
     if ((e->what == (u32)OP1F_DOWN || e->what == (u32)OP1F_DOWN_SHIFT) &&
-        ((e->key >= (u32)KEY_CLICK_1 && e->key <= (u32)KEY_CLICK_4) || (e->key >= (u32)KEY_PRESS_1 && e->key <= (u32)KEY_PRESS_4))) return 1;
-    return 0;
+        ((e->key > (u32)KEY_CLICK_1 && e->key <= (u32)KEY_CLICK_4) || (e->key >= (u32)KEY_PRESS_1 && e->key <= (u32)KEY_PRESS_4))) return 1;
+    return 0;                                         // the 1st knob's click is left to the train, which closes the page (fx train 12, tape train 6)
 }
 
 // ---------------------------------------------------------------- the faceplate (display thread)

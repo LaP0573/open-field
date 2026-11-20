@@ -9,7 +9,7 @@
 .global op1f_art_juneaux
 .type op1f_art_juneaux, STT_OBJECT
 op1f_art_juneaux:
-    .long 0x31545241, 1, 44947, 1
+    .long 0x31545241, 1, 44947, 2
     .ascii "juneaux"
     .fill 9, 1, 0
 .global op1f_art_juneaux_path

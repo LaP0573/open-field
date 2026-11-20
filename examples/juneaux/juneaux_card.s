@@ -18,7 +18,7 @@ op1f_card_juneaux_level:
 .global op1f_card_juneaux
 .type op1f_card_juneaux, STT_OBJECT
 op1f_card_juneaux:
-    .long 0x44524143, 56, 3, 1
+    .long 0x44524143, 56, 3, 2
     .ascii "juneaux"
     .fill 9, 1, 0
     .long juneaux_frame

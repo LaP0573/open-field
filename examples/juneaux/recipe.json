@@ -1,7 +1,7 @@
 {
   "about": "The example of a wagon for fx train (module/op1f_wagon.h): JUNEAUX, the Juno-60 chorus, one more pick on every knob of the train (never the lamp's), with its own drawing there and its own faceplate as its page: MODE (I, II, I+II), MIX, DEPTH, TONE. It changes no place of the firmware and needs the base; fx train 11 or later offers it. tools/build_all.py builds it into out/examples/.",
   "name": "juneaux",
-  "version": 1,
+  "version": 2,
   "interface": 1,
   "build": "build_m3_juneaux",
   "sources": [

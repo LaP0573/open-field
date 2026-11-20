@@ -10,7 +10,7 @@ The example of a wagon for the effect train: an effect of a pack's own that `fx 
 | Turn the 2nd knob | MIX: dry to the original balance of the Juno |
 | Turn the 3rd knob | DEPTH: no sweep to twice the mode's. The voices swing wider |
 | Turn the 4th knob | TONE: the low-pass after the line, about 7.5 kHz in the middle |
-| T3 | Back to the train |
+| T3, or a click of the 1st knob (fx train 12 or later) | Back to the train |
 
 The train keeps the four values in its file and in its presets, with the wagon by its name. With `juneaux.pack` away, the train runs as before, and a train saved with JUNEAUX loads with that wagon empty.
 
