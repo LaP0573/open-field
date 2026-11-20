@@ -74,7 +74,7 @@
         It has been tried with Brave, with its flag <code>brave://flags/#file-system-access-api</code> switched on;
         Chrome and Chromium have not been tried.
         You also need a USB cable that carries data, a <b>charged</b> unit on the original <b>OS 1.7.3</b> with
-        bootloader <b>1000.1.1</b> (step 1 checks both, and step 5 checks your firmware file), and half an hour. From
+        bootloader <b>1000.1.1</b> or <b>1000.2.0</b> (step 1 checks both, and step 5 checks your firmware file), and half an hour. From
         Linux the install has been made once, on one unit. A Mac is not supported yet.</li>
       <li><b>Keep your own firmware file.</b> Step 3 copies it off your unit into a folder on this computer. Put a copy
         somewhere else as well (a USB stick, another computer): it is your way back.</li>
@@ -251,9 +251,12 @@
   import { LISTING_FILE, NOTICE, readListing, isOurs, fileName, withNeeds, neededBy, download } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
-  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0"];   // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0",    // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+    "1000.2.0", "1000.2.0+0"];                       // placement.mjs holds both; on 1000.2.0 a write landed on one unit (2026-11-20)
   const FIRMWARE = "1.7.3";                          // the one firmware this page builds for: the original OS 1.7.3
-  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0"];
+  // "+1": a unit whose screen said OS 1.7.3+1 held exactly the original 1.7.3 file (its SHA-256 is the one loader.json
+  // names), seen on one unit (2026-11-20). The label alone proves nothing: step 5's check of the file's SHA-256 decides.
+  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0", FIRMWARE + "+1"];
   const OLDER_OS = ["1.7.0", "1.7.0+0"];             // a unit on it is sent to the page kept for it, ./1.7.0/
   // The browser's storage of this tab is shared with the page kept for OS 1.7.0 (the same site): this page's keys carry
   // its firmware, so that neither page takes what the other one stored.
@@ -503,8 +506,8 @@
           "(not a later build) with Teenage Engineering's own update first, and then come back to this page.</span>";
         log("refused: OS " + id.os_version + "; the page for it is ./1.7.0/", "warn");
       } else {
-        $("gate").innerHTML = "<span class='warn'>" + (blOk ? "OS " + id.os_version + " is not 1.7.3" : "Bootloader " + (id.bl_version || "?") + " is not 1000.1.1") +
-          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 only. Stop here on this unit.</span>";
+        $("gate").innerHTML = "<span class='warn'>" + (blOk ? "OS " + id.os_version + " is not 1.7.3" : "Bootloader " + (id.bl_version || "?") + " is not 1000.1.1 or 1000.2.0") +
+          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 or 1000.2.0 only. Stop here on this unit.</span>";
         log("refused: not the supported versions", "warn");
       }
     } catch (e) { $("findStatus").textContent = ""; log("could not reach the unit: " + (e.message || e), "warn"); }
@@ -721,7 +724,7 @@
     try {
       folderPacks = new Map((await readPacks(folder)).map((p) => [p.name.toLowerCase(), p.sha256]));
       renderStates();
-      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks() });
+      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks(), bootloader: gate?.bl });
     } catch (e) { $("planError").textContent = "No plan: " + e.message + ". Run the helper's line again to start over."; return; }
     const p = preview.plan;
     const fromListing = new Set((p.chosen ?? []).map((c) => c.name.toLowerCase()));
@@ -772,7 +775,7 @@
       const h = await readHelper(folder);
       if (!h || h.state !== "listed") throw new Error("the helper is not waiting any more");
       if (downloading) throw new Error("a pack is still downloading");
-      const done = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks() });
+      const done = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks(), bootloader: gate.bl });
       planned = done.plan;
       for (const c of done.chosen) {
         log(c.name + (c.state === "same" ? " from the listing is in the folder's packs already" : " from the listing put into the folder's packs") + (c.kept ? "; the one there before is kept as " + c.kept : ""));

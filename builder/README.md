@@ -52,7 +52,7 @@ node builder/validate-install.mjs
 
 The first runs the unit's check against a made-up bootloader; no MIDI port of the computer is touched. The second builds the image from your own firmware file and holds its SHA-256 to the manifest's; without `--stock` it makes only the checks that need no firmware file. The third holds the install's plan to the placement on made-up disks; it needs no firmware file.
 
-A helper can be run whole without a unit: `-Source` (the `.ps1`) or `--source` (the `.py`) names a folder of the computer that stands for the unit's disk. The `.py` also has `--list-only`, which reads the unit and changes nothing. `node builder/validate-install.mjs --play <folder> --stock <your own os.ldr>` plays the page's part on the helper's folder.
+A helper can be run whole without a unit: `-Source` (the `.ps1`) or `--source` (the `.py`) names a folder of the computer that stands for the unit's disk. The `.py` also has `--list-only`, which reads the unit and changes nothing. `node builder/validate-install.mjs --play <folder> --bootloader <version> --stock <your own os.ldr>` plays the page's part on the helper's folder.
 
 ## More than one version of the loader
 
@@ -94,6 +94,6 @@ The page can be served from any web address over HTTPS: the unit's check uses US
 
 - It does not press the unit's keys. The write itself is always keys on the unit.
 - It has a helper for Windows and one for Linux. On a Mac the page could do the file work itself over USB, as open-xy's builder does for the OP-XY, but that is not built.
-- The placement model is that of one bootloader version, 1000.1.1. The page's first step reads the version and refuses any other.
+- The placement model is that of two bootloader versions, 1000.1.1 and 1000.2.0. 1000.2.0's heap was read from the bootloader itself; the rest of the model is 1000.1.1's, and one write on one unit holds it for 1000.2.0. The page's first step reads the version and refuses any other, and every plan names the version it was made for.
 
 [The owner's guide](../docs/guide.md) has the whole install in words.

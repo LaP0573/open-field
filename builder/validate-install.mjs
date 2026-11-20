@@ -6,7 +6,7 @@
 // unit and without a browser (open-field-helper.ps1 -Source <a folder standing for the unit's disk> -Folder <folder>,
 // or open-field-helper.py --source <a folder standing for the unit's disk> --folder <folder>):
 //
-//   node builder/validate-install.mjs --play <folder> --stock <your own os.ldr>
+//   node builder/validate-install.mjs --play <folder> --bootloader <the unit's bootloader version> --stock <your own os.ldr>
 //
 // --play waits for the helper to list the disk, builds the new firmware file with the same code as the page
 // (patch.mjs, the manifest loader.json and the loader's file beside this file), makes and writes the plan with the same
@@ -22,7 +22,7 @@ import {
   NAMES, PACK_FOLDER, makePlan, checkAfter, compareListings, normalRows, padBytes, padName, packOrder, packNameProblem,
   prepare, readHelper, checkFolder, sha256,
 } from "./install.mjs";
-import { analyzeListing, fileTnodes } from "./placement.mjs";
+import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
 import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +68,9 @@ function memoryFolder(files = {}) {
     async writeText(name, text) { store.set(name, new TextEncoder().encode(text)); writes.push(name); },
   };
 }
+
+// The bootloader the checks made before 1000.2.0 was known are for.
+const BL = Object.freeze({ bootloader: "1000.1.1" });
 
 let checks = 0, fails = 0;
 function check(what, ok, detail = "") {
@@ -130,12 +133,12 @@ async function selfChecks() {
   for (const osLdr of [null, 2096456, IMAGE_BYTES]) {
     for (let files = 0; files < 60; files += 25) {
       const rows = volume({ files, osLdr });
-      const plan = makePlan({ run: "r", listing: rows, image });
+      const plan = makePlan({ ...BL, run: "r", listing: rows, image });
       const top = plan.expected.filter((r) => r.path === "os.ldr");
       check("the plan has one os.ldr at the top, of the image's size", top.length === 1 && top[0].size === IMAGE_BYTES);
-      const v = analyzeListing(plan.expected);
+      const v = analyzeListing(plan.expected, BL);
       check("every plan's listing lands the write and is off a batch edge", v.current.pass && !v.onEdge, files + " files, os.ldr " + osLdr);
-      const without = analyzeListing(rows, { imageBytes: IMAGE_BYTES });
+      const without = analyzeListing(rows, { ...BL, imageBytes: IMAGE_BYTES });
       check("a pad file is planned exactly when the disk with the image would not land", (plan.pad !== null) === (!without.current.pass || without.onEdge));
       check("the plan says whether os.ldr is replaced", plan.image.replaces === (osLdr !== null));
       if (plan.pad) check("the pad file's row is in the plan", plan.expected.some((r) => r.path === plan.pad.name && r.size === plan.pad.bytes));
@@ -148,8 +151,8 @@ async function selfChecks() {
   let padded = 0;
   for (let n = 0; n < 40; n++) {
     const rows = volume({ files: Math.floor(rnd() * 1500), tapeBytes: Math.floor(rnd() * 400_000_000), osLdr: rnd() < 0.5 ? null : 2096456 });
-    const plan = makePlan({ run: "r", listing: rows, image });
-    const v = analyzeListing(plan.expected);
+    const plan = makePlan({ ...BL, run: "r", listing: rows, image });
+    const v = analyzeListing(plan.expected, BL);
     if (plan.pad) padded++;
     check("a random volume's plan lands", v.current.pass && !v.onEdge, "case " + n);
     const c2 = checkAfter(plan, plan.expected);
@@ -159,24 +162,24 @@ async function selfChecks() {
 
   // pack files in the plan
   const packs = [{ name: "base.pack", bytes: 93596, sha256: "b".repeat(64) }, { name: "8 tracks.pack", bytes: 99476, sha256: "8".repeat(64) }];
-  const p1 = makePlan({ run: "r", listing: volume(), image, packs });
+  const p1 = makePlan({ ...BL, run: "r", listing: volume(), image, packs });
   check("the pack folder is made when it is not there", p1.makeFolder === PACK_FOLDER && p1.expected.some((r) => r.path === PACK_FOLDER && r.dir));
   check("the packs are copied base.pack last", p1.packs.map((p) => p.name).join("|") === "8 tracks.pack|base.pack");
   check("each pack's row is in the plan", p1.packs.every((p) => p.expected === undefined && p1.expected.some((r) => r.path === "user/pk/" + p.name && r.size === p.bytes)));
-  const p2 = makePlan({ run: "r", listing: volume({ pk: true, extra: [{ path: "user/pk/base.pack", size: 87452, dir: false }] }), image, packs });
+  const p2 = makePlan({ ...BL, run: "r", listing: volume({ pk: true, extra: [{ path: "user/pk/base.pack", size: 87452, dir: false }] }), image, packs });
   check("the pack folder is not made again", p2.makeFolder === null);
   check("a pack that is there is replaced, its row the new size", p2.packs.find((p) => p.name === "base.pack").replaces &&
     p2.expected.filter((r) => r.path === "user/pk/base.pack").length === 1 && p2.expected.find((r) => r.path === "user/pk/base.pack").size === 93596);
-  check("the packs are counted in the placement", analyzeListing(p1.expected).counts.files === volume().filter((r) => !r.dir && r.path !== "lost+found").length + 1 + (p1.pad ? 1 : 0) + 2);
+  check("the packs are counted in the placement", analyzeListing(p1.expected, BL).counts.files === volume().filter((r) => !r.dir && r.path !== "lost+found").length + 1 + (p1.pad ? 1 : 0) + 2);
 
   // refusals
-  throws("a folder named os.ldr is refused", () => makePlan({ run: "r", listing: volume({ extra: [{ path: "os.ldr", dir: true }] }), image }), /folder named os\.ldr/);
-  throws("packs with no user folder are refused", () => makePlan({ run: "r", listing: volume().filter((r) => r.path !== "user"), image, packs }), /no folder user/);
-  throws("a pack whose name does not end in .pack is refused", () => makePlan({ run: "r", listing: volume(), image, packs: [{ name: "x.bin", bytes: 1, sha256: "" }] }), /\.pack/);
-  throws("a plan needs the helper's run", () => makePlan({ listing: volume(), image }), /run/);
+  throws("a folder named os.ldr is refused", () => makePlan({ ...BL, run: "r", listing: volume({ extra: [{ path: "os.ldr", dir: true }] }), image }), /folder named os\.ldr/);
+  throws("packs with no user folder are refused", () => makePlan({ ...BL, run: "r", listing: volume().filter((r) => r.path !== "user"), image, packs }), /no folder user/);
+  throws("a pack whose name does not end in .pack is refused", () => makePlan({ ...BL, run: "r", listing: volume(), image, packs: [{ name: "x.bin", bytes: 1, sha256: "" }] }), /\.pack/);
+  throws("a plan needs the helper's run", () => makePlan({ ...BL, listing: volume(), image }), /run/);
 
   // the check after: a missing, an added, a resized row
-  const plan = makePlan({ run: "r", listing: volume(), image });
+  const plan = makePlan({ ...BL, run: "r", listing: volume(), image });
   const bad = plan.expected.filter((r) => r.path !== "os.ldr");
   const c3 = checkAfter(plan, bad);
   check("a missing os.ldr fails the check after, and is named", !c3.ok && c3.lines.some((l) => l.includes("planned and not on the unit: F os.ldr")), c3.lines.join("; "));
@@ -196,7 +199,7 @@ async function selfChecks() {
   });
   const fakeImage = new Uint8Array(IMAGE_BYTES).fill(7);
   let given = null;
-  const { plan: made } = await prepare(folder, { build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
+  const { plan: made } = await prepare(folder, { ...BL, build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
   check("the build is given the owner's file from the folder", given && given.length === 4);
   check("the plan is for the helper's run", made.run === "2026-11-18_20-00-00");
   check("the plan names the listing it was made from by its SHA-256", made.before.sha256 === await sha256(new TextEncoder().encode(listingText)));
@@ -213,12 +216,12 @@ async function selfChecks() {
     [NAMES.packs + "/base.pack"]: new Uint8Array(93596),
   });
   let built = false;
-  const { plan: wayBack } = await prepare(back, { build: async () => { built = true; return { image: fakeImage }; }, wayBack: true });
+  const { plan: wayBack } = await prepare(back, { ...BL, build: async () => { built = true; return { image: fakeImage }; }, wayBack: true });
   check("the way back builds nothing", !built);
   check("the way back writes the owner's own file as os.ldr", wayBack.wayBack === true && wayBack.image.file === NAMES.stock && wayBack.image.bytes === STOCK_BYTES &&
     wayBack.expected.some((r) => r.path === "os.ldr" && r.size === STOCK_BYTES));
   check("the way back writes no new firmware file and copies no pack", !back.writes.includes(NAMES.image) && wayBack.packs.length === 0);
-  check("the way back's plan lands", analyzeListing(wayBack.expected).current.pass);
+  check("the way back's plan lands", analyzeListing(wayBack.expected, BL).current.pass);
   // base.pack, which comes with the page (2026-11-18, the owner's word: "base.pack is part of open-field"): put into
   // the folder's packs, counted in the placement, copied last; one of other bytes kept in the folder's replaced first;
   // the way back adds none
@@ -228,32 +231,32 @@ async function selfChecks() {
     [NAMES.helper]: JSON.stringify({ helper: 1, run, state: "listed", stock: { file: NAMES.stock } }), [NAMES.before]: listingText, [NAMES.stock]: stock, ...more });
   const stand = async () => ({ image: fakeImage, report: { loader: { version: "test" } } });
   const fresh = listed("base-1", { [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
-  const r1 = await prepare(fresh, { build: stand, base });
+  const r1 = await prepare(fresh, { ...BL, build: stand, base });
   check("the page's base.pack goes into the folder's packs", r1.base.state === "added" && (await sha256(fresh.store.get(NAMES.packs + "/base.pack"))) === base.sha256);
   check("the page's base.pack is in the plan, last, with its size and SHA-256", r1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|base.pack" &&
     r1.plan.packs[1].bytes === 107492 && r1.plan.packs[1].sha256 === base.sha256 && r1.plan.packs[1].file === NAMES.packs + "/base.pack");
   check("the page's base.pack is counted in the placement", r1.plan.expected.some((r) => r.path === "user/pk/base.pack" && r.size === 107492) &&
-    analyzeListing(r1.plan.expected).current.pass);
+    analyzeListing(r1.plan.expected, BL).current.pass);
   check("base.pack is written before the plan, and the plan last", fresh.writes.includes(NAMES.packs + "/base.pack") &&
     fresh.writes.indexOf(NAMES.packs + "/base.pack") < fresh.writes.indexOf(NAMES.plan) && fresh.writes[fresh.writes.length - 1] === NAMES.plan, fresh.writes.join(", "));
   check("the plan says where its base.pack came from", r1.plan.base?.from === "the page" && r1.plan.base.in_folder === "added" && r1.plan.base.kept === null);
   const same = listed("base-2", { [NAMES.packs + "/base.pack"]: pageBase });
-  const r2 = await prepare(same, { build: stand, base });
+  const r2 = await prepare(same, { ...BL, build: stand, base });
   check("a base.pack of the same bytes is left as it is", r2.base.state === "same" && !same.writes.includes(NAMES.packs + "/base.pack") &&
     !same.writes.some((w) => w.startsWith(NAMES.replaced + "/")) && r2.plan.packs.length === 1 && r2.plan.packs[0].sha256 === base.sha256);
   const older = new Uint8Array(93596).fill(3);
   const olderSha = await sha256(older);
   const other = listed("base-3", { [NAMES.packs + "/base.pack"]: older, [NAMES.packs + "/lfo.pack"]: new Uint8Array(375422).fill(4) });
-  const r3 = await prepare(other, { build: stand, base });
+  const r3 = await prepare(other, { ...BL, build: stand, base });
   check("a base.pack of other bytes is kept in the folder's replaced first", r3.base.state === "replaced" && r3.base.kept === NAMES.replaced + "/base-" + olderSha.slice(0, 12) + ".pack" &&
     (await sha256(other.store.get(r3.base.kept))) === olderSha && other.writes.indexOf(r3.base.kept) < other.writes.indexOf(NAMES.packs + "/base.pack"), JSON.stringify(r3.base));
   check("and the page's takes its place, once and last", (await sha256(other.store.get(NAMES.packs + "/base.pack"))) === base.sha256 &&
     r3.plan.packs.map((p) => p.name).join("|") === "lfo.pack|base.pack" && r3.plan.packs[1].sha256 === base.sha256 && r3.plan.base.kept === r3.base.kept);
   const back2 = listed("base-4", { [NAMES.packs + "/base.pack"]: older });
-  const r4 = await prepare(back2, { build: stand, wayBack: true, base });
+  const r4 = await prepare(back2, { ...BL, build: stand, wayBack: true, base });
   check("the way back adds no pack, not even the page's base.pack", r4.plan.packs.length === 0 && r4.base === null && !r4.plan.base &&
     !back2.writes.some((w) => w.startsWith(NAMES.packs + "/") || w.startsWith(NAMES.replaced + "/")), back2.writes.join(", "));
-  await prepare(listed("base-5"), { build: stand, base: { bytes: pageBase, sha256: "0".repeat(64) } }).then(() => check("a base.pack that is not the file it names is refused", false),
+  await prepare(listed("base-5"), { ...BL, build: stand, base: { bytes: pageBase, sha256: "0".repeat(64) } }).then(() => check("a base.pack that is not the file it names is refused", false),
     (e) => check("a base.pack that is not the file it names is refused", /not the file it names/.test(e.message), e.message));
   // the page's own base.pack, beside this file: the one base-pack.json names
   const own = pageOwnBase();
@@ -267,11 +270,11 @@ async function selfChecks() {
   const wink = { name: "wink.pack", bytes: winkBytes, sha256: await sha256(winkBytes), from: null };
   const oldLfo = new Uint8Array(375418).fill(13), oldLfoSha = await sha256(oldLfo);
   const withTicks = listed("tick-1", { [NAMES.packs + "/lfo.pack"]: oldLfo, [NAMES.packs + "/wink.pack"]: winkBytes, [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
-  const t1 = await prepare(withTicks, { build: stand, base, chosen: [lfo, wink] });
+  const t1 = await prepare(withTicks, { ...BL, build: stand, base, chosen: [lfo, wink] });
   check("ticked packs are in the plan with the folder's own, base.pack last", t1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|lfo.pack|wink.pack|base.pack",
     t1.plan.packs.map((p) => p.name).join("|"));
   check("a ticked pack is counted in the placement with its own size", t1.plan.expected.some((r) => r.path === "user/pk/lfo.pack" && r.size === 375422) &&
-    analyzeListing(t1.plan.expected).current.pass);
+    analyzeListing(t1.plan.expected, BL).current.pass);
   check("a ticked pack of other bytes than the folder's is put in its place, the old one kept in replaced first",
     (await sha256(withTicks.store.get(NAMES.packs + "/lfo.pack"))) === lfo.sha256 &&
     (await sha256(withTicks.store.get(NAMES.replaced + "/lfo-" + oldLfoSha.slice(0, 12) + ".pack"))) === oldLfoSha &&
@@ -282,14 +285,14 @@ async function selfChecks() {
     withTicks.writes[withTicks.writes.length - 1] === NAMES.plan, withTicks.writes.join(", "));
   check("the plan says where each ticked pack came from", t1.plan.chosen?.length === 2 && t1.plan.chosen[0].from === lfo.from && t1.plan.chosen[0].in_folder === "replaced");
   const tickBack = listed("tick-2");
-  const t2 = await prepare(tickBack, { build: stand, base, chosen: [lfo], wayBack: true });
+  const t2 = await prepare(tickBack, { ...BL, build: stand, base, chosen: [lfo], wayBack: true });
   check("the way back puts no ticked pack on", t2.plan.packs.length === 0 && !t2.plan.chosen && !tickBack.writes.some((w) => w.startsWith(NAMES.packs + "/")));
   for (const [what, chosen, words] of [
     ["a ticked pack that is not its file is refused", [{ ...lfo, sha256: "0".repeat(64) }], /not the file the listing names/],
     ["base.pack is never ticked", [{ ...lfo, name: "base.pack" }], /never ticked/],
     ["two ticked packs of one name are refused", [lfo, { ...lfo }], /two ticked packs/],
     ["a ticked pack with a name the unit cannot hold is refused", [{ ...lfo, name: "a/b.pack" }], /cannot be copied/],
-  ]) await prepare(listed("tick-x"), { build: stand, base, chosen }).then(() => check(what, false), (e) => check(what, words.test(e.message), e.message));
+  ]) await prepare(listed("tick-x"), { ...BL, build: stand, base, chosen }).then(() => check(what, false), (e) => check(what, words.test(e.message), e.message));
 
   // the listing as the page reads it (catalog.mjs), and the download of a ticked pack held to its entry
   const COMMIT = "0123456789abcdef0123456789abcdef01234567";
@@ -331,10 +334,52 @@ async function selfChecks() {
     ["a download that fails is refused", async () => { throw new Error("offline"); }, /could not be downloaded \(offline\)/],
   ]) await download(good, get).then(() => check(what, false), (e) => check(what, words.test(e.message) && e.message.startsWith("one: "), e.message));
 
+  // the bootloader: every verdict names one the model knows, and none is assumed
+  check("the screen's form of a version is the model's", bootloaderVersion("1000.2.0+0") === "1000.2.0" && bootloaderVersion("1000.1.1+0") === "1000.1.1" &&
+    bootloaderVersion("1000.2.0") === "1000.2.0");
+  const few = analyzeListing(volume(), BL).counts;
+  for (const [what, given] of [["no bootloader", undefined], ["an unknown bootloader", "1000.3.0"], ["a bootloader with another build number", "1000.2.0+1"], ["an empty bootloader", ""]]) {
+    throws("the placement refuses " + what, () => placement(few, given === undefined ? {} : { bootloader: given }), /knows the bootloaders/);
+    throws("the pad search refuses " + what, () => recommendPad(few, given === undefined ? {} : { bootloader: given }), /knows the bootloaders/);
+    throws("the mount's end refuses " + what, () => mountEndFor(10, 3, given === undefined ? {} : { bootloader: given }), /knows the bootloaders/);
+    throws("the listing's verdict refuses " + what, () => analyzeListing(volume(), given === undefined ? {} : { bootloader: given }), /knows the bootloaders/);
+    throws("a plan refuses " + what, () => makePlan({ run: "r", listing: volume(), image, bootloader: given }), /knows the bootloaders/);
+    const untouched = listed("bl-x");
+    await prepare(untouched, { build: stand, base, bootloader: given }).then(() => check("prepare refuses " + what, false),
+      (e) => check("prepare refuses " + what + ", and writes nothing", /knows the bootloaders/.test(e.message) && untouched.writes.length === 0, e.message));
+  }
+  const on2 = listed("bl-2");
+  const { plan: plan2 } = await prepare(on2, { build: stand, base, bootloader: "1000.2.0+0" });
+  check("the plan records the bootloader, in the model's form", plan2.bootloader === "1000.2.0" && JSON.parse(new TextDecoder().decode(on2.store.get(NAMES.plan))).bootloader === "1000.2.0");
+  check("a plan for 1000.2.0 lands by 1000.2.0's model", analyzeListing(plan2.expected, { bootloader: "1000.2.0" }).current.pass && checkAfter(plan2, plan2.expected).ok);
+  // the check after uses the plan's bootloader: the same listing judged as for the other bootloader moves every buffer
+  // by 8 modulo 32, so a plan that lands on one cannot land on the other
+  const as1 = checkAfter({ ...plan2, bootloader: "1000.1.1" }, plan2.expected);
+  check("the check after uses the plan's bootloader", !as1.ok && as1.analysis.current.perRest.every((r) => r.mod === 24), JSON.stringify(as1.analysis.current.perRest));
+  const { bootloader: _gone, ...noBl } = plan2;
+  const c4 = checkAfter(noBl, plan2.expected);
+  check("a plan that names no bootloader is not checked, with a line that says so", !c4.ok && c4.lines.length === 1 && /cannot be checked.*none/.test(c4.lines[0]), c4.lines.join("; "));
+  check("a plan that names an unknown bootloader is not checked", !checkAfter({ ...plan2, bootloader: "1000.3.0" }, plan2.expected).ok);
+  // 1000.2.0's heap starts 0x60c8 above 1000.1.1's and is otherwise the same: every buffer is that much higher
+  let cases = 0, off = 0;
+  for (let nodeBatches = 0; nodeBatches <= 400; nodeBatches += 7) {
+    for (let recordBatches = 1; recordBatches <= 60; recordBatches += 3) {
+      for (const rest of SEEN_RESTS) {
+        const end1 = mountEndFor(nodeBatches, recordBatches, { bootloader: "1000.1.1", rest });
+        const end2 = mountEndFor(nodeBatches, recordBatches, { bootloader: "1000.2.0", rest });
+        for (const withComputer of [true, false]) {
+          cases++;
+          if (plainBuffer(end2, withComputer) - plainBuffer(end1, withComputer) !== 0x60c8) off++;
+        }
+      }
+    }
+  }
+  check("on 1000.2.0 every buffer stands 0x60c8 above 1000.1.1's", cases === 58 * 20 * 2 * 2 && off === 0, off + " of " + cases + " cases differ");
+
   const helperGone = memoryFolder({});
-  await prepare(helperGone, { build: async () => ({ image: fakeImage }) }).then(() => check("no helper, no plan", false), (e) => check("no helper, no plan", /written nothing/.test(e.message), e.message));
+  await prepare(helperGone, { ...BL, build: async () => ({ image: fakeImage }) }).then(() => check("no helper, no plan", false), (e) => check("no helper, no plan", /written nothing/.test(e.message), e.message));
   const notWaiting = memoryFolder({ [NAMES.helper]: JSON.stringify({ run: "x", state: "ready" }) });
-  await prepare(notWaiting, { build: async () => ({ image: fakeImage }) }).then(() => check("a helper that does not wait gets no plan", false),
+  await prepare(notWaiting, { ...BL, build: async () => ({ image: fakeImage }) }).then(() => check("a helper that does not wait gets no plan", false),
     (e) => check("a helper that does not wait gets no plan", /not waiting/.test(e.message), e.message));
 }
 
@@ -355,7 +400,7 @@ function pageOwnBase() {
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function play(root, { stockPath, manifestName = "loader.json", timeout = 900, wayBack = false }) {
+async function play(root, { stockPath, manifestName = "loader.json", timeout = 900, wayBack = false, bootloader }) {
   const { buildImage, ours } = await import("./patch.mjs");
   const manifest = JSON.parse(readFileSync(join(here, manifestName), "utf8"));
   const loader = new Uint8Array(readFileSync(join(here, ours(manifest).file)));
@@ -381,7 +426,7 @@ async function play(root, { stockPath, manifestName = "loader.json", timeout = 9
   if (base.problem !== null) { console.log("play: no plan: " + base.problem); return 1; }
   let plan, step;
   try {
-    ({ plan, base: step } = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock, wayBack, base }));
+    ({ plan, base: step } = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock, wayBack, base, bootloader }));
   } catch (e) { console.log("play: no plan: " + e.message); return 1; }
   console.log("play: plan written for run " + plan.run + ": os.ldr " + plan.image.bytes + " bytes" + (plan.pad ? ", pad " + plan.pad.name + " " + plan.pad.bytes + " bytes" : ", no pad")
     + ", " + plan.packs.length + " pack(s); " + plan.counts.records + " records, " + plan.counts.nodes + " index nodes, " + plan.counts.recordBatches + " and " + plan.counts.nodeBatches + " batches");
@@ -403,8 +448,8 @@ const words = process.argv.slice(2);
 if (words[0] === "--play") {
   const root = words[1];
   const opt = (name) => { const i = words.indexOf(name); return i >= 0 ? words[i + 1] : undefined; };
-  if (!root || root.startsWith("--")) { console.error("usage: node validate-install.mjs --play <folder> [--stock <your own os.ldr>] [--timeout <seconds>]"); process.exitCode = 2; }
-  else process.exitCode = await play(root, { stockPath: opt("--stock"), timeout: Number(opt("--timeout") || 900), wayBack: words.includes("--way-back") });
+  if (!root || root.startsWith("--")) { console.error("usage: node validate-install.mjs --play <folder> --bootloader <version> [--stock <your own os.ldr>] [--timeout <seconds>]"); process.exitCode = 2; }
+  else process.exitCode = await play(root, { stockPath: opt("--stock"), timeout: Number(opt("--timeout") || 900), wayBack: words.includes("--way-back"), bootloader: opt("--bootloader") });
 } else {
   await selfChecks();
   console.log((fails ? "FAILED " : "ok ") + (checks - fails) + " of " + checks + " checks of install.mjs");

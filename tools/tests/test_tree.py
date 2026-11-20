@@ -642,7 +642,7 @@ class ThePageSStorage(unittest.TestCase):
 
     def test_the_page_is_for_the_tree_s_firmware(self):
         self.assertIn('const FIRMWARE = "%s";' % self.firmware, self.page)
-        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\"];", self.page)
+        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\", FIRMWARE + \"+1\"];", self.page)
         self.assertEqual(load("builder", "loader.json")["os"], self.firmware)
 
     def test_every_key_of_the_session_s_storage_carries_the_firmware(self):
