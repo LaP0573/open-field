@@ -44,6 +44,19 @@ const manifest = JSON.parse(manText);
 const our = ours(manifest);
 const loader = u8(join(here, our.file));
 
+// 0. the install page's script parses: a slip in it stops the page before it loads anything, and no other check runs it
+{
+  const page = readFileSync(join(here, "index.html"), "utf8");
+  const script = page.match(/<script type="module">([\s\S]*)<\/script>/);
+  const { spawnSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const file = join(tmpdir(), "open-field-page-" + process.pid + ".mjs");
+  if (script) writeFileSync(file, script[1]);
+  const parsed = script && spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+  if (parsed && parsed.status === 0) ok("the install page's script parses");
+  else bad("the install page's script does not parse: " + (parsed ? parsed.stderr.split("\n").slice(0, 5).join(" ") : "no module script found"));
+}
+
 // 1. the loader's file is the one the manifest names
 if (loader.length === our.bytes && (await sha256hex(loader)) === our.sha256) ok(`the loader's file is the manifest's (${loader.length} bytes)`);
 else bad("the loader's file is not the one the manifest names");

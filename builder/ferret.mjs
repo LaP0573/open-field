@@ -5,7 +5,7 @@
 // string. The te-serial wire encoding and the dev-marker payload are the upstream's, unchanged, but for one
 // thing: the frame check's table is computed here, where the upstream carries it (next comment).
 // This talks only to the owner's own unit in te-boot and only toggles the documented dev menu; it transfers
-// no firmware. open-field gates on bl_version = 1000.1.1 in the wizard before any of this is offered.
+// no firmware. open-field gates on bl_version 1000.1.1 or 1000.2.0 in the wizard before any of this is offered.
 
 // The table of the frame check. The upstream writes it out as a string of 256 bytes; they follow from a formula
 // and two numbers, so they are computed: the table of a reflected CRC-8 with the polynomial 0xB2, every entry
@@ -69,7 +69,7 @@ function metadata(reply) {
     .split(';').map(kv => { const i = kv.indexOf(':'); return i < 1 ? [] : [kv.slice(0, i), kv.slice(i + 1)]; })
     .filter(pair => pair.length === 2));
   // The Field is identified by the header answering the read-only metadata query; the fields confirm it is
-  // te-boot (a serial and a bootloader version, in boot mode). open-field checks bl_version = 1000.1.1 above.
+  // te-boot (a serial and a bootloader version, in boot mode). open-field checks bl_version (1000.1.1 or 1000.2.0) above.
   if (!fields.serial || !fields.bl_version || (fields.mode && !/boot/i.test(fields.mode))) {
     // Say what did answer (the serial's value left out), so that a bootloader whose field names differ can be
     // told from a unit that is not in te-boot.

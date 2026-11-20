@@ -54,10 +54,10 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 
 ## What you need
 
-- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1**. Other versions are refused: every address in this project belongs to that one firmware file. The original firmware's start screen shows `1.7.3`; a build of 1.7.3 with another number behind it, such as `1.7.3+1`, is another file, and the install page refuses it.
-- A desktop computer with Chrome or Edge, and a USB cable.
+- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1** or **1000.2.0**. Other versions are refused: every address in this project belongs to that one firmware file. With 1000.2.0 the install has been made on one unit. The start screen of the original firmware shows `1.7.3`, and on one unit it showed `1.7.3+1` with exactly the original file on the unit, so the install page takes both. The screen decides nothing: the page holds the unit's firmware file to the original's SHA-256 and refuses any other file.
+- A desktop computer with Chrome or Edge, or a Linux computer with a browser that has the folder access the page needs (tried with Brave), or a Mac with Chrome, `python3` and Homebrew's `libusb` (the Linux helper runs there; tried once, on one unit), and a USB cable.
 
-**A unit still on OS 1.7.0** has two ways. Update it to OS 1.7.3 with Teenage Engineering's own official update, one that gives OS 1.7.3 itself and not a later build such as `1.7.3+1`, and then use the install page. Or use the page for OS 1.7.0, which the install page links to: the release of before, kept as it was, only for a unit that was never updated to 1.7.3 ([the guide](docs/guide.md), "A unit on OS 1.7.0").
+**A unit still on OS 1.7.0** has two ways. Update it to OS 1.7.3 with Teenage Engineering's own official update, one that gives the original OS 1.7.3 file, and then use the install page: it refuses a unit whose firmware file is not that one. Or use the page for OS 1.7.0, which the install page links to: the release of before, kept as it was, only for a unit that was never updated to 1.7.3 ([the guide](docs/guide.md), "A unit on OS 1.7.0").
 
 **A unit on a later OS version than 1.7.3 cannot use this yet.** The builder takes only the OS 1.7.3 file, which such a unit does not hold, and whether such a unit can be brought back to OS 1.7.3 is not known. Do not update a unit in the hope of going back. Support for a later version is work that has not been done ([methods](docs/methods.md), "Moving the work to another firmware version").
 
@@ -65,7 +65,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 
 ## What is proven and what is not
 
-- The install without any key has been made on several units, by their owners, from Windows computers. It has not been tried on another bootloader version, or from a Mac or Linux computer.
+- The install without any key has been made on several units, by their owners, from Windows computers. It has also been made once, on one unit, from a Linux computer. It has been made once from a Mac, on one unit with bootloader 1000.2.0. It has not been tried on another bootloader version.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
 - The features have been used on several units, on the maintainer's for weeks. The three example packs `wink`, `yoyo` and `list` have run on the maintainer's unit.
 

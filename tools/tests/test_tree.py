@@ -587,10 +587,11 @@ class ThePagesOnAHost(unittest.TestCase):
     def test_every_file_the_page_fetches_by_name_is_beside_it(self):
         manifest = load(self.served, "loader.json")
         named = load(self.served, "base-pack.json")
-        for name in ("loader.json", "base-pack.json", manifest["loader"]["file"], named["file"], "open-field-helper.ps1"):
+        for name in ("loader.json", "base-pack.json", manifest["loader"]["file"], named["file"], "open-field-helper.ps1", "open-field-helper.py"):
             self.assertTrue(os.path.isfile(os.path.join(self.folder, name)), name)
         page = text(self.served, "index.html")
-        for said in ('get("loader.json")', 'get("base-pack.json")', 'new URL("./open-field-helper.ps1", location.href)', 'fetch("./" + LISTING_FILE)'):
+        for said in ('get("loader.json")', 'get("base-pack.json")', 'new URL("./open-field-helper.ps1", location.href)',
+                     'new URL("./open-field-helper.py", location.href)', 'fetch("./" + LISTING_FILE)'):
             self.assertIn(said, page)
         # the listing of packs, packs.json, is put beside the page by the pages workflow, from catalog/packs.json
         self.assertIn('export const LISTING_FILE = "packs.json"', text(self.served, "catalog.mjs"))
@@ -621,6 +622,11 @@ class ThePagesOnAHost(unittest.TestCase):
         self.assertIn("$Page = [string] $openFieldPage", helper)                                                         # and which the helper checks
         self.assertIn("STOPPED: the install page did not choose this folder", helper)
         self.assertNotRegex(page, r"irm\s+'https?://")
+        # the line for Linux: the same mark, the helper read from the page's own address and run by python3
+        self.assertIn("\"curl -fsSL '\" + linuxHelperUrl + \"' | python3 -I - --page '\" + PAGE_ID + \"'\"", page)
+        self.assertIn('ap.add_argument("--page"', text(self.served, "open-field-helper.py"))                          # which the helper takes
+        self.assertIn("STOPPED: the install page did not choose this folder", text(self.served, "open-field-helper.py"))
+        self.assertNotRegex(page, r"curl\s+-fsSL\s+'https?://")
 
 
 class ThePageSStorage(unittest.TestCase):
@@ -636,7 +642,7 @@ class ThePageSStorage(unittest.TestCase):
 
     def test_the_page_is_for_the_tree_s_firmware(self):
         self.assertIn('const FIRMWARE = "%s";' % self.firmware, self.page)
-        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\"];", self.page)
+        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\", FIRMWARE + \"+1\"];", self.page)
         self.assertEqual(load("builder", "loader.json")["os"], self.firmware)
 
     def test_every_key_of_the_session_s_storage_carries_the_firmware(self):

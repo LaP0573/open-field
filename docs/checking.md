@@ -71,7 +71,7 @@ It looks at names and at the form of a log, of a listing and of quoted instructi
 
 ### The checks on every change
 
-On every pull request and every change to `main`, the host runs `.github/workflows/checks.yml` on its standard Windows machine. It needs no firmware, and it runs:
+On every pull request and every change to `main`, the host runs `.github/workflows/checks.yml` on its standard Windows and Linux machines. It needs no firmware, and it runs:
 
 - the build, `python -I tools/build_all.py`, held to `packs/built.json`, with the compiler fetched as [docs/build.md](build.md) says and kept between runs;
 - the tree's own tests, `python -I -m unittest discover -s tools/tests`;

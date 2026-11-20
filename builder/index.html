@@ -69,9 +69,13 @@
         Engineering, and it is not affiliated with them. Changing a device's firmware is risky: a unit can end up unable
         to start for good ("bricked"), and installing this will void the warranty of your device. Whether to do it is
         your choice alone.</li>
-      <li>You need a <b>Windows</b> computer with <b>Chrome or Edge</b>, a USB cable that carries data, a
-        <b>charged</b> unit on the original <b>OS 1.7.3</b> with bootloader <b>1000.1.1</b> (step 1 checks both, and
-        step 5 checks your firmware file), and half an hour. Mac and Linux are not supported yet.</li>
+      <li>You need a <b>Windows</b> computer with <b>Chrome or Edge</b>, or a <b>Linux</b> computer with <code>python3</code>,
+        <code>curl</code>, <code>libusb-1.0</code> and a browser that has USB MIDI and the folder access this page needs.
+        It has been tried with Brave, with its flag <code>brave://flags/#file-system-access-api</code> switched on;
+        Chrome and Chromium have not been tried.
+        You also need a USB cable that carries data, a <b>charged</b> unit on the original <b>OS 1.7.3</b> with
+        bootloader <b>1000.1.1</b> or <b>1000.2.0</b> (step 1 checks both, and step 5 checks your firmware file), and half an hour. From
+        Linux the install has been made once, on one unit, and from a Mac once (Chrome, <code>python3</code> and <code>brew install libusb</code>; use the Linux line in step 4).</li>
       <li><b>Keep your own firmware file.</b> Step 3 copies it off your unit into a folder on this computer. Put a copy
         somewhere else as well (a USB stick, another computer): it is your way back.</li>
       <li><b>In the bootloader's menus, press only the keys this page names.</b> In its main menu, <code>3</code>
@@ -111,7 +115,7 @@
   <div class="card later" id="s3">
     <h2><span class="num">3</span>Choose the folder</h2>
     <p>This page and the helper share one folder on this computer: <code>open-field</code> in your user folder
-      (<code>C:\Users\</code> and your name). Press <b>Choose the folder</b>. In the dialog, open your user folder; if
+      (<code>C:\Users\</code> and your name on Windows, your home folder on Linux). Press <b>Choose the folder</b>. In the dialog, open your user folder; if
       there is no <code>open-field</code> in it yet, make one (the dialog's <b>New folder</b>, named
       <code>open-field</code>). Choose it, and let the browser view and edit its files. The page keeps it for the rest
       of the install, and offers it again next time.</p>
@@ -123,15 +127,21 @@
 
   <div class="card later" id="s4">
     <h2><span class="num">4</span>Run the helper</h2>
-    <p>A web page cannot reach the unit's files on Windows, so a small helper does that part. Open PowerShell (press
-      the Windows key, type <code>PowerShell</code>, press Enter), paste this line and press Enter:</p>
+    <p>A web page cannot reach the unit's files, so a small helper does that part.</p>
+    <p><b>On Windows:</b> open PowerShell (press the Windows key, type <code>PowerShell</code>, press Enter), paste this
+      line and press Enter:</p>
     <pre class="cmd" id="command"></pre>
     <p><button type="button" class="ghost" id="copy">Copy the line</button> <span class="note" id="copied"></span></p>
+    <p><b>On Linux or a Mac:</b> open a terminal (on a Mac, the app Terminal), paste this line and press Enter. On a Mac, quit Image Capture and Photos first. If the desktop's file manager opens the
+      unit's drive, unmount it there first, and open nothing on it before the helper runs.</p>
+    <pre class="cmd" id="commandLinux"></pre>
+    <p><button type="button" class="ghost" id="copyLinux">Copy the line</button> <span class="note" id="copiedLinux"></span></p>
     <p class="note">It checks that the folder you chose in step 3 is its own, finds the unit, copies your own firmware
       file off into that folder, takes the unit's log files off into the same folder, lists the unit's disk, and waits for this page.
       Leave its window open. What it changes on the unit, and nothing else: it takes the files in <code>logs</code>
       off, and the pad files earlier installs left (<code>open-field-pad.bin</code> and the like), and later writes
       <code>os.ldr</code> at the top of the drive, a pad file if one is needed, and your pack files. <a id="readHelper" href="./open-field-helper.ps1" target="_blank" rel="noopener">Read the helper</a>
+      (<a id="readHelperLinux" href="./open-field-helper.py" target="_blank" rel="noopener">the one for Linux</a>)
       before you run it, if you like.</p>
     <p class="note"><b>Pack files.</b> <code>base.pack</code>, the shared pack every feature needs, comes with this
       page: step 5 puts it into the folder <code>packs</code> inside <code>open-field</code>, and the helper copies it
@@ -241,9 +251,12 @@
   import { LISTING_FILE, NOTICE, readListing, isOurs, fileName, withNeeds, neededBy, download } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
-  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0"];   // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0",    // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+    "1000.2.0", "1000.2.0+0"];                       // placement.mjs holds both; on 1000.2.0 a write landed on one unit (2026-11-20)
   const FIRMWARE = "1.7.3";                          // the one firmware this page builds for: the original OS 1.7.3
-  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0"];
+  // "+1": a unit whose screen said OS 1.7.3+1 held exactly the original 1.7.3 file (its SHA-256 is the one loader.json
+  // names), seen on one unit (2026-11-20). The label alone proves nothing: step 5's check of the file's SHA-256 decides.
+  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0", FIRMWARE + "+1"];
   const OLDER_OS = ["1.7.0", "1.7.0+0"];             // a unit on it is sent to the page kept for it, ./1.7.0/
   // The browser's storage of this tab is shared with the page kept for OS 1.7.0 (the same site): this page's keys carry
   // its firmware, so that neither page takes what the other one stored.
@@ -468,7 +481,7 @@
     refresh();
   }
   $("find").addEventListener("click", async () => {
-    if (!navigator.requestMIDIAccess) { log("This browser has no USB MIDI: use Chrome or Edge on a desktop computer.", "warn"); return; }
+    if (!navigator.requestMIDIAccess) { log("This browser has no USB MIDI: use Chrome or Edge on a desktop computer (on Linux it has been tried with Brave).", "warn"); return; }
     gate = null; sessionStorage.removeItem(GATE_KEY); show("devBox", false); $("gate").textContent = "";
     $("findStatus").textContent = "connecting…";
     try {
@@ -490,11 +503,11 @@
       } else if (blOk && OLDER_OS.includes(id.os_version)) {
         $("gate").innerHTML = "<span class='warn'>This unit runs OS " + id.os_version + ". This page is for OS 1.7.3 only. Stop here on this unit: " +
           "<a href=\"./1.7.0/\">the page for OS 1.7.0</a>, kept as it was, is the one for it. Or update the unit to OS 1.7.3 itself " +
-          "(not a later build) with Teenage Engineering's own update first, and then come back to this page.</span>";
+          "(the update must leave the original 1.7.3 firmware file, which step 5 checks) with Teenage Engineering's own update first, and then come back to this page.</span>";
         log("refused: OS " + id.os_version + "; the page for it is ./1.7.0/", "warn");
       } else {
-        $("gate").innerHTML = "<span class='warn'>" + (blOk ? "OS " + id.os_version + " is not 1.7.3" : "Bootloader " + (id.bl_version || "?") + " is not 1000.1.1") +
-          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 only. Stop here on this unit.</span>";
+        $("gate").innerHTML = "<span class='warn'>" + (blOk ? "OS " + id.os_version + " is not 1.7.3" : "Bootloader " + (id.bl_version || "?") + " is not 1000.1.1 or 1000.2.0") +
+          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 or 1000.2.0 only. Stop here on this unit.</span>";
         log("refused: not the supported versions", "warn");
       }
     } catch (e) { $("findStatus").textContent = ""; log("could not reach the unit: " + (e.message || e), "warn"); }
@@ -511,6 +524,13 @@
   $("copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("command").textContent); $("copied").textContent = "copied"; }
     catch { $("copied").textContent = "select the line and copy it"; }
+  });
+  // the same for Linux: the helper in Python, read from the page's address and run with this page's mark
+  const linuxHelperUrl = new URL("./open-field-helper.py", location.href).href;
+  $("commandLinux").textContent = "curl -fsSL '" + linuxHelperUrl + "' | python3 -I - --page '" + PAGE_ID + "'";
+  $("copyLinux").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("commandLinux").textContent); $("copiedLinux").textContent = "copied"; }
+    catch { $("copiedLinux").textContent = "select the line and copy it"; }
   });
 
   // ---- step 3: the shared folder, chosen once, through the browser's folder access ----
@@ -589,7 +609,7 @@
   }
   window.openFieldUseFolder = useFolder;              // also called by a test, in place of the browser's dialog
   $("choose").addEventListener("click", async () => {
-    if (!window.showDirectoryPicker) { log("This browser cannot open a folder for a page: use Chrome or Edge.", "warn"); return; }
+    if (!window.showDirectoryPicker) { log("This browser cannot open a folder for a page: use Chrome or Edge. On Linux, in Brave, switch on its flag brave://flags/#file-system-access-api.", "warn"); return; }
     try { await useFolder(await window.showDirectoryPicker({ id: "open-field", mode: "readwrite" })); }
     catch (e) { if (e.name !== "AbortError") log("no folder: " + (e.message || e), "warn"); }
   });
@@ -665,7 +685,7 @@
       const result = await checkFolder(folder);
       $("checkLines").textContent = [...(h.checks || []), "", "This page's own check:", ...result.lines].join("\n");
       ready = result.ok;
-      if (result.ok) $("putStatus").innerHTML = "<span class='ok big'>Ready to write. ✔</span>";
+      if (result.ok) $("putStatus").innerHTML = "<span class='ok big'>Ready to write. ✔</span> <span class='note'>Planned for the bootloader " + planned.bootloader + ": write only on the unit step 1 checked.</span>";
       else $("putStatus").innerHTML = "<span class='warn'>The helper says ready, but this page's check does not agree. Do not write: run the helper's line again.</span>";
       refresh();
     }
@@ -701,10 +721,11 @@
     // a dry run of prepare() on a folder that keeps its writes in memory: what the plan will be, before the owner's word
     const memory = { ...folder, writes: {}, async writeBytes(n, b) { this.writes[n] = b; }, async writeText(n, t) { this.writes[n] = t; } };
     $("planError").textContent = "";
+    if (!gate) { $("planError").textContent = "Step 1 has not passed in this browser tab: go back to the bootloader's menu (press 2 to close the drive) and press Find."; return; }
     try {
       folderPacks = new Map((await readPacks(folder)).map((p) => [p.name.toLowerCase(), p.sha256]));
       renderStates();
-      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks() });
+      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks(), bootloader: gate?.bl });
     } catch (e) { $("planError").textContent = "No plan: " + e.message + ". Run the helper's line again to start over."; return; }
     const p = preview.plan;
     const fromListing = new Set((p.chosen ?? []).map((c) => c.name.toLowerCase()));
@@ -718,7 +739,7 @@
     const baseNote = !base ? "" : base.state === "replaced" ? " The folder's packs held another base.pack: it is kept as " + base.kept + ", and this page's takes its place." :
       base.state === "same" ? " The folder's packs holds this page's base.pack already." : " This page's base.pack goes into the folder's packs.";
     $("pPlace").textContent = "The write lands with this disk: " + p.counts.files + " files, " + p.counts.folders + " folders, " + p.counts.nodeBatches +
-      " and " + p.counts.recordBatches + " batches. " + (p.wayBack ? "Nothing is built and no pack file is copied: the original firmware does not read them." : "Built with the loader " + (preview.report?.loader?.version ?? "?") + "." + baseNote);
+      " and " + p.counts.recordBatches + " batches, for the bootloader " + p.bootloader + " as step 1 read it: if the unit on the cable is not the one step 1 checked, stop and start again from step 1. " + (p.wayBack ? "Nothing is built and no pack file is copied: the original firmware does not read them." : "Built with the loader " + (preview.report?.loader?.version ?? "?") + "." + baseNote);
     show("planBox");
     $("go").disabled = !($("kept").checked && gate);
     if (!gate) $("planError").textContent = "Step 1 has not passed in this browser tab: go back to the bootloader's menu (press 2 to close the drive) and press Find.";
@@ -755,7 +776,7 @@
       const h = await readHelper(folder);
       if (!h || h.state !== "listed") throw new Error("the helper is not waiting any more");
       if (downloading) throw new Error("a pack is still downloading");
-      const done = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks() });
+      const done = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, chosen: chosenPacks(), bootloader: gate.bl });
       planned = done.plan;
       for (const c of done.chosen) {
         log(c.name + (c.state === "same" ? " from the listing is in the folder's packs already" : " from the listing put into the folder's packs") + (c.kept ? "; the one there before is kept as " + c.kept : ""));
