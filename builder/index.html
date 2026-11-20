@@ -739,7 +739,7 @@
     const baseNote = !base ? "" : base.state === "replaced" ? " The folder's packs held another base.pack: it is kept as " + base.kept + ", and this page's takes its place." :
       base.state === "same" ? " The folder's packs holds this page's base.pack already." : " This page's base.pack goes into the folder's packs.";
     $("pPlace").textContent = "The write lands with this disk: " + p.counts.files + " files, " + p.counts.folders + " folders, " + p.counts.nodeBatches +
-      " and " + p.counts.recordBatches +  batches, for the bootloader " + p.bootloader + " as step 1 read it: if the unit on the cable is not the one step 1 checked, stop and start again from step 1. " + (p.wayBack ? "Nothing is built and no pack file is copied: the original firmware does not read them." : "Built with the loader " + (preview.report?.loader?.version ?? "?") + "." + baseNote);
+      " and " + p.counts.recordBatches + " batches, for the bootloader " + p.bootloader + " as step 1 read it: if the unit on the cable is not the one step 1 checked, stop and start again from step 1. " + (p.wayBack ? "Nothing is built and no pack file is copied: the original firmware does not read them." : "Built with the loader " + (preview.report?.loader?.version ?? "?") + "." + baseNote);
     show("planBox");
     $("go").disabled = !($("kept").checked && gate);
     if (!gate) $("planError").textContent = "Step 1 has not passed in this browser tab: go back to the bootloader's menu (press 2 to close the drive) and press Find.";
