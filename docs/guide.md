@@ -8,8 +8,8 @@ Read the whole page before you begin. The install changes the firmware of your u
 
 ## What you need
 
-- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1**. The install page checks both and refuses any other. The original firmware's start screen shows `1.7.3`. A build of 1.7.3 with another number behind it, such as `1.7.3+1`, is another firmware file: the page's check of the firmware file in step 5 refuses it.
-- A **Windows** computer with **Chrome or Edge**, or a **Linux** computer with `python3`, `curl`, `libusb-1.0` and a browser that has USB MIDI and the folder access the page needs. It has been tried with Brave, with its flag `brave://flags/#file-system-access-api` switched on; Chrome and Chromium have not been tried. You also need a USB cable that carries data. A Mac cannot be used yet.
+- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1** or **1000.2.0**. The install page checks both and refuses any other. The original firmware's start screen shows `1.7.3`; a unit updated to bootloader 1000.2.0 may show `1.7.3+1` ([below](#a-unit-that-shows-1731)). Whatever the screen says, step 5 checks that the firmware file on your unit is the original OS 1.7.3 file, byte for byte, and refuses any other.
+- A **Windows** computer with **Chrome or Edge**, or a **Linux** computer with `python3`, `curl`, `libusb-1.0` and a browser that has USB MIDI and the folder access the page needs. It has been tried with Brave, with its flag `brave://flags/#file-system-access-api` switched on; Chrome and Chromium have not been tried. Or a **Mac** with **Chrome**, `python3` and `libusb` from Homebrew (`brew install libusb`): the Linux helper runs there too, and the install has been made from a Mac once, on one unit. You also need a USB cable that carries data.
 - A **charged** unit. A write that loses power halfway can leave nothing to start from.
 - Half an hour in which you will not be interrupted.
 
@@ -21,13 +21,22 @@ Read the whole page before you begin. The install changes the firmware of your u
 
 open-field was made for OS 1.7.0 first. A unit still on OS 1.7.0 has two ways:
 
-- **Update the unit to OS 1.7.3** with Teenage Engineering's own update, as they offer it, and then install open-field from this page as on any unit. The update writes the maker's firmware: if the unit ran open-field for 1.7.0, the loader is gone after it, and the unit is on the original OS 1.7.3. Check which version the update gives before you run it: this page works with OS 1.7.3 itself. A later build, such as `1.7.3+1`, is another firmware, and the page refuses it.
+- **Update the unit to OS 1.7.3** with Teenage Engineering's own update, as they offer it, and then install open-field from this page as on any unit. The update writes the maker's firmware: if the unit ran open-field for 1.7.0, the loader is gone after it, and the unit is on the original OS 1.7.3. Check which version the update gives before you run it: this page works with OS 1.7.3 itself, and with an update that shows `1.7.3+1` when its firmware file is the original 1.7.3 file (step 5 checks).
 - **Stay on OS 1.7.0** and use the page kept for it: the install page links to it at the top ("Still on OS 1.7.0?"). It is the release of before, kept as it was, and it will not change. Use it only on a unit that was never updated to 1.7.3: on a unit that was, it stops at its own first step.
 
 **Pack files left from OS 1.7.0.** A pack file is made for one firmware. The loader for 1.7.3 leaves out every pack file made for 1.7.0 and starts everything else; the start screen counts what it left out, `1.7.3 - open-field 0.3 (4 left out)` for four such files. Nothing breaks, but those features do not run. Two ways to set it right:
 
 - In step 5 of the install, tick the packs again in the listing: the page puts their 1.7.3 files into the folder `packs`, and the helper copies them onto the unit in place of the old files of the same name. `base.pack` is always the page's own. Look at the folder `packs` inside `open-field` on your computer before step 5, too: a pack file from your 1.7.0 install that is still there would be copied onto the unit again, and left out again. Delete the ones you do not tick.
 - Or delete the old files from the folder `packs` on the unit in the disk mode ([below](#taking-a-feature-away)).
+
+### A unit that shows 1.7.3+1
+
+A unit updated to the bootloader **1000.2.0** may show `1.7.3+1` on its start screen. On the one such unit tried (2026-11-20), the firmware file on the unit was exactly the original OS 1.7.3 file, and the install went as on any unit: the write landed the first time. Use the install below as it stands. Nothing is different for you except two things the page does by itself:
+
+- Step 1 reads the bootloader's version, and the page works out the write for that bootloader. 1000.2.0 keeps its working memory at another place than 1000.1.1, so the pad file it needs is another size.
+- Step 5 checks your firmware file. If it is not the original 1.7.3 file, the page says so and builds nothing. Do not try to get around it.
+
+Only one unit on 1000.2.0 has had the install so far. If yours shows a bootloader other than 1000.1.1 or 1000.2.0, the page stops at step 1.
 
 ## Two rules before anything else
 
