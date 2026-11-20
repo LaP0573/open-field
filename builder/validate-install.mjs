@@ -360,6 +360,13 @@ async function selfChecks() {
   const c4 = checkAfter(noBl, plan2.expected);
   check("a plan that names no bootloader is not checked, with a line that says so", !c4.ok && c4.lines.length === 1 && /cannot be checked.*none/.test(c4.lines[0]), c4.lines.join("; "));
   check("a plan that names an unknown bootloader is not checked", !checkAfter({ ...plan2, bootloader: "1000.3.0" }, plan2.expected).ok);
+  // The one write made on 1000.2.0 (2026-11-20, it landed the first time): its disk, with os.ldr and base.pack as the
+  // plan put them, counted 541 records and 2547 index nodes before the pad. Only these counts are kept here, nothing of
+  // that unit's files. The model must choose the pad that write used, and 1000.1.1's model must see that disk otherwise.
+  const landed = { records: 541, nodes: 2547, recordBatches: 6, nodeBatches: 26 };
+  const landedPad = recommendPad(landed, { bootloader: "1000.2.0" });
+  check("the counts of the write that landed on 1000.2.0 get its pad, 14,400,000 bytes", landedPad && landedPad.bytes === 14_400_000, JSON.stringify(landedPad && landedPad.bytes));
+  check("1000.1.1's model sees that disk as landing with no pad", placement(landed, { bootloader: "1000.1.1" }).pass && !placement(landed, { bootloader: "1000.2.0" }).pass);
   // 1000.2.0's heap starts 0x60c8 above 1000.1.1's and is otherwise the same: every buffer is that much higher
   let cases = 0, off = 0;
   for (let nodeBatches = 0; nodeBatches <= 400; nodeBatches += 7) {

@@ -2,8 +2,8 @@
 // file listing of the unit's volume. No memory reading. Runs in the browser (plain ES module, no Node
 // APIs in this file) and in Node.
 //
-// The model was worked out for te-boot 1000.1.1 and held against real writes. It also holds te-boot
-// 1000.2.0, whose heap is the same but for where it starts (BOOTLOADERS, below). Every verdict names the
+// The model was worked out for te-boot 1000.1.1 and held against real writes. For te-boot 1000.2.0,
+// whose heap is the same but for where it starts (BOOTLOADERS, below), one write on one unit holds it. Every verdict names the
 // bootloader it is for, and a version not in BOOTLOADERS gets none: the dev-mode step reads the
 // bootloader's version and refuses any other.
 //
