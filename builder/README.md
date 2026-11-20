@@ -93,7 +93,7 @@ The page can be served from any web address over HTTPS: the unit's check uses US
 ## What the page cannot do
 
 - It does not press the unit's keys. The write itself is always keys on the unit.
-- It has a helper for Windows and one for Linux. On a Mac the page could do the file work itself over USB, as open-xy's builder does for the OP-XY, but that is not built.
+- It has a helper for Windows and one for Linux, which also runs on a Mac with Homebrew's `libusb`. The page could do the file work itself over USB, as open-xy's builder does for the OP-XY, but that is not built.
 - The placement model is that of two bootloader versions, 1000.1.1 and 1000.2.0. 1000.2.0's heap was read from the bootloader itself; the rest of the model is 1000.1.1's, and one write on one unit holds it for 1000.2.0. The page's first step reads the version and refuses any other, and every plan names the version it was made for.
 
 [The owner's guide](../docs/guide.md) has the whole install in words.
