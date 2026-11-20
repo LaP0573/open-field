@@ -292,7 +292,10 @@ class Responder:
             if o is None:
                 reply = NO_OBJECT
             else:
-                data = described(STORAGE, o.name, min(o.size, 0xFFFFFFFF), o.parent, o.kind, o.association)
+                # An object at the top: the unit's ObjectInfo names the parent 0, as the MTP spec says (seen on a unit
+                # with bootloader 1000.2.0). TOP is only GetObjectHandles' word for the top.
+                data = described(STORAGE, o.name, min(o.size, 0xFFFFFFFF), 0 if o.parent == TOP else o.parent,
+                                 o.kind, o.association)
         elif code == GET_PROP_VALUE:
             o = self.objects.get(params[0])
             if self.no_size_property or params[1] != SIZE_PROPERTY:
@@ -764,6 +767,22 @@ class ChangeTests(Base):
             disk.remove_file('logs/y.log')
         self.assertNotIn(DELETE_OBJECT, self.unit.ops)
         self.assertEqual(self.unit.paths(), ['logs/', 'logs/x.log', 'logs/z.log', 'other/', 'other/x.log'])
+
+    def test_a_top_level_file_whose_object_info_says_parent_0_is_removed(self):
+        disk = self.disk({'os.ldr': b'old', 'logs/x.log': b'1'})
+        disk.children('')
+        self.assertEqual(disk._info(disk._handles['os.ldr'].handle, 'describe os.ldr').parent, 0)
+        disk.remove_file('os.ldr')
+        self.assertEqual(self.unit.ops.count(DELETE_OBJECT), 1)
+        self.assertEqual(self.unit.paths(), ['logs/', 'logs/x.log'])
+
+    def test_a_file_listed_at_the_top_whose_object_info_names_a_folder_is_refused(self):
+        disk = self.disk({'logs/x.log': b'1'})
+        inside = self.unit.find(self.unit.make('logs'), 'x.log')
+        with self.assertRaisesRegex(DiskError, 'no longer where it was listed'):
+            disk._delete(inside, TOP, 'x.log', 'x.log')
+        self.assertNotIn(DELETE_OBJECT, self.unit.ops)
+        self.assertEqual(self.unit.paths(), ['logs/', 'logs/x.log'])
 
     def test_the_one_delete_refuses_0_and_ffffffff_whoever_asks(self):
         disk = self.disk({'a': b'1'})

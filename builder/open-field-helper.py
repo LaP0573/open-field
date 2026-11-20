@@ -34,9 +34,14 @@ file off, took the log files off, put os.ldr, a pad file, the folder user/pk, fo
 unit, and read each back with the plan's SHA-256. The page agreed that the write could be made. The owner made the
 write with the unit's keys, and the unit started with open-field.
 
-Not tried on a unit: any other unit or distribution, a second install over an earlier one (os.ldr or a pack replaced,
-old pad files taken off), the way back, a unit whose drive the desktop's file manager holds, a computer that needs the
-udev rule. These paths of the helper have run on stand-ins only, in its tests.
+One unit with the bootloader 1000.2.0, its screen saying OS 1.7.3+1 and its firmware file the original 1.7.3, from
+one computer with macOS and Homebrew's libusb (2026-11-20): the helper copied the original file off, took the log
+files off, replaced the os.ldr at the top level, put a pad file, the folder user/pk and base.pack on the unit, read
+each back with the plan's SHA-256 and said READY TO WRITE. The owner made the write, and it landed the first time.
+
+Not tried on a unit: any other unit or distribution, a pack replaced or old pad files taken off, the way back, a unit
+whose drive the desktop's file manager holds, a computer that needs the udev rule. These paths of the helper have run
+on stand-ins only, in its tests.
 
 Two things on Linux can stand in the way, and the helper says which:
   - The computer does not let you open the unit. A udev rule gives the device to the person at the screen. Put the
@@ -1001,7 +1006,11 @@ class UsbDisk(Disk):
         info = self._info(handle, 'describe %s' % path)
         require(not info.folder and info.format != FOLDER_FORMAT and info.association == 0,
                 'the helper removes files only, and to the unit %s is a folder' % path, 'usage')
-        require(info.name == name and info.parent == parent,
+        # A file at the top of the storage: its ObjectInfo names the parent 0, as the MTP spec says and as the unit
+        # answered (2026-11-20, a unit with bootloader 1000.2.0). ROOT, 0xFFFFFFFF, means "the top" only as a
+        # parameter of GetObjectHandles; it is taken here too, for a unit that answers with it.
+        top = parent == ROOT and info.parent in (NO_OBJECT, ROOT)
+        require(info.name == name and (info.parent == parent or top),
                 'the unit changed: %s is no longer where it was listed, so nothing is removed' % path, 'usage')
         self._expect(self._run(DELETE_OBJECT, [handle, 0]), 'remove %s' % path)
 
