@@ -85,6 +85,7 @@ import re
 import shutil
 import stat
 import struct
+import subprocess
 import sys
 import time
 
@@ -310,7 +311,8 @@ LIBUSB_BUSY, LIBUSB_TIMEOUT, LIBUSB_PIPE = -6, -7, -9
 LIBUSB_ERRORS = {-1: 'input/output error', -2: 'invalid parameter', -3: 'access denied', -4: 'no such device',
                  -5: 'not found', -6: 'busy', -7: 'timed out', -8: 'overflow', -9: 'stalled',
                  -10: 'interrupted', -11: 'out of memory', -12: 'not supported'}
-LIBRARY_NAMES = ('libusb-1.0.so.0', 'libusb-1.0.so')
+LIBRARY_NAMES = ('libusb-1.0.so.0', 'libusb-1.0.so',
+                 '/opt/homebrew/lib/libusb-1.0.0.dylib', '/usr/local/lib/libusb-1.0.0.dylib')   # the last two: macOS, Homebrew
 
 # What the owner reads.
 NOT_FOUND = NOT_SHOWN
@@ -324,6 +326,11 @@ PERMISSION = ('the unit is connected (bus {bus:03d}, device {address:03d}, produ
 BUSY = ('the desktop\'s file manager holds the unit: it opens an MTP device by itself, and then the helper cannot. '
         'Unmount "OP-1" there (the eject sign beside it in Files), or run gio mount -l to see its mtp:// address '
         'and unmount it with gio mount -u mtp://... (that address); then run the command again')
+MAC = sys.platform == 'darwin'
+if MAC:   # macOS: no udev; Image Capture's ptpcamerad, or an MTP app, takes the device instead.
+    PERMISSION = BUSY = ('the unit is connected (bus {bus:03d}, device {address:03d}, product id {product:04x}), but another program '
+                         'holds it. Quit Image Capture, Photos, OpenMTP and Android File Transfer, run killall ptpcamerad, '
+                         'then run the command again')
 GONE = ('the unit went away while the helper was working with it ({action}). Check the cable and that the unit '
         'still shows the bootloader\'s disk mode. The unit is as this moment left it')
 SILENT = ('the unit stopped answering ({action}). Check the cable and that the unit still shows the bootloader\'s '
@@ -642,7 +649,7 @@ class Usb:
         if code == LIBUSB_ACCESS:
             return DiskError(PERMISSION.format(bus=self.bus, address=self.address, product=self.product), 'permission')
         if code == LIBUSB_BUSY:
-            return DiskError(BUSY, 'busy')
+            return DiskError(BUSY.format(bus=self.bus, address=self.address, product=self.product), 'busy')
         if code in (LIBUSB_NO_DEVICE, LIBUSB_IO):
             return DiskError(GONE.format(action=action), 'gone')
         if code == LIBUSB_TIMEOUT:
@@ -686,6 +693,12 @@ class Usb:
                 raise self._failure(code, 'choosing the unit\'s configuration')
         libusb.auto_detach(self.handle)   # Only Linux has kernel drivers to detach; none is expected on MTP.
         code = libusb.claim(self.handle, self.number_wanted)
+        for _ in range(5 if MAC else 0):   # macOS's ptpcamerad grabs MTP devices and launchd restarts it: kill, retry.
+            if code not in (LIBUSB_ACCESS, LIBUSB_BUSY):
+                break
+            subprocess.run(['killall', 'ptpcamerad'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.3)
+            code = libusb.claim(self.handle, self.number_wanted)
         if code != 0:
             raise self._failure(code, 'taking the unit\'s MTP interface')
         self.number = self.number_wanted
@@ -1915,7 +1928,7 @@ def main(argv=None, disk=None, echo=terminal, system=None):
     """The helper's run. `disk`, from a test, takes the place of --source; `echo(line, color)` prints a line;
     `system`, from a test, takes the place of sys.platform."""
     # Before anything is read or made: this helper is for Linux only.
-    if not (sys.platform if system is None else system).startswith("linux"):
+    if not (sys.platform if system is None else system).startswith(("linux", "darwin")):
         echo(NOT_LINUX, "Red")
         return 2
     ap = argparse.ArgumentParser(prog="open-field-helper.py", description="The open-field install's file work on the unit's disk.")

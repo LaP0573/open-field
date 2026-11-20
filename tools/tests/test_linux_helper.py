@@ -24,7 +24,7 @@ import time
 import unittest
 from unittest import mock
 
-if not sys.platform.startswith("linux"):
+if not sys.platform.startswith(("linux", "darwin")):
     # Before the helper is loaded: it is for Linux, and these tests use os.O_NOFOLLOW, named pipes and symbolic links.
     raise unittest.SkipTest("the Linux helper is tried on Linux only")
 
@@ -778,7 +778,7 @@ class Parts(HelperCase):
 
     def test_a_system_that_is_not_linux_is_refused_before_anything_is_made(self):
         folder = os.path.join(self.tmp, "not-made")
-        for system in ("win32", "darwin", "cygwin"):
+        for system in ("win32", "cygwin"):
             with self.subTest(system):
                 lines = []
                 code = H.main(["--folder", folder, "--source", self.unit], echo=lambda l, c: lines.append(l), system=system)

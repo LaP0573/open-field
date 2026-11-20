@@ -32,7 +32,7 @@ import time
 import unittest
 from unittest import mock
 
-if not sys.platform.startswith("linux"):
+if not sys.platform.startswith(("linux", "darwin")):
     # Before the helper is loaded: it is for Linux, and these tests use os.O_NOFOLLOW, named pipes and symbolic links.
     raise unittest.SkipTest("the Linux helper is tried on Linux only")
 
@@ -982,6 +982,7 @@ class UsbTests(Base):
         self.assertEqual((error.kind, str(error)), ('several', H.SEVERAL))
         self.assertNotIn(('open', 'one'), self.libusb.calls)
 
+    @unittest.skipIf(H.MAC, "asserts the Linux texts; the macOS ones are held in test_mac_claim_retry")
     def test_no_permission(self):
         for options in ({'open_code': -3}, {'claim_code': -3}):
             error = self.open_with([unit()], **options)
@@ -993,6 +994,16 @@ class UsbTests(Base):
         self.assertEqual(self.libusb.calls[-2:], ['close', 'exit'])
         self.assertNotIn(('release', 0), self.libusb.calls)
 
+    @unittest.skipUnless(H.MAC, "macOS only")
+    def test_mac_claim_retry(self):
+        # ptpcamerad holds the unit for good: every retry is refused, and the owner reads the macOS text.
+        error = self.open_with([unit()], claim_code=-3)
+        self.assertEqual(error.kind, 'permission')
+        for words_ in ('product id 0102', 'another program holds it', 'killall ptpcamerad'):
+            self.assertIn(words_, str(error))
+        self.assertEqual(self.libusb.calls.count(('claim', 0)), 6)   # the first claim and five after a kill
+
+    @unittest.skipIf(H.MAC, "asserts the Linux texts; the macOS ones are held in test_mac_claim_retry")
     def test_the_interface_is_busy(self):
         error = self.open_with([unit()], claim_code=-6)
         self.assertEqual(error.kind, 'busy')
@@ -1366,6 +1377,7 @@ class FullRunOverUsb(OverUsb):
         self.assertFalse([c for c in self.found[-1].calls if c[0] == 'open'])
         self.assertEqual(self.unit.ops, [])
 
+    @unittest.skipIf(H.MAC, "asserts the Linux texts; the macOS ones are held in test_mac_claim_retry")
     def test_no_permission_and_busy_show_the_transports_texts_and_stop(self):
         for options, kind, words_ in (({'open_code': -3}, 'permission', 'uaccess'),
                                       ({'claim_code': -3}, 'permission', '70-op1-field.rules'),
@@ -1415,6 +1427,7 @@ class ListOnlyOverUsb(OverUsb):
         self.assertEqual(out[0], H.WAITING)
         self.assertNothingMade()
 
+    @unittest.skipIf(H.MAC, "asserts the Linux texts; the macOS ones are held in test_mac_claim_retry")
     def test_list_only_stops_with_the_texts_of_the_transport(self):
         cases = (([[]], {}, H.NOT_SHOWN), ([[unit(ref='one'), unit(ref='two', address=43)]], {}, H.MORE_THAN_ONE),
                  ([[unit()]], {'open_code': -3}, None), ([[unit()]], {'claim_code': -6}, H.BUSY))
