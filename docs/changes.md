@@ -4,7 +4,7 @@ Every place where open-field changes OS 1.7.3+0 of the OP-1 Field, and nothing e
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 131 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 138 changes in 7 tables. A place that two packs can use is listed under each.
+There are 132 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 139 changes in 7 tables. A place that two packs can use is listed under each.
 
 ## In the firmware file, by the builder
 
@@ -27,7 +27,7 @@ The loader's own three changes: the loader is our small piece inside the firmwar
 | `0x8fcafc0a` | a call | `op1f_base_populate_stub` | In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it. | A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own. |
 | `0x8c0b43e4` | a call | `op1f_base_text_stub` | In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address. | A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock. |
 
-### The base, `base.pack` (14)
+### The base, `base.pack` (15)
 
 The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).
 
@@ -47,6 +47,7 @@ The pack `base`, the file base.pack: the shared pack every other pack relies on.
 | `0x8c0b1c00` | a jump, with a trampoline of 8 bytes | `op1f_input_turn_place` | In the function that hands a knob's turn to the mode shown: the call right behind its own bookkeeping of the knob. | A jump to ours, which offers the turn to the packs as a key is offered; a turn a pack takes goes no further, any other goes on as before. |
 | `0x8c0b2578` | a call | `op1f_page_screen` | In the function that asks which screen is to show: the load right behind the mode's answer, where the screen's number is in hand. | A call to ours, which does the load and, while a pack's page is open in the mode shown, answers the screen the base lends packs in place of the mode's. |
 | `0x8c0b1936` | a call | `op1f_gfx_frame_hook` | In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown. | A call to our frame hook, which does our own work of a frame and then makes the firmware's call. |
+| `0x8c0b2e9a` | a call | `op1f_recstart_entry` | In the key thread's main loop, a call made on every pass. | A call to ours, which makes the firmware's call and then, while the firmware waits on REC and the input goes over -40 dBFS, presses PLAY, so sound coming in starts the recording. |
 
 ### `8 tracks` (73)
 

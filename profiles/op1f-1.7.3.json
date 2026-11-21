@@ -155,6 +155,13 @@
    "name": "In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown."
   },
   {
+   "address": "0x8c0b2e9a",
+   "length": 8,
+   "sum": "0x8898bdc0",
+   "group": "base",
+   "name": "In the key thread's main loop, a call made on every pass."
+  },
+  {
    "address": "0x8fc22eb0",
    "length": 8,
    "sum": "0x4a79151e",
@@ -1087,6 +1094,12 @@
      "form": "call",
      "target": "op1f_gfx_frame_hook",
      "does": "A call to our frame hook, which does our own work of a frame and then makes the firmware's call."
+    },
+    {
+     "address": "0x8c0b2e9a",
+     "form": "call",
+     "target": "op1f_recstart_entry",
+     "does": "A call to ours, which makes the firmware's call and then, while the firmware waits on REC and the input goes over -40 dBFS, presses PLAY, so sound coming in starts the recording."
     }
    ]
   },

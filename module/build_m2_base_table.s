@@ -24,6 +24,7 @@ op1f_boot_table:
     .long 0x00080014, 0x8c0b1c00, op1f_input_turn_place, 0xe4c2b241, op1f_input_turn_room    /* A jump to ours, which offers the turn to the packs as a key is offered; a turn a pack takes goes no further, any other goes on as before. */
     .long 0x00000012, 0x8c0b2578, op1f_page_screen, 0xcb4e35d8, 0    /* A call to ours, which does the load and, while a pack's page is open in the mode shown, answers the screen the base lends packs in place of the mode's. */
     .long 0x00000012, 0x8c0b1936, op1f_gfx_frame_hook, 0x712953dc, 0    /* A call to our frame hook, which does our own work of a frame and then makes the firmware's call. */
+    .long 0x00000012, 0x8c0b2e9a, op1f_recstart_entry, 0x8898bdc0, 0    /* A call to ours, which makes the firmware's call and then, while the firmware waits on REC and the input goes over -40 dBFS, presses PLAY, so sound coming in starts the recording. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

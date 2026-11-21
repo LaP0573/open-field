@@ -406,6 +406,10 @@ Besides the card, the base holds what our own four features share. A pack by som
 - **The picture loader's directories of the four features**, each offered under a name the base knows: `op1f_art_sidechain`, `op1f_art_lfo`, `op1f_art_fx_train`, `op1f_art_8_tracks`. A feature whose pictures are instructions needs one of the marks `op1f_art_maker_1` to `op1f_art_maker_3`; a pack with a card needs none, since level 1 promises pictures.
 - **A frame function for each feature**, called by its name (`op1f_duck_frame`, `op1f_fx_frame`, `op1f_chain_frame`, `op1f_lfo_alone_frame`, `op1f_sums_frame`, `op1f_xmap_frame`), each an optional name: a feature that is away is not called.
 
+## What the base does for every owner
+
+- **Sound coming in starts a tape recording** (`module/build_m3_recstart.cpp`). With REC held and the tape stopped, the firmware starts a recording on the first key of the keyboard; the base also starts it on the first sound over -40 dBFS on the input, so gear on line in or USB (a sampler, a phone) can start a take on a unit without TRS MIDI. It presses PLAY for you, REC + PLAY being the firmware's own start, once per press of REC. It runs on the key thread from a call in its main loop (0x8c0b2e9a, `module/build_m3_recstart.s`): a key handed to the firmware's queue there needs the wake that follows it (0x8c0b2530), or it waits for the next real key.
+
 ## What the base does not offer yet
 
 - **Folders inside a pack's folder, in the disk mode.** A pack may make them on the disk itself; the disk mode does not show them, and `op1f_list` leaves them out.
