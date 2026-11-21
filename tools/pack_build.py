@@ -657,7 +657,7 @@ def layout3(elf, origin):
     binary = data["address"] + data["size"] - origin
     if values["__module_initialized_end"] - origin != binary:
         raise ValueError("The pack's initialised data does not end where the linker says")
-    align = max(elf.section(name)["align"] for name in (".text", ".rodata", ".data", ".bss"))
+    align = max(s["align"] for s in elf.sections if s["name"] in (".text", ".rodata", ".data", ".bss"))   # ld drops an empty .rodata or .bss
     return data["address"] - origin, binary, values["__module_end"] - origin - binary, align, values
 
 
