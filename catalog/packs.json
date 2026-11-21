@@ -260,6 +260,56 @@
       "needs": [],
       "level": 10,
       "folders": []
+    },
+    {
+      "id": "veffbode",
+      "author": "galfaroth",
+      "status": "listed",
+      "categories": ["effects"],
+      "description": "A Bode frequency shifter in a delay's feedback loop, in the unit's lists of effects and on fx train's wagons.",
+      "repository": "https://github.com/galfaroth/open-field-veff",
+      "commit": "fd0707e7f318022284570c4560ea8f709fefb6d5",
+      "path": "veffbode.pack",
+      "sha256": "e8997d4e0c162ac3dd896bd2f9a17d9cf2e55302a9a7d84b855f4a6f59d56750",
+      "bytes": 304450,
+      "version": 1,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "veffrosion",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A degrader in the spirit of Erosion: a tiny delay wobbled by a sine or band-passed noise, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffsaturator",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A saturator with six curves, colour, soft clip and 2x oversampling, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffshaper",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A parametric waveshaper with a drawn curve, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffgrrr",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A two-stage distortion with filters and a feedback loop, in the unit's lists of effects.",
+      "level": 10
     }
   ]
 }
