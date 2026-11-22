@@ -84,6 +84,23 @@
       "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}]
     },
     {
+      "id": "master mod",
+      "author": "Reverdy-Carrasco",
+      "status": "listed",
+      "categories": ["mixer", "looks"],
+      "description": "Encoder remap on the Master page, L/R post-makeup on the master compressor, matching SVGs.",
+      "repository": "https://github.com/Reverdy-Carrasco/master-mod",
+      "commit": "781ea4ffbe61a8e52750fb88e2c48310174f0999",
+      "path": "out/master mod.pack",
+      "sha256": "421aea3a276ba3ffb7a05c4a9201b746cb4cf49d7937fb4c5a0b7fb791e8f0eb",
+      "bytes": 3656,
+      "version": 1,
+      "firmware": "1.7.3",
+      "places": 14,
+      "needs": [],
+      "level": 1,
+      "folders": []
+    },    {
       "id": "sidechain",
       "author": "open-field",
       "status": "listed",
