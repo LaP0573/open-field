@@ -633,6 +633,10 @@ const u32 op1f_level_7 = 7;
 // functions: it tells the packs what the firmware's threads took from a file, and keeps the base's store of the slots.
 extern "C" void op1f_keeps_frame() OP1F_NAMED("op1f_keeps_frame");
 
+// R8 (base 31): the options (module/build_r8_options.cpp): the file read, the page put up and painted, `changed` told;
+// before any frame function. Weak: away, nothing of options is done.
+extern "C" void __attribute__((weak)) op1f_options_frame() OP1F_NAMED("op1f_options_frame");
+
 // R5: the effects unit's (base 28's effects unit): its frame work, once a frame on the display thread behind the
 // values' unit's and before the frame functions; and whether an effect's page stands in for a screen now. Weak: away,
 // nothing of level 8 is done here.
@@ -1125,6 +1129,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (kind == (u32)OP1F_ASK_SEQUENCER || kind == (u32)OP1F_ASK_NOTES) continue;
         if (six && (kind == (u32)OP1F_ASK_STAGE || kind == (u32)OP1F_ASK_MEMORY || kind == (u32)OP1F_ASK_PLACES)) continue;   // R4
         if (seven && kind == (u32)OP1F_ASK_KEEPS) continue;                         // R4b
+        if (six && kind == 10u) continue;                                           // R8: the options (OP1F_ASK_OPTIONS), the options unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
         if (unknown == 0) first = kind;
@@ -2902,6 +2907,7 @@ extern "C" void op1f_cards_frame() {
     op1f_memory_frame();                                    // R4: the memory unit's frame work, then the stages unit's
     op1f_stages_frame();
     op1f_keeps_frame();                                     // R4b: the values' unit's, before any frame function
+    if (&op1f_options_frame != 0) op1f_options_frame();     // R8: the options, before any frame function
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     said_passed();                                          // R4: the pictures a card of level 6 carries and a screen was not served

@@ -412,6 +412,13 @@
    "sum": "0x712953dc",
    "group": "base",
    "name": "In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown."
+  },
+  {
+   "address": "0x8c0d57a8",
+   "length": 8,
+   "sum": "0xf5f3b463",
+   "group": "base",
+   "name": "The entry of the function the settings controller adds a row of the settings list with: the controller, the row's controller. Called six times at the start, before the first frame."
   }
  ],
  "image": [
@@ -817,6 +824,14 @@
      "form": "call",
      "target": "op1f_gfx_frame_hook",
      "does": "A call to our frame hook, which does our own work of a frame and then makes the firmware's call."
+    },
+    {
+     "address": "0x8c0d57a8",
+     "form": "jump",
+     "target": "op1f_options_add",
+     "room": "op1f_options_add_room",
+     "copies": 8,
+     "does": "A jump to ours (base 31), which lets the firmware add each of its settings rows through a trampoline and, behind the sixth, adds the row \"packs\" that opens the base's page of the packs' options."
     }
    ]
   }

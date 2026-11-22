@@ -151,8 +151,8 @@ Each of these is called by the files named. The type is what our code hands over
 | `0x8fcacea0` | `void* root_child(void* behaviour, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_disk.cpp` |
 | `0x8fcaeb10` | `void* make_folder(void* parent, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
 | `0x8fcaed68` | `void* add_file(void* folder, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
-| `0x8fcba8ac` | `void close(int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
+| `0x8fcba8ac` | `void close(int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcba8c0` | `int write(const void* data, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
-| `0x8fcba954` | `int read(void* buffer, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r6d_engines.cpp` |
-| `0x8fcba988` | `int open(const char* path, const char* mode)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
+| `0x8fcba954` | `int read(void* buffer, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
+| `0x8fcba988` | `int open(const char* path, const char* mode)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcbabb8` | `void fs_file_ctor(void* obj, const char* path)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |

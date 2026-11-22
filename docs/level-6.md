@@ -166,6 +166,20 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | `memory: '<name>' of '<pack>' is refused <bytes> bytes: ...` | Why not |
 | `cards: '<pack>' carries a picture named ... and does not take its place` | A screen asked for a name your pack carries and doesn't list |
 
+## Options (base 31)
+
+Some things a pack does are a matter of taste: a drawing that takes the whole tape screen, a gesture that gets in the way, a way of working. From base 31 a card of level 6 or later can hand such things to the owner as **options**, and the base shows every pack's options on **one page**, reached from the unit's own settings: the base adds the row **packs** to the settings list, and a click of any knob on that row opens the page. There the first knob moves from option to option, the second knob or a click changes the one chosen, and the help key or T1 leaves. A switch shows OFF and ON with the value's word in a filled box; a list shows its choice's word between arrows and a dot for each choice.
+
+One ask a card, of the kind `options`, with up to eight options. A switch has no `choices`; a list has two to eight words of up to seven characters. `first` is where the option starts on a unit that has never changed it:
+
+```json
+{ "kind": "options", "name": "lanes", "changed": null,
+  "options": [ { "name": "LCARS lanes", "first": true },
+               { "name": "snap", "choices": ["off", "1/16", "1/8"], "first": 0 } ] }
+```
+
+Read a value with `op1f_option(card, i)`, from any thread: 0 or 1 for a switch, the choice's number for a list. The base keeps the values for the whole unit in its own file, `user/pf/.options`, a line `<pack>/<option>=<choice>` each, and keeps the lines of a pack that is off the unit for when it comes back. `changed(option, value)`, when you give one, is told on the display thread before the frame functions of the frame that takes the change; like level 7's, it notes what it's told and does no more. Import `op1f_option` as optional and take the first choice where it is 0, and your pack runs as before on a base that doesn't know the kind: such a base leaves the ask aside, with its line for kinds it doesn't know. `"where": "tape"` is reserved for a value kept with each tape; base 31 keeps it for the unit.
+
 ## Limits, in one place
 
 | | |

@@ -61,6 +61,7 @@ op1f_boot_table:
     .long 0x00000012, 0x8d4ec1f4, op1f_keeps_read_list_drum_stub, 0xbf339f84, 0    /* A call to our stub, which makes the firmware's call and keeps the values packs keep in the kit's file. */
     .long 0x00000012, 0x8d4ec2c6, op1f_keeps_put_drum_at, 0x34cfb303, 0    /* A call to ours, which makes the firmware's call and then tells the packs that another kit is on the slot. */
     .long 0x00000012, 0x8c0b1936, op1f_gfx_frame_hook, 0x712953dc, 0    /* A call to our frame hook, which does our own work of a frame and then makes the firmware's call. */
+    .long 0x00080014, 0x8c0d57a8, op1f_options_add, 0xf5f3b463, op1f_options_add_room    /* A jump to ours (base 31), which lets the firmware add each of its settings rows through a trampoline and, behind the sixth, adds the row "packs" that opens the base's page of the packs' options. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

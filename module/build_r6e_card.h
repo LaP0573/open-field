@@ -1532,4 +1532,60 @@ extern "C" int op1f_param_heard(const Op1fCard* card, unsigned ask, unsigned pla
 // The mark of a base of level 10 (a constant 10): a pack that calls op1f_param_heard names it.
 extern "C" const unsigned op1f_level_10 OP1F_NAMED("op1f_level_10");
 
+// Base 31: options. Up to here every word is base 30's; this part only adds behind it, and a pack built for base 30 is
+// not touched by it.
+//
+// A pack that has things the owner may want on or off (a full-screen drawing, a gesture, a way of working) declares
+// them in one ask of kind OP1F_ASK_OPTIONS, on a card of level 6 or later: up to eight options, each a switch (off or
+// on) or a list of up to eight choices, with the one it starts at. The base keeps the values for the whole unit, in a
+// file of its own (user/pf/.options, a line `<pack>/<option>=<choice>` each), shows every pack's options on one page,
+// and hands the values to the pack: op1f_option(card, i) from any thread, and `changed` when the owner changes one.
+// The page opens from the unit's own settings: the base adds the row "packs" to its list; with that row chosen, a click
+// of any knob opens the page. On the page the first knob moves from option to option, the second knob or a click
+// changes the one chosen, and the help key or T1 leaves.
+//
+// The kind of ask a base 31 knows beside levels 5 to 9's, for a card of level 6 or later. A base that does not know it
+// (base 30) leaves the ask aside, with its line for kinds it does not know, and uses the card: a pack reads its
+// options through op1f_option imported as optional, and takes the first choice of each where the name is 0.
+//   OP1F_ASK_OPTIONS  the pack's options: what `what` points at is an Op1fOptions
+enum { OP1F_ASK_OPTIONS = 10 };   // not 9: packs out there ask for options as 10, and 9 is proposed for files per tape
+
+// An option's kind, and where its value is kept.
+//   OP1F_OPTION_SWITCH  off (0) or on (1); the page shows OFF and ON
+//   OP1F_OPTION_LIST    one of `count` choices (2 to 8), from 0; the page shows the choice's word
+//   OP1F_OPTION_UNIT    the same value whatever the tape (the only place base 31 keeps)
+//   OP1F_OPTION_TAPE    reserved for a value kept with each tape (level 7's place): base 31 keeps it for the unit
+enum { OP1F_OPTION_SWITCH = 0, OP1F_OPTION_LIST = 1, OP1F_OPTION_UNIT = 0, OP1F_OPTION_TAPE = 1 };
+enum { OP1F_OPTIONS_MOST = 8, OP1F_CHOICES_MOST = 8, OP1F_OPTION_NAME = 16, OP1F_CHOICE_NAME = 8 };
+
+// One option: its name (1 to 15 plain characters, shown as they are), its kind, how many choices (2 for a switch), the
+// choice it starts at, where it is kept, and for a list the words of its choices (1 to 7 plain characters each).
+struct Op1fOption {
+    char name[OP1F_OPTION_NAME];                        // +0
+    unsigned char kind, count, first, where;            // +16
+    char choices[OP1F_CHOICES_MOST][OP1F_CHOICE_NAME];  // +20, a switch's are zeros
+};   // 84 bytes
+
+// The options: what its ask points at; one such ask a card. The head's `flags` is 0 and its `shown` 0.
+//   changed  called on the display thread, outside the pack's frame function, before the frame functions of the frame
+//            after the owner changed option `option` to `value` on the page. Like level 7's `changed`, it notes what it
+//            is told and does no more. 0 for none: op1f_option answers the new value from then on either way
+//   count    how many options follow, 1 to OP1F_OPTIONS_MOST
+struct Op1fOptions {
+    Op1fKindHead head;                                  // +0
+    void (*changed)(unsigned option, unsigned value);   // +28
+    unsigned count;                                     // +32
+    Op1fOption options[OP1F_OPTIONS_MOST];              // +36
+};   // 708 bytes in base 31
+static_assert(sizeof(Op1fOption) == 84 && sizeof(Op1fOptions) == 708 && OP1F_PLACE_IN(Op1fOptions, options) == 36,
+              "the table of options is 708 bytes");
+
+// The value of the card's option `option` (from 0, in the ask's order): 0 to its count - 1. Before the base has read its
+// file it answers the option's `first`; for a card with no such ask, or an option it does not list, OP1F_BAD_NAME.
+// From any thread: it reads one byte.
+extern "C" int op1f_option(const Op1fCard* card, unsigned option) OP1F_NAMED("op1f_option");
+
+// The mark of a base that carries out an ask of kind OP1F_ASK_OPTIONS (a constant 1).
+extern "C" const unsigned op1f_options_1 OP1F_NAMED("op1f_options_1");
+
 #endif

@@ -53,7 +53,7 @@ python -I tools/pack_build.py card --recipe examples/wink/recipe.json --out <the
 | 3 | Folders and files on the unit's disk, and text on a page | 56 bytes | `op1f_level_3` |
 | 4 | [What a page needs](level-4.md): pages that stack, a blank page to paint, painting, text placed and measured, a file deleted, a key watched, the thread an event came on; and the card's list of asks | 64 bytes | `op1f_level_4` |
 | 5 | [A sequencer of the pack's own](level-5.md) in the unit's list, and the notes heard | 64 bytes | `op1f_level_5` |
-| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name | 64 bytes | `op1f_level_6` |
+| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name; from base 31, [options](level-6.md#options-base-31) on one page reached from the unit's settings | 64 bytes | `op1f_level_6` |
 | 7 | [Values kept in tapes and sounds](level-7.md), in the unit's own files | 64 bytes | `op1f_level_7` |
 | 8 | [An effect of the pack's own](level-8.md) in the unit's lists of effects, for the sounds and the master, and the list of every pack's effects, to run inside another pack | 64 bytes | `op1f_level_8` |
 | 9 | [A synth engine of the pack's own](level-9.md) in the unit's list of engines, with sounds of its own in the sound list | 64 bytes | `op1f_level_9` |
@@ -404,6 +404,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_stages` | `stage:` | Level 6: each sound stage, its cost, and why one was left aside or switched off |
 | `op1f_memory` | `memory:` | Level 6: the working memory given, or refused |
 | `op1f_keeps` | `keeps:` | Level 7: the values kept in the unit's files, written and read |
+| `op1f_options` | `options:` | Base 31: the packs' options read and written, the page up and closed, whether the settings row is in the list ([level 6](level-6.md#options-base-31)) |
 | `op1f_effects` | `effect:` | Level 8: the packs' effects in the unit's lists, which place plays which, their memory and their period |
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |
 | `op1f_tape_art` | `artwork` | A picture put together on the unit, and from what |

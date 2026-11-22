@@ -118,6 +118,8 @@ Delete its file from `packs` in the disk mode, and switch the unit off and on. K
 
 Saved trains and LFO sets are files. The disk mode shows them in the folders `fx` and `lfo`, so you can keep copies on the computer or pass your own on.
 
+A pack may have options, switches and choices its author leaves to you. From base 31 the unit's settings list has a row **packs**: click any knob on it for one page of every pack's options. The first knob moves from option to option, the second knob or a click changes the one chosen, and the help key or T1 leaves. The values are kept for the whole unit, in `user/pf/.options`; a pack taken away and put back finds its own again.
+
 A pack may have folders of its own, which the disk mode shows beside `packs`, `fx` and `lfo`: the example pack `list` has one, `list`. On the unit's disk they lie in `user/pf`. A pack's folder stays there when the pack is deleted; delete it in the bootloader's drive mode if you no longer want it.
 
 ## Your tapes

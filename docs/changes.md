@@ -4,7 +4,7 @@ Every place where the loader and the base of open-field change OS 1.7.3+0 of the
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 56 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 54 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
+There are 57 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 55 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
 
 ## In the firmware file, by the builder
 
@@ -27,7 +27,7 @@ The loader's own three changes: the loader is our small piece inside the firmwar
 | `0x8fcafc0a` | a call | `op1f_base_populate_stub` | In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it. | A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own. |
 | `0x8c0b43e4` | a call | `op1f_base_text_stub` | In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address. | A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock. |
 
-### The base, `base.pack` (51)
+### The base, `base.pack` (52)
 
 The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).
 
@@ -84,6 +84,7 @@ The pack `base`, the file base.pack: the shared pack every other pack relies on.
 | `0x8d4ec1f4` | a call | `op1f_keeps_read_list_drum_stub` | In the loading of a drum kit picked in the unit's list: the call that reads the kit's file. | A call to our stub, which makes the firmware's call and keeps the values packs keep in the kit's file. |
 | `0x8d4ec2c6` | a call | `op1f_keeps_put_drum_at` | In the loading of a drum kit picked in the unit's list: the call that puts the kit on its slot. | A call to ours, which makes the firmware's call and then tells the packs that another kit is on the slot. |
 | `0x8c0b1936` | a call | `op1f_gfx_frame_hook` | In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown. | A call to our frame hook, which does our own work of a frame and then makes the firmware's call. |
+| `0x8c0d57a8` | a jump, with a trampoline of 8 bytes | `op1f_options_add` | The entry of the function the settings controller adds a row of the settings list with: the controller, the row's controller. Called six times at the start, before the first frame. | A jump to ours (base 31), which lets the firmware add each of its settings rows through a trampoline and, behind the sixth, adds the row "packs" that opens the base's page of the packs' options. |
 
 ## Words
 

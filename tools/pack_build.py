@@ -383,6 +383,21 @@ ENGINE_ALIGN_LEAST = 4
 CARD_LEVELS = CARD_LEVELS + (10,)
 ASK_KINDS_OF_LEVEL[10] = dict(ASK_KINDS_OF_LEVEL[9])
 KINDS_COUNTED[10] = KINDS_COUNTED[9]
+# base 31 (module/build_r6e_card.h, "Options"): a card of level 6 or later may ask for one kind more, its options (its
+# table 708 bytes: the head, the function told, the count, eight options of 84 bytes). A base that does not know the kind
+# leaves the ask aside and uses the card.
+OPTIONS = 10                                                    # not 9: packs out there ask for options as 10
+for _level in (6, 7, 8, 9, 10):
+    ASK_KINDS_OF_LEVEL[_level] = dict(ASK_KINDS_OF_LEVEL[_level], options=OPTIONS)
+KINDS_COUNTED.update({6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "nine"})
+KIND_WORDS_6[OPTIONS] = "options"
+TABLE_BYTES_6[OPTIONS] = 708
+ASK_KEYS_6[OPTIONS] = ("kind", "name", "changed", "options")
+ASK_ADDRESSES_6[OPTIONS] = (("shown", 24), ("changed", 28))
+OPTIONS_MOST, CHOICES_MOST, OPTION_NAME, CHOICE_NAME, OPTION_BYTES = 8, 8, 16, 8, 84
+OPTION_NAME_FORM = re.compile(r"[A-Za-z0-9 _.+#%-]{1,15}")       # an option's name: plain characters the page's font draws
+CHOICE_FORM = re.compile(r"[A-Za-z0-9 _./+#%-]{1,7}")            # a choice's word
+OPTION_WHERE = {"unit": 0, "tape": 1}
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1284,7 +1299,7 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card asks for memory %d times: the base takes %d such asks in all and leaves the next aside" % (len(memories), MEMORIES_MOST))
     if sum(ask[4]["bytes"] for ask in out if ask[0] == 4) > MEMORY_MOST:
         raise ValueError("The card's memory asks come to more than 16 MiB together: the base gives %d bytes in all and refuses the later" % MEMORY_MOST)
-    for what in (5, 6):
+    for what in (5, 6, OPTIONS):
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
         if len(found) > 1:
             raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
@@ -1296,7 +1311,7 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
     effect, held as a base of level 8 holds it (`earlier`: the card's asks before it), and the keeps of a card of level
     8, which may name the master."""
     what = ASK_KINDS_OF_LEVEL[9][ask["kind"]]
-    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine"}[what]
+    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine", OPTIONS: "the options"}[what]
     name = ask.get("name")
     unknown = sorted(set(ask) - set(ASK_KEYS_6[what]))
     if unknown:
@@ -1347,6 +1362,36 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
             if text in names[:place - 1]:
                 raise ValueError("%s: its name %d, %r, is there before" % (said, place, text))
         extra = {"names": list(names)}
+    elif what == OPTIONS:                                   # base 31
+        if not a_symbol(ask.get("changed")):
+            raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
+        options = ask.get("options")
+        if not isinstance(options, list) or not 1 <= len(options) <= OPTIONS_MOST:
+            raise ValueError("%s: its options are a list of one to %d options" % (said, OPTIONS_MOST))
+        held = []
+        for place, o in enumerate(options, 1):
+            if not isinstance(o, dict) or set(o) - {"name", "choices", "first", "where"} or "name" not in o:
+                raise ValueError('%s: its option %d is {"name": its name, "choices": null for a switch or a list of 2 to %d words, "first": the choice it starts at, "where": "unit"}'
+                                 % (said, place, CHOICES_MOST))
+            if not isinstance(o["name"], str) or not OPTION_NAME_FORM.fullmatch(o["name"]):
+                raise ValueError("%s: its option %d's name, %r, is not one to fifteen plain characters the page draws" % (said, place, o["name"]))
+            if o["name"] in [h[0] for h in held]:
+                raise ValueError("%s: its option %d's name, %r, is there before" % (said, place, o["name"]))
+            choices = o.get("choices")
+            if choices is not None and (not isinstance(choices, list) or not 2 <= len(choices) <= CHOICES_MOST
+                                        or any(not isinstance(c, str) or not CHOICE_FORM.fullmatch(c) for c in choices)):
+                raise ValueError("%s: its option %d's choices are null (a switch) or a list of 2 to %d words of one to seven plain characters" % (said, place, CHOICES_MOST))
+            count = 2 if choices is None else len(choices)
+            first = o.get("first", 0)
+            if isinstance(first, bool):
+                first = int(first)
+            if not whole(first, 0, count - 1):
+                raise ValueError("%s: its option %d's first is a choice from 0 to %d (a switch: false or true), not %r" % (said, place, count - 1, o.get("first")))
+            if o.get("where", "unit") not in OPTION_WHERE:
+                raise ValueError("%s: its option %d's where is \"unit\" or \"tape\", not %r" % (said, place, o.get("where")))
+            held.append((o["name"], 0 if choices is None else 1, count, first, OPTION_WHERE[o.get("where", "unit")], list(choices or [])))
+        functions = {"changed": ask.get("changed")}
+        extra = {"options": held}
     else:
         if not a_symbol(ask.get("changed")):
             raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
@@ -1643,6 +1688,9 @@ def ask_words(what, name, flags, functions, extra=None):
         return "memory '%s', %d bytes on %d" % (name, extra["bytes"], extra["align"])
     if what == 5:
         return "places '%s', %d name(s): %s" % (name, len(extra["names"]), " ".join(n if n is not None else "?" for n in extra["names"]))
+    if what == OPTIONS:                                     # base 31
+        return "options '%s', %d option(s): %s" % (name, len(extra["options"]), "; ".join(
+            "%s %s from %s" % (n, "on/off" if k == 0 else "/".join(cs), ("off", "on")[f] if k == 0 else cs[f]) for n, k, _c, f, _w, cs in extra["options"])) + (", changed" if functions.get("changed") else "")
     if what == 6:
         said = "keeps '%s', %d key(s): %s" % (name, len(extra["keys"]), "; ".join(
             "%s in %s" % (key, " and ".join(KEEP_WORDS[bit] for bit in (1, 2, 4, 8) if bits & bit) or "no file") for key, bits in extra["keys"]))
@@ -1686,6 +1734,13 @@ def ask_table_words(ask, address_of=None):
         return [extra["bytes"], extra["align"]]
     if what == 5:
         return [len(extra["names"]), address(extra["names_symbol"])]
+    if what == OPTIONS:                                     # base 31: each option its name, four bytes, its choices' words
+        words = [address(functions["changed"]), len(extra["options"])]
+        for n, k, c, f, w, cs in extra["options"]:
+            words += [n.encode("ascii").ljust(OPTION_NAME, b"\0"), k | c << 8 | f << 16 | w << 24]
+            words += [(cs[i] if i < len(cs) else "").encode("ascii").ljust(CHOICE_NAME, b"\0") for i in range(CHOICES_MOST)]
+        left = OPTIONS_MOST - len(extra["options"])
+        return words + ([bytes(left * OPTION_BYTES)] if left else [])
     if what == 8:                                           # since R6: an engine, its values as signed words, its list of sounds
         words = [extra["cycles"], extra["voice_bytes"], extra["voice_align"], address(functions["render"]), address(functions["reset"]), len(extra["params"])]
         for value_name, low, high, start in extra["params"]:
@@ -2020,6 +2075,20 @@ def ask_tables_6(data, level):
                         extra["names"][-1] = None
             else:
                 wrong = "its list of names does not lie in its pack on a word"
+        elif kind == OPTIONS:                                # base 31
+            functions["changed"] = words[0]
+            held = []
+            for n in range(min(words[1], OPTIONS_MOST)):
+                o = at + 36 + OPTION_BYTES * n
+                raw = bytes(body[o:o + OPTION_NAME])
+                k, c, f, w = body[o + 16], body[o + 17], body[o + 18], body[o + 19]
+                cs = [bytes(body[o + 20 + CHOICE_NAME * i:o + 20 + CHOICE_NAME * (i + 1)]).split(b"\0")[0].decode("latin-1") for i in range(min(c, CHOICES_MOST))]
+                held.append((raw.split(b"\0")[0].decode("latin-1"), k, c, f, w, cs if k == 1 else []))
+            extra = {"options": held}
+            if not 1 <= words[1] <= OPTIONS_MOST:
+                wrong = "its count of options is not between 1 and %d" % OPTIONS_MOST
+            elif any(k > 1 or not 2 <= c <= CHOICES_MOST or (k == 0 and c != 2) or f >= c for _n, k, c, f, _w, _cs in held):
+                wrong = "an option that is not in order"
         else:
             functions["changed"] = words[0]
             keys = []
@@ -2066,7 +2135,7 @@ def ask_tables_6(data, level):
             continue
         if kind == 3 and ask[4]["memory"] and not (ask[4]["memory"] <= len(out) and out[ask[4]["memory"] - 1][0] == 4):
             out[number] = item[:4] + ("its memory names no memory ask of its card",)
-        elif kind in (5, 6) and any(other[0] == kind for other in out[:number]):
+        elif kind in (5, 6, OPTIONS) and any(other[0] == kind for other in out[:number]):
             out[number] = item[:4] + ("a second ask of %s, where the base takes one a card" % KIND_WORDS_6[kind],)
     return out
 
