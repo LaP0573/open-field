@@ -1,4 +1,11 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 32 (R8), the base pack: base 31's cards, edited in place (base 31's text is release 0.13's, in this repository's history), with one kind
+// of ask more for a card of level 6 or later, a pack's options (OP1F_ASK_OPTIONS): the options unit's
+// (module/build_r8_options.cpp), whose frame work this unit calls once a frame behind the values' unit's, a weak name
+// (away: nothing of options is done), and which the line of the kinds this base does not know passes by.
+//
+// What base 31 said follows and holds.
+//
 // Base 31 (R6h), the base pack: base 30's cards, edited in place (base 30's text is release 0.12's, in this repository's history), with one rule added for
 // every pack alike:
 //
@@ -649,6 +656,19 @@ const u32 op1f_level_7 = 7;
 // functions: it tells the packs what the firmware's threads took from a file, and keeps the base's store of the slots.
 extern "C" void op1f_keeps_frame() OP1F_NAMED("op1f_keeps_frame");
 
+// R8 (base 32): the options unit's (module/build_r8_options.cpp): its frame work, once a frame on the display thread
+// behind the values' unit's and before any frame function: the file read, the settings' lines filled, `changed` and
+// `open` told. And its key down, first in op1f_input_down behind the top page's: not 0 when it took the key (T1, while a
+// pack's options show under PACKS in the settings, goes back to the list of packs; the firmware's own T1 there leaves
+// the settings at its press). Weak: away, nothing of options is done. The kind of its ask is the header's
+// (module/build_r6e_card.h); this unit reads base 29's header, so it names the same number here where that header is
+// not read.
+extern "C" void __attribute__((weak)) op1f_options_frame() OP1F_NAMED("op1f_options_frame");
+extern "C" int __attribute__((weak)) op1f_options_down(unsigned key) OP1F_NAMED("op1f_options_down");
+#ifndef OP1F_BUILD_R6E_CARD_H
+enum { OP1F_ASK_OPTIONS = 10 };
+#endif
+
 // R5: the effects unit's (base 28's effects unit): its frame work, once a frame on the display thread behind the
 // values' unit's and before the frame functions; and whether an effect's page stands in for a screen now. Weak: away,
 // nothing of level 8 is done here.
@@ -1141,6 +1161,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (kind == (u32)OP1F_ASK_SEQUENCER || kind == (u32)OP1F_ASK_NOTES) continue;
         if (six && (kind == (u32)OP1F_ASK_STAGE || kind == (u32)OP1F_ASK_MEMORY || kind == (u32)OP1F_ASK_PLACES)) continue;   // R4
         if (seven && kind == (u32)OP1F_ASK_KEEPS) continue;                         // R4b
+        if (six && kind == (u32)OP1F_ASK_OPTIONS) continue;                         // R8 (base 32): the options unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
         if (unknown == 0) first = kind;
@@ -2541,6 +2562,7 @@ extern "C" int op1f_input_down(const u32* record, int shifted) {
     input.last_down_ms = state.ms;
     count(&input.down);                                                             // M3: masked for the instant
     if (top_input(shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record)) return 1;   // S1: the base's top page
+    if (&op1f_options_down != 0 && op1f_options_down(key)) return 1;               // R8 (base 32): T1 back to the list of packs
     if (!checked() || state.inputs == 0) return 0;
     Op1fInput e;
     event_of(&e, shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record);
@@ -2918,6 +2940,7 @@ extern "C" void op1f_cards_frame() {
     op1f_memory_frame();                                    // R4: the memory unit's frame work, then the stages unit's
     op1f_stages_frame();
     op1f_keeps_frame();                                     // R4b: the values' unit's, before any frame function
+    if (&op1f_options_frame != 0) op1f_options_frame();     // R8 (base 32): the options unit's, before any frame function
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     said_passed();                                          // R4: the pictures a card of level 6 carries and a screen was not served

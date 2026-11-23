@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 91 functions bound in the sources. 39 are described below, by subject. The other 52 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 102 functions bound in the sources. 50 are described below, by subject. The other 52 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -90,6 +90,10 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | `0x8fc25abc` | `void* label_from_node(void* screen, void* node, int align)` | Turns a part of a picture into a label, an object whose text can be set while the unit runs. The part is a placeholder: it gives the label its place and its colour. The label takes the part's place in the document and comes back; keep it, since the id finds it no more. Our code passes 0 for `kind`: the text then starts at the placeholder's left edge. | Ours: the display thread, once for each label. |
 | `0x8fc3aa3c` | `void label_text(void* label, const char* text, int width)` | Sets a label's text from a C text. A text wider than `max_width` pixels is shortened and gets a mark at its end. An empty text hides the label. Send small letters and digits: the firmware's font has the letters at the small letters' codes and its own signs at the capitals'. Each call asks the heap for memory, so set a text only when it changes; setting the text a label already has changes nothing. | Ours: the display thread. |
 | `0x8fc3820c` | `LabelBox label_bounds(void* label)` | The box of a label's text as it was last laid out: left, right, top and bottom, each a number with ten bits behind the point. It is the box of the shapes without their stroke, so an upright stroke is 0 wide. The box comes back as a structure, by value: bind the function as one that returns the structure, and the compiler hands over the address for it in P0. | Ours: the display thread. |
+| `0x8fc64c68` | `void settings_screen_make(void* screen, const char* name)` | Makes a screen of the kind the settings rows KEYBOARD, SYSTEM and MIDI show on the right: up to seven lines, a name and a value each, and one set of seven lines that all such screens share. `screen` is a block of 44 bytes from the allocator; `name` is a text in small letters, which the list on the left shows in capitals. The function writes the screen's table into its first word: our code writes a table of its own over it, its name function first and its draw second. Each call empties the seven shared lines, so make a screen once, at the start. | Ours: the main thread at the start. |
+| `0x8fc64de0` | `void settings_screen_draw(void* screen, void* context)` | Draws the right side of such a screen: the first lines of the shared seven, as many as the word at `screen + 0xc` says, in the unit's own letters and colours, with the line the word at `screen + 8` names drawn as the chosen one. `context` is what the firmware hands a screen's draw: pass it on as it came. | Ours: the display thread, from our own screen's draw. |
+| `0x8fc64c2c` | `void settings_line_name(void* screen, u32 line, const char* text)` | Sets the name on line `line` (0 to 6) of the seven shared lines: a text in small letters, at most 31 characters, shown in capitals. `screen` is not read: the lines are the same for every such screen, so write them right before the draw of the screen they are meant for. | Ours: the display thread and the key thread. |
+| `0x8fc64c08` | `void settings_line_value(void* screen, u32 line, const char* text)` | Sets the value on line `line` (0 to 6) of the seven shared lines, as `settings_line_name` sets the name. | Ours: the display thread and the key thread. |
 
 ## Keys and the screen that is shown
 
@@ -97,6 +101,13 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | --- | --- | --- | --- |
 | `0x8c0b2554` | `void request_screen(void)` | Asks the firmware to show the screen the present mode wants now. The firmware does this itself after every key; our code calls it after a change that no key press follows, such as a timer running out. It takes no argument. From the display thread, call it with interrupts masked for the length of the call: the firmware stops when two threads are inside it at once. | Ours: the key thread, and the display thread with interrupts masked. |
 | `0x8fc24ca4` | `int shift(void)` | Not 0 while the shift key is held. | Ours: the key thread, the display thread. |
+| `0x8c0b68b0` | `void knob_item_top(void* knob, u32 top)` | Sets the highest value of one of the unit's knob items, the 32-byte objects the settings' items and line pickers are made of, to `top` whole steps, and holds the item's value to it. KEYBOARD, SYSTEM and MIDI keep their line picker in the row at `row + 4`, with the number of lines less one as its top. The firmware stops when the top is below the item's lowest value. | Ours: the key thread. |
+| `0x8c0d44b0` | `void keyboard_chosen(void* row)` | The settings screen lists its rows on the left; a row is an object whose first word is the address of its table of functions, which the firmware calls on the key thread. This is KEYBOARD's function for its row being chosen (`row`: the row). It writes the row's own three lines into the shared seven, sets the number of lines in the row (the word at `row + 0x2c`) and in its screen, and sets the top of the row's line picker. The firmware calls it through the row's table; our code calls it first from its own function in that word of the table. | Ours: the key thread. |
+| `0x8c0d4d0c` | `void system_chosen(void* row)` | The same for SYSTEM, with its six lines. | Ours: the key thread. |
+| `0x8c0d484c` | `void midi_chosen(void* row)` | The same for MIDI, with its five lines. | Ours: the key thread. |
+| `0x8c0d45ce` | `void keyboard_red(void* row, u32 line, u32 amount)` | The settings row KEYBOARD's function for a turn of the red knob on line `line` of its row (`row`). `amount` is the turn as the firmware hands it, a float: pass it on as it came. Hand it only the row's own lines, 0 to 2. | Ours: the key thread. |
+| `0x8c0d5018` | `void system_red(void* row, u32 line, u32 amount)` | The same for SYSTEM: only its own lines, 0 to 5. | Ours: the key thread. |
+| `0x8c0d49d0` | `void midi_red(void* row, u32 line, u32 amount)` | The same for MIDI: only its own lines, 0 to 4. | Ours: the key thread. |
 
 ## Bound in the sources, not described yet
 
@@ -116,7 +127,7 @@ Each of these is called by the files named. The type is what our code hands over
 | `0x8c0dd2cc` | `void draw_char(u16* framebuffer, int character)` | `build_r2_measure.cpp` |
 | `0x8c0df868` | `void restart(int code, int delay_ms)` | `build_r4c_door.cpp` |
 | `0x8d4e5cb8` | `void midi_out(int index, const void* packets, u32 bytes)` | `build_r4c_door.cpp` |
-| `0x8d4e63bc` | `void* heap_alloc(u32 bytes)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
+| `0x8d4e63bc` | `void* new(u32 bytes)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp`, `build_r8_options.cpp` |
 | `0x8d4e63cc` | `void free(void* memory)` | `build_m1_loader_disk.cpp` |
 | `0x8d4f24dc` | `int tape_set(int db, const char* key, const void* value)` | `build_r6b_keeps.cpp` |
 | `0x8d4f2b80` | `void* tape_root(void)` | `build_r6b_keeps.cpp` |
@@ -151,8 +162,8 @@ Each of these is called by the files named. The type is what our code hands over
 | `0x8fcacea0` | `void* root_child(void* behaviour, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_disk.cpp` |
 | `0x8fcaeb10` | `void* make_folder(void* parent, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
 | `0x8fcaed68` | `void* add_file(void* folder, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
-| `0x8fcba8ac` | `void close(int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
+| `0x8fcba8ac` | `void close(int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcba8c0` | `int write(const void* data, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
-| `0x8fcba954` | `int read(void* buffer, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r6d_engines.cpp` |
-| `0x8fcba988` | `int open(const char* path, const char* mode)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
+| `0x8fcba954` | `int read(void* buffer, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
+| `0x8fcba988` | `int open(const char* path, const char* mode)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcbabb8` | `void fs_file_ctor(void* obj, const char* path)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |

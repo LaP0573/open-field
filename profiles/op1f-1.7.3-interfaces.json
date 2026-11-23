@@ -276,6 +276,72 @@
    "group": "keys",
    "what": "Not 0 while the shift key is held.",
    "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8fc64c68": {
+   "name": "settings_screen_make",
+   "group": "screens",
+   "what": "Makes a screen of the kind the settings rows KEYBOARD, SYSTEM and MIDI show on the right: up to seven lines, a name and a value each, and one set of seven lines that all such screens share. `screen` is a block of 44 bytes from the allocator; `name` is a text in small letters, which the list on the left shows in capitals. The function writes the screen's table into its first word: our code writes a table of its own over it, its name function first and its draw second. Each call empties the seven shared lines, so make a screen once, at the start.",
+   "thread": "Ours: the main thread at the start."
+  },
+  "0x8fc64de0": {
+   "name": "settings_screen_draw",
+   "group": "screens",
+   "what": "Draws the right side of such a screen: the first lines of the shared seven, as many as the word at `screen + 0xc` says, in the unit's own letters and colours, with the line the word at `screen + 8` names drawn as the chosen one. `context` is what the firmware hands a screen's draw: pass it on as it came.",
+   "thread": "Ours: the display thread, from our own screen's draw."
+  },
+  "0x8fc64c2c": {
+   "name": "settings_line_name",
+   "group": "screens",
+   "what": "Sets the name on line `line` (0 to 6) of the seven shared lines: a text in small letters, at most 31 characters, shown in capitals. `screen` is not read: the lines are the same for every such screen, so write them right before the draw of the screen they are meant for.",
+   "thread": "Ours: the display thread and the key thread."
+  },
+  "0x8fc64c08": {
+   "name": "settings_line_value",
+   "group": "screens",
+   "what": "Sets the value on line `line` (0 to 6) of the seven shared lines, as `settings_line_name` sets the name.",
+   "thread": "Ours: the display thread and the key thread."
+  },
+  "0x8c0b68b0": {
+   "name": "knob_item_top",
+   "group": "keys",
+   "what": "Sets the highest value of one of the unit's knob items, the 32-byte objects the settings' items and line pickers are made of, to `top` whole steps, and holds the item's value to it. KEYBOARD, SYSTEM and MIDI keep their line picker in the row at `row + 4`, with the number of lines less one as its top. The firmware stops when the top is below the item's lowest value.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d44b0": {
+   "name": "keyboard_chosen",
+   "group": "keys",
+   "what": "The settings screen lists its rows on the left; a row is an object whose first word is the address of its table of functions, which the firmware calls on the key thread. This is KEYBOARD's function for its row being chosen (`row`: the row). It writes the row's own three lines into the shared seven, sets the number of lines in the row (the word at `row + 0x2c`) and in its screen, and sets the top of the row's line picker. The firmware calls it through the row's table; our code calls it first from its own function in that word of the table.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d4d0c": {
+   "name": "system_chosen",
+   "group": "keys",
+   "what": "The same for SYSTEM, with its six lines.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d484c": {
+   "name": "midi_chosen",
+   "group": "keys",
+   "what": "The same for MIDI, with its five lines.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d45ce": {
+   "name": "keyboard_red",
+   "group": "keys",
+   "what": "The settings row KEYBOARD's function for a turn of the red knob on line `line` of its row (`row`). `amount` is the turn as the firmware hands it, a float: pass it on as it came. Hand it only the row's own lines, 0 to 2.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d5018": {
+   "name": "system_red",
+   "group": "keys",
+   "what": "The same for SYSTEM: only its own lines, 0 to 5.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8c0d49d0": {
+   "name": "midi_red",
+   "group": "keys",
+   "what": "The same for MIDI: only its own lines, 0 to 4.",
+   "thread": "Ours: the key thread."
   }
  }
 }

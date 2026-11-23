@@ -31,8 +31,8 @@ its size and its SHA-256, and that what the file says of itself is what the entr
 firmware it is for, how many places of the firmware it changes, the packs it needs, the level of the base it needs
 or offers, the folders its card asks for. The file is read by tools/pack_build.py, as `check` reads it. And that its
 card asks for nothing the listing's base for its firmware is too old to serve (BASE_SINCE: an ask of places that gives
-way needs base 31 or later), which is no level: an older base of the same level leaves that ask aside and runs the
-rest of the pack.
+way needs base 31 or later, an ask of options base 32 or later), which is no level: an older base of the same level
+leaves that ask aside and runs the rest of the pack.
 
 With `--files`, an author whose file lies in one of the folders is held whole: every entry of theirs that names a file
 is held to it, and one whose file is not there is refused. So open-field's own packs are all held when the folders of
@@ -123,7 +123,7 @@ RAW = "https://raw.githubusercontent.com/%s/%s/%s/%s"           # a file of a re
 BRANCH_HEAD = "refs/heads/"                                     # before a branch's name in that link: the head of the branch
 UNREADABLE = (ValueError, IndexError, KeyError, TypeError, OverflowError, struct.error)   # what reading a file nobody built here may raise
 NAME_MOST = 255                                                 # the longest name a followed file's lists may hold, as the install page takes it
-PLACES_KIND = 6                                                 # the level from which a card may ask for places
+PLACES_KIND = 6                                                 # the level from which a card may ask for places (and, from base 32, options)
 GIVES_WAY = getattr(pack_build, "PLACES_GIVES_WAY", 1)          # the places ask's flag that it gives way
 
 
@@ -136,12 +136,24 @@ def gives_way(data):
     return any(kind == places and ask is not None and ask[2] & GIVES_WAY for kind, _size, _what, ask, _wrong in pack_build.ask_tables(data))
 
 
+OPTIONS_KIND = getattr(pack_build, "OPTIONS", 10)               # the kind of an ask of options, the pack's settings (base 32)
+
+
+def asks_options(data):
+    """Whether the file's card asks for options (an ask of kind OP1F_ASK_OPTIONS), on a card of level 6 or later."""
+    card = pack_build.card_in(data)
+    if card is None or card["level"] < PLACES_KIND:
+        return False
+    return any(kind == OPTIONS_KIND for kind, _size, _what, _ask, _wrong in pack_build.ask_tables(data))
+
+
 # What a card may ask that a base serves only from one of its versions on, with no new level: (what, that version, how
 # it is read in a file). A base of the same level before that version leaves the ask aside, says so in its log and
 # runs the rest of the pack. A pack that asks it is listed only beside a base of that version or later for its
 # firmware: the base the install page puts on the unit with every pack.
 BASE_SINCE = (
     ("places that give way", 31, gives_way),
+    ("options", 32, asks_options),
 )
 
 

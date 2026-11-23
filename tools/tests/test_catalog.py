@@ -585,6 +585,86 @@ class ABaseOfTheVersionACardNeeds(unittest.TestCase):
                     self.assertIn(self.SAID, said)
 
 
+def options_pack(level=6, name="tester", version=2, with_places=False):
+    """A pack file with a card of `level` whose ask is an ask of options (the pack's settings, base 32) with one switch
+    shown in KEYBOARD, as the base reads it; with `with_places`, a firm ask of places and one that gives way before it."""
+    link, at = pb.ROOM_START, 4
+    lists = ((("tape.svg",), False), (("signalflow.svg",), True)) if with_places else ()
+    count = len(lists) + 1
+    asks = at + pb.CARD_4_BYTES
+    places_size, size = pb.TABLE_BYTES_6[5], pb.TABLE_BYTES_6[pb.OPTIONS]
+    tables = asks + pb.ASK.size * count
+    table = tables + places_size * len(lists)                   # the options' table, behind those of places
+    end = table + size                                          # where the lists of names go
+    body = bytearray(end + sum(pb.PLACE_NAME * len(names) for names, _gives in lists))
+    pb.CARD_4.pack_into(body, at, pb.CARD_MARK, pb.CARD_4_BYTES, level, version, name.encode("ascii"), 0, 0, 0, 0, 0, 0,
+                        link + asks, count)
+    places = [(at + pb.CARD_3_BYTES, pb.KIND_WORD, None, link + asks)]
+    for number, (names, gives) in enumerate(lists):
+        place = tables + places_size * number
+        pb.ASK.pack_into(body, asks + pb.ASK.size * number, 5, places_size, link + place)
+        pb.KIND_HEAD.pack_into(body, place, places_size, b"list%d" % number, pb.PLACES_GIVES_WAY if gives else 0, 0)
+        struct.pack_into("<2I", body, place + pb.KIND_HEAD.size, len(names), link + end)
+        for n, picture in enumerate(names):
+            body[end + pb.PLACE_NAME * n:end + pb.PLACE_NAME * n + len(picture)] = picture.encode("ascii")
+        places += [(asks + pb.ASK.size * number + 8, pb.KIND_WORD, None, link + place), (place + 32, pb.KIND_WORD, None, link + end)]
+        end += pb.PLACE_NAME * len(names)
+    ask = asks + pb.ASK.size * len(lists)
+    pb.ASK.pack_into(body, ask, pb.OPTIONS, size, link + table)
+    pb.KIND_HEAD.pack_into(body, table, size, b"mine", 0, 0)
+    struct.pack_into("<2I", body, table + pb.KIND_HEAD.size, 0, 1)             # no `changed`, one option
+    option = table + pb.KIND_HEAD.size + 8
+    body[option:option + 3] = b"dot"
+    body[option + 16:option + 20] = bytes((pb.OPTION_SWITCH, 2, 0, pb.OPTION_CATEGORY["keyboard"] << 4))   # a switch, off at first, in KEYBOARD
+    places.append((ask + 8, pb.KIND_WORD, None, link + table))
+    return pb.make3(bytes(body), link, len(body), 0, name, OS_173, (link, link), version=version,
+                    imports=[("op1f_level_%d" % level, True)], places=places, card_place=at, no_table=True)
+
+
+class ABaseOfVersion32ForOptions(unittest.TestCase):
+    """The second row of BASE_SINCE: a card that asks for options, the pack's settings in the unit's settings, which
+    base 32 serves and bases before it leave aside (with their line for a kind they do not know)."""
+
+    SAID = ("REFUSED: tester: the file's card asks for options, which the base serves from its version 32, "
+            "and the listing's base for 1.7.3 is version %d")
+
+    held = ABaseOfTheVersionACardNeeds.held
+
+    def test_the_file_is_read_as_its_card_asks(self):
+        data = options_pack()
+        tables = pb.ask_tables(data)
+        self.assertEqual([(kind, wrong) for kind, _size, _what, _ask, wrong in tables], [(pb.OPTIONS, None)])   # an ask in order
+        self.assertTrue(check.asks_options(data))
+        self.assertEqual(check.base_needed(data), (32, "options"))
+        self.assertEqual(check.base_needed(options_pack(with_places=True)), (32, "options"))      # the later of the two bases asked for
+        for data in (places_pack(), places_pack(lists=((("tape.svg",), False),)), card_pack(), pack()):
+            self.assertFalse(check.asks_options(data))
+
+    def test_a_pack_that_asks_for_options_is_listed_beside_base_32_or_later(self):
+        data = options_pack()
+        entry = entry_for(data, level=6)
+        for version in (30, 31):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertFalse(in_order, said)
+                self.assertIn(self.SAID % version, said)
+        for version in (32, 33):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertTrue(in_order, said)
+                self.assertIn("ok: tester (listed, its file held)", said)
+
+    def test_a_followed_file_that_asks_for_options_is_held_so_too(self):
+        data = options_pack()
+        entry = followed_for(data)
+        for version, in_order_then in ((31, False), (32, True)):
+            with self.subTest(version=version):
+                said, in_order = run(dict(listing(), packs=[versioned_base(version), entry]), download=True, get=lambda url: data)
+                self.assertEqual(in_order, in_order_then, said)
+                if not in_order_then:
+                    self.assertIn(self.SAID % version, said)
+
+
 class TheFormOfAnEntry(unittest.TestCase):
     def refused(self, entry, words):
         said, in_order = run(listing(entry))
