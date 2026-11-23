@@ -277,7 +277,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffbode.png", "sha256": "2963eac7f4feaafc5148af0516c3f34b17b53940c4310e36a089def684f53936", "bytes": 1859}
     },
     {
       "id": "veffrosion",
@@ -295,7 +296,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffrosion.png", "sha256": "122adf94ce5e6f6d936e75fdc1be88f3ef3562d74b5a028103ec7663e3b52300", "bytes": 979}
     },
     {
       "id": "veffsaturator",
@@ -321,7 +323,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffurator.png", "sha256": "7d1c4ca983bee84e1b3d20acae1c5394c5099291d1966e82e05af384bf10a2ee", "bytes": 1157}
     },
     {
       "id": "veffshaper",
@@ -339,7 +342,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffshaper.png", "sha256": "025e81baf2be726149d247d9464bb0c5fe160e29c1a7473908292ad7c584f3b1", "bytes": 1409}
     },
     {
       "id": "veffgrrr",
@@ -365,7 +369,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffrrrr.png", "sha256": "93b1f80bd332f290bdbdea965fd3bb58d818bf0251cc9b6e2ede310eedd63f3c", "bytes": 1602}
     }
   ]
 }

@@ -166,7 +166,8 @@
   .tile:hover { background: var(--white); }
   .tile:hover .pic .fp { fill: var(--white); }
   .tile .hd { display: flex; justify-content: space-between; align-items: center; font: 11px var(--mono); color: var(--mid); }
-  .tile svg.pic { width: 150px; height: 120px; margin: 12px auto 10px; display: block; }
+  .tile svg.pic, .tile img.pic { width: 150px; height: 120px; margin: 12px auto 10px; display: block; }
+  .tile img.pic { object-fit: contain; }
   .tile h3 { margin: 0; font-size: 26px; font-weight: 400; letter-spacing: -.03em; line-height: 1.1; }
   .tile p { margin: 6px 0 0; font-size: 13px; color: var(--mid); line-height: 1.4; }
   .tile .meta { display: flex; justify-content: space-between; gap: 8px; font: 11px var(--mono); color: var(--mid); margin-top: auto; padding-top: 12px; }
@@ -285,7 +286,7 @@
   @media (max-width: 560px) {
     .wrap { padding: 0 16px; }
     .grid { grid-template-columns: minmax(0, 1fr); }
-    .tile svg.pic { width: 130px; height: 104px; }
+    .tile svg.pic, .tile img.pic { width: 130px; height: 104px; }
     .sec-h { gap: 12px; } .sec-h h2 { font-size: 32px; }
     .now h3, .step h3, .install-h h3 { font-size: 24px; }
     .strip, .strip.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1340,7 +1341,7 @@
   // and holds every file to the record it kept in the browser's storage (one record a firmware).
   import * as D from "./door.mjs";
   import * as P from "./packs-live.mjs";
-  import { readListing, knownVersions, fileName, isOurs, download } from "./catalog.mjs";
+  import { readListing, knownVersions, fileName, isOurs, download, pictureOf, downloadPicture } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
   const FW = window.openFieldFirmware;               // the firmware this page is for, from the install's own script
@@ -1599,6 +1600,29 @@
     return s.firstChild;
   }
 
+  // A pack's own picture in the pictogram's slot: downloaded when its tile comes into view, shown only once its
+  // SHA-256 is the listing's and it loads; the category's pictogram stays otherwise. Held once per file.
+  const pictures = new Map();   // sha256 -> Promise of an object URL
+  const seen = "IntersectionObserver" in window ? new IntersectionObserver((all) => {
+    for (const e of all) if (e.isIntersecting) { seen.unobserve(e.target); e.target._show(); }
+  }, { rootMargin: "200px" }) : null;
+  function picFor(entry, category) {
+    const svg = pic(category), picture = pictureOf(entry);
+    if (!picture) return svg;
+    svg._show = () => {
+      if (!pictures.has(picture.sha256)) {
+        pictures.set(picture.sha256, downloadPicture(entry).then((bytes) => URL.createObjectURL(new Blob([bytes], { type: "image/png" }))));
+      }
+      pictures.get(picture.sha256).then((url) => {
+        const img = Object.assign(document.createElement("img"), { className: "pic", alt: entry.id, loading: "lazy", decoding: "async" });
+        img.onload = () => { if (svg.isConnected) svg.replaceWith(img); };
+        img.src = url;
+      }, () => {});   // refused or not answered: the pictogram stays
+    };
+    if (seen) seen.observe(svg); else svg._show();
+    return svg;
+  }
+
   function choose(fn) { fn(); $("changeSay").textContent = ""; resolved = rowsNow ? P.resolve(rowsNow, choices, listing, base) : null; render(); }
 
   function act(text, cls, onClick, disabled, title) {
@@ -1694,7 +1718,7 @@
           }
         }
         ft.append(who, acts);
-        t.append(hd, pic(category.key), h3, p);
+        t.append(hd, picFor(entry, category.key), h3, p);
         if (live && r) {
           const st = el("span", "st");
           st.append(Object.assign(el("span", "dot"), { style: "--c:var(--" + P.stateColour(r, v) + ")" }), document.createTextNode(P.stateWords(r, v)));

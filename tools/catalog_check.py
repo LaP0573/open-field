@@ -25,6 +25,8 @@ which downloads it from its repository at the entry's commit):
 its size and its SHA-256, and that what the file says of itself is what the entry says: its name, its version, the
 firmware it is for, how many places of the firmware it changes, the packs it needs, the level of the base it needs
 or offers, the folders its card asks for. The file is read by tools/pack_build.py, as `check` reads it.
+An entry's picture (a transparent PNG thumbnail, 5:4, at most 600x480 and 100 KB) is held the same way, from the same
+repository at the same commit: its size, its SHA-256, and what its IHDR and chunks say.
 
 The listing's `ours` names the repositories of open-field's own packs: an entry whose author is `open-field` and
 that names a repository names one of them, and an entry in one of them has `open-field` as its author. The install
@@ -69,7 +71,8 @@ LOCATION = ("repository", "commit", "path")                     # where a listed
 BUNDLED_IN = "builder/"                                         # where a bundled entry's file lies in this repository: beside the install page
 FILE_FACTS = ("sha256", "bytes", "version", "firmware", "places", "needs", "folders")   # what the file says, held to it
 OPTIONAL = ("level", "offers_level")                            # a pack with a card needs a level; the base offers them
-KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL)
+PICTURE = "picture"                                             # a listed or bundled entry's thumbnail, beside its pack
+KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL + (PICTURE,))
 TOP_KEYS = {"about", "categories", "packs"}
 TOP_OPTIONAL = {"ours"}                                         # the repositories of open-field's own packs
 OURS = "open-field"                                             # the author of open-field's own packs
@@ -89,6 +92,11 @@ CATEGORIES_MOST = 3
 DESCRIPTION_MOST = 140
 FOLDERS_MOST = pack_build.FOLDERS_MOST
 LARGEST = 2 * 1024 * 1024                                       # a pack file larger than this is not downloaded
+PICTURE_LARGEST = 100 * 1024                                    # a picture larger than this is refused
+PICTURE_SIDE_MOST = (600, 480)                                  # its width and its height at most, in pixels
+PICTURE_ASPECT = (5, 4)                                         # its width to its height, exactly: the tile's pictogram slot
+PICTURE_KINDS = (".png",)
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 RAW = "https://raw.githubusercontent.com/%s/%s/%s/%s"           # a file of a repository at a commit: a web page can read it too
 
 
@@ -126,6 +134,62 @@ def path_faults(path):
     if any(part in ("", ".", "..") or not PATH_PART.fullmatch(part) for part in parts):
         return ["its path is not a plain path inside the repository: parts of letters, digits, spaces and . _ ( ) + -, parted by /"]
     return []
+
+
+def picture_faults(picture):
+    """The form of an entry's picture: {path, sha256, bytes}, a transparent PNG in the pack's repository."""
+    if not isinstance(picture, dict) or set(picture) != {"path", "sha256", "bytes"}:
+        return ["its picture is not a path, a sha256 and a size in bytes"]
+    faults = []
+    path = picture["path"]
+    if not plain(path, 200) or not path.lower().endswith(PICTURE_KINDS):
+        faults.append("its picture's path is not one to two hundred plain characters ending in .png")
+    elif any(part in ("", ".", "..") or not PATH_PART.fullmatch(part) for part in path.split("/")):
+        faults.append("its picture's path is not a plain path inside the repository: parts of letters, digits, spaces and . _ ( ) + -, parted by /")
+    if not (isinstance(picture["sha256"], str) and SHA256_FORM.fullmatch(picture["sha256"])):
+        faults.append("its picture's sha256 is not sixty-four digits of 0-9 and a-f")
+    if not (is_int(picture["bytes"]) and 0 < picture["bytes"] <= PICTURE_LARGEST):
+        faults.append("its picture's size is not a number of bytes from 1 to %d" % PICTURE_LARGEST)
+    return faults
+
+
+def png_facts(data):
+    """A PNG's (width, height, whether it has transparency), read from its IHDR and its chunks: or a text that says why not."""
+    if data[:8] != PNG_SIGNATURE:
+        return "it is not a PNG"
+    if len(data) < 33 or data[12:16] != b"IHDR":
+        return "it is a PNG with no IHDR first"
+    width, height, colour = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big"), data[25]
+    alpha = colour in (4, 6)                                    # grey or colour with an alpha channel
+    at = 8
+    while not alpha and at + 8 <= len(data):                     # or a palette or a colour made transparent by tRNS
+        length, kind = int.from_bytes(data[at:at + 4], "big"), data[at + 4:at + 8]
+        if kind == b"tRNS":
+            alpha = True
+        if kind in (b"IDAT", b"IEND"):
+            break
+        at += 12 + length
+    return width, height, alpha
+
+
+def picture_file_faults(picture, data):
+    """What a picture's file is that the entry does not say, or that a picture may not be: none for one in order."""
+    faults = []
+    if len(data) != picture["bytes"]:
+        faults.append("the picture has %d bytes, the entry says %d" % (len(data), picture["bytes"]))
+    if hashlib.sha256(data).hexdigest() != picture["sha256"]:
+        return faults + ["the picture's SHA-256 is %s, not the entry's" % hashlib.sha256(data).hexdigest()]
+    facts = png_facts(data)
+    if isinstance(facts, str):
+        return faults + ["the picture: %s" % facts]
+    width, height, alpha = facts
+    if not (0 < width <= PICTURE_SIDE_MOST[0] and 0 < height <= PICTURE_SIDE_MOST[1]):
+        faults.append("the picture is %dx%d: it is at most %dx%d" % ((width, height) + PICTURE_SIDE_MOST))
+    elif width * PICTURE_ASPECT[1] != height * PICTURE_ASPECT[0]:
+        faults.append("the picture is %dx%d: its width to its height is not exactly %d:%d" % ((width, height) + PICTURE_ASPECT))
+    if not alpha:
+        faults.append("the picture has no transparency: a PNG with an alpha channel or a tRNS chunk")
+    return faults
 
 
 def folder_faults(folders):
@@ -201,6 +265,10 @@ def entry_faults(entry, categories, known_firmwares):
             faults.append("its %s is not a whole number from 1" % key.replace("_", " "))
     if "folders" in entry:
         faults += folder_faults(entry["folders"])
+    if PICTURE in entry:
+        if status not in ("listed", "bundled"):
+            faults.append("only a listed or a bundled entry has a picture")
+        faults += picture_faults(entry[PICTURE])
     return faults
 
 
@@ -349,13 +417,14 @@ def changed(entry, before):
     """Whether an entry is new, or names another file than it did before."""
     for old in before.get("packs", []):
         if isinstance(old, dict) and old.get("id") == entry["id"]:
-            return any(old.get(key) != entry.get(key) for key in LOCATION + ("sha256",))
+            return any(old.get(key) != entry.get(key) for key in LOCATION + ("sha256", PICTURE))
     return True
 
 
-def raw_link(entry):
+def raw_link(entry, path=None):
+    """A file of the entry's repository at the entry's commit: its pack's, or another path in it (its picture's)."""
     owner, name = REPOSITORY_FORM.fullmatch(entry["repository"]).groups()
-    return RAW % (owner, name, entry["commit"], urllib.parse.quote(entry["path"]))
+    return RAW % (owner, name, entry["commit"], urllib.parse.quote(path or entry["path"]))
 
 
 def fetch(url):
@@ -424,6 +493,21 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
             if data is not None:
                 faults += file_faults(entry, data, known_firmwares)
                 held = ", its file held"
+            if PICTURE in entry:
+                picture, shown = entry[PICTURE], None
+                if entry["status"] == "bundled":
+                    shown = repository_file(picture["path"])
+                    if shown is None:
+                        faults.append("its picture is not in this repository at %s" % picture["path"])
+                elif where is not None and where.startswith("https://"):   # downloaded: the picture too, from the same repository and commit
+                    link = raw_link(entry, picture["path"])
+                    try:
+                        shown = get(link)
+                    except Exception as problem:
+                        faults.append("its picture could not be downloaded from %s: %s" % (link, problem))
+                if shown is not None:
+                    faults += picture_file_faults(picture, shown)
+                    held += ", its picture held"
         if faults:
             refused = True
             lines += ["REFUSED: %s: %s" % (label, fault) for fault in faults]
