@@ -2,6 +2,14 @@
 
 Extra features for the OP-1 Field, added to the firmware that is already on your own unit.
 
+## Install
+
+**[Open the install page: lap0573.github.io/open-field](https://lap0573.github.io/open-field/)**
+
+The page runs in your browser and takes you through the install step by step. Afterwards, the same page adds and removes packs. Plug your OP-1 Field in and press **connect**. Use Chrome, or Edge on Windows ([what you need](#what-you-need)). Read [the guide](docs/guide.md) before your first install: it says what can go wrong and how to go back.
+
+Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
+
 **Unofficial.** This project is not made, endorsed or supported by Teenage Engineering, and it is not affiliated with them.
 
 **At your own risk.** Installing it changes the firmware of your unit. That is a risky process: a unit can end up unable to start for good ("bricked"), and installing it will void the warranty of your device. Whether to do it is your decision alone. Read [NOTICE.md](NOTICE.md) first.
@@ -39,7 +47,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 
 **To use it**
 
-- Install it and use it: [docs/guide.md](docs/guide.md).
+- Install it: [the install page](https://lap0573.github.io/open-field/). Use it: [docs/guide.md](docs/guide.md).
 - See exactly what the loader and the base change in the firmware: [docs/changes.md](docs/changes.md). What a pack changes is in that pack's own profile: for the four, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs).
 - Build the loader, the base and the examples yourself from the sources: [docs/build.md](docs/build.md).
 
