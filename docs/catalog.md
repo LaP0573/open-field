@@ -32,7 +32,7 @@ If you have not built a pack yet, start with [a first pack](first-pack.md).
 | Field | What |
 | --- | --- |
 | `id` | Your pack's name, as its header holds it (its recipe's `name`). The install page names the file after it on the unit, `<id>.pack`, so it is 1 to 15 plain characters, none of `/ \ : * ? " < > |`, with no space or dot at either end. It is held for good: no other pack ever gets it |
-| `author` | Your GitHub name, or your organisation's |
+| `author` | The name owners see beside your pack: your GitHub name, your organisation's, or the name you make things under. Letters, digits and single dashes, up to 39. Never `open-field`, which is the base's and the examples' |
 | `status` | `reserved`, `bundled`, `listed` or `retired` (below) |
 | `categories` | One to three of the listing's categories (below) |
 | `description` | One line for the install page, up to 140 plain characters |
@@ -98,11 +98,11 @@ The list is the maintainer's to change. To ask for a word it lacks, say so in yo
 
 An entry only moves that way, and is never taken out.
 
-## This project's own packs
+## Every author alike
 
-The listing's `ours` names the repositories that hold this project's own packs: the four features lie in a repository of their own beside this one, [open-field-packs](https://github.com/LaP0573/open-field-packs), sources and finished files, and are listed like anyone's.
+The listing sets no pack apart by who made it. Faust's four packs, `8 tracks`, `fx train`, `lfo` and `sidechain`, lie in a repository of their own, [open-field-packs](https://github.com/LaP0573/open-field-packs), and are listed like anyone's. The folder names `fx` and `lfo` are kept for the entries `fx train` and `lfo`: the base showed those folders itself up to version 20, and from 21 they are those packs' folders. The check refuses them to any other entry.
 
-The examples under `examples/` are for people who write packs, not for owners: their sources lie in this repository, and the build makes their files. Ten of them have an entry, `wink`, `yoyo`, `list`, `sketch`, `echo`, `dub`, `crush`, `ping`, `pluck` and `fold`, and every one of those stays `reserved`. That keeps their names held, and with them the folders `list`, `sketch`, `echo` and `dub`, and the install page never offers them. `trampolines`, the example that changes places of the firmware, has no entry. An entry whose `author` is `open-field` lies in one of those repositories, and an entry in one of them has `open-field` as its author. The check refuses anything else. A pull request never changes `ours`: the check refuses that too, so that no entry can take the place of this project's own.
+The examples under `examples/` are for people who write packs, not for owners: their sources lie in this repository, and the build makes their files. Ten of them have an entry, `wink`, `yoyo`, `list`, `sketch`, `echo`, `dub`, `crush`, `ping`, `pluck` and `fold`, and every one of those stays `reserved`. That keeps their names held, and with them the folders `list`, `sketch`, `echo` and `dub`, and the install page never offers them. `trampolines`, the example that changes places of the firmware, has no entry.
 
 ## On the install page
 
@@ -110,8 +110,10 @@ The install page reads the listing beside it, as `packs.json`: the workflow that
 
 - `base.pack`, which goes on every unit and has no tick;
 - every `listed` entry for the unit's firmware, under its first category, with its description, author, version, what it needs and its size, and a tick;
-- on every entry that is not this project's own, the warning: **a pack is a program that can read and write the files on your unit: take packs only from people you trust**;
-- on a followed entry, beside the warning, the mark `latest from <author>'s <branch> · not reviewed`, and `latest from open-field's <branch>` on one of this project's own ([following a branch](#following-a-branch)).
+- on a followed entry, the mark `latest from <author>'s <branch>` ([following a branch](#following-a-branch));
+- under the packs, the warning: **a pack is a program that can read and write the files on your unit: take packs only from people you trust**.
+
+Every author's pack is shown the same way.
 
 When an owner ticks a pack, the page downloads its file from `https://raw.githubusercontent.com/<owner>/<name>/<commit>/<path>`, the entry's repository at the entry's commit, and holds it to the entry's size and SHA-256. A file that differs is refused, named, and its tick taken off. A pack the ticked one needs is ticked with it.
 
@@ -151,7 +153,7 @@ A followed entry names a branch of your repository with `follow`, in place of a 
 
 A file that fails one of them is not offered, and the page's log says which. The listing's check holds the same, and holds the card, the release and the base's version (above) as it does for a pinned file: run `python -I tools/catalog_check.py --fetch` after you push, or `--files` with your file in a folder.
 
-**What the owner sees** on the row of a followed pack, beside the warning: the mark `latest from <author>'s <branch> · not reviewed`. With the pointer on it, it says: "This file comes straight from <author>'s branch <branch> as it stands today: nobody at open-field has looked at this version." On one of this project's own packs, from [open-field-packs](https://github.com/LaP0573/open-field-packs), the mark is `latest from open-field's <branch>`, with no "not reviewed": a new version there is the project's own work.
+**What the owner sees** on the row of a followed pack: the mark `latest from <author>'s <branch>`. With the pointer on it, it says: "This file comes straight from <author>'s branch <branch> as it stands today: its new versions reach this page without a review."
 
 **What is given up.** Know this before you choose it:
 
@@ -177,7 +179,7 @@ Do not delete or rewrite the commit that holds the old file. A page for the old 
 
 A followed entry moves by a pull request too, with its new `firmware`. Put the file for the new firmware on a branch of its own and name that branch in the entry. The old branch keeps the old file for a page of the old firmware: a page offers a followed file only when it is built for the entry's firmware.
 
-## The check on this repository's own packs
+## The check on the files a build makes
 
 The listing's form, and every name held once:
 
@@ -185,13 +187,13 @@ The listing's form, and every name held once:
 python -I tools/catalog_check.py
 ```
 
-After a build ([docs/build.md](build.md)), every entry of this project's own packs held to its file: the base's and the examples' in `out/packs/` and `out/examples/`, the four features' in a checkout of open-field-packs at the commit their entries name:
+After a build ([docs/build.md](build.md)), the base's and the examples' entries held to their files in `out/packs/` and `out/examples/`, and the entries of open-field-packs to a checkout of it:
 
 ```bash
 python -I tools/catalog_check.py --files out/packs --files out/examples --files <your checkout of open-field-packs>
 ```
 
-The rule for `--files`: an author with a file in one of the folders is held whole, each of their entries that names a file held to it and a missing one refused. So every entry whose `author` is `open-field` is held here, and a missing file of ours is refused. An entry by another author, whose file is not in these folders, passes on its form, and its line says `its file not held`; `--fetch` holds it to its file. Folders that hold no entry's file at all are refused: a file is looked for by the last part of its entry's `path`, or as `<id>.pack`.
+The rule for `--files`: an author with a file in one of the folders is held whole, each of their entries that names a file held to it and a missing one refused. So every entry by `open-field` and by `Faust` is held here, and a missing file of theirs is refused. An entry by another author, whose file is not in these folders, passes on its form, and its line says `its file not held`; `--fetch` holds it to its file. Folders that hold no entry's file at all are refused: a file is looked for by the last part of its entry's `path`, or as `<id>.pack`.
 
 Every listed entry held to its file downloaded from its repository at its commit, or at the head of the branch it follows, as the install page downloads it:
 
@@ -209,4 +211,4 @@ It does not hold keys. When two packs pick the same keys for their pages, their 
 
 ## A pack is code
 
-A pack runs inside the firmware with nothing walled off from it. The install page says so on every pack that is not this project's own, and an owner chooses. Review is a person reading your source and trying your file; it is no promise that a pack is safe. A followed pack's later versions get no review at all, and the page marks them as not reviewed.
+A pack runs inside the firmware with nothing walled off from it. The install page says so under its list of packs, and an owner chooses. Review is a person reading your source and trying your file; it is no promise that a pack is safe. A followed pack's later versions get no review at all, and the page says so when the pointer rests on the row's mark.

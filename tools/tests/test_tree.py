@@ -160,7 +160,7 @@ class TheRecipes(unittest.TestCase):
         self.assertEqual(there, used)
 
     def test_the_tree_builds_the_base_and_no_feature(self):
-        """A feature is a pack in a repository of its own, the project's four in open-field-packs: no recipe, table,
+        """A feature is a pack in a repository of its own, Faust's four in open-field-packs: no recipe, table,
         place or kept file of one is here, and the base works with none of them."""
         self.assertEqual(load("build.json")["packs"], list(PACKS))
         self.assertEqual(sorted(os.listdir(os.path.join(ROOT, "packs"))), ["base.json", "built.json"])

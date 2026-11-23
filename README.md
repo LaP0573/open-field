@@ -22,7 +22,7 @@ Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
 - **The base** (`base.pack`). The shared pack every feature relies on: one file that every unit with open-field has. It is also what any pack can build on: a call every frame, pictures, a page with keys and knobs, folders and files.
 - **Feature files** ("packs"). Each feature is one file that you copy onto the unit like a sample. With the file there, the feature is there at the next start. Delete the file and the feature is gone.
 
-This project's own four live in a repository of their own, [open-field-packs](https://github.com/LaP0573/open-field-packs), sources and finished files:
+Faust's four packs live in a repository of their own, [open-field-packs](https://github.com/LaP0573/open-field-packs), with a manual each, their sources and finished files:
 
 | Feature file | What it adds |
 | --- | --- |
@@ -81,7 +81,7 @@ When the examples get too small to learn from, read [open-field-packs](https://g
 - One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.14 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
 - For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
-- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 32, has run on the maintainer's unit beside the four features and the examples, with two test packs that add settings: their settings showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart. `fx train` 17, the version the listing offers, has been proven on a computer and not yet watched on a unit: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
+- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 32, has run on the maintainer's unit beside the four features and the examples, with two test packs that add settings: their settings showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart. `fx train` 17, the version the listing offers, has been proven on a computer and not yet watched on a unit: if it gives you trouble, `fx train` 16 is linked from [its manual](https://github.com/LaP0573/open-field-packs/blob/main/fx%20train/README.md) in open-field-packs.
 
 ## What is in this repository
 

@@ -63,7 +63,7 @@ A **mark** is a name that says what a base can do. It is never called or read. T
 
 A base offers the marks of every level up to its own: a pack built for an earlier level runs on it as it is. **A card only grows**: a later level adds fields behind the last one, and a base reads the part it knows. From level 4 on the card keeps its size, and a level adds kinds of ask instead. Level 10 adds neither: its mark says the base offers one more helper.
 
-A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. This project's own four features ([open-field-packs](https://github.com/LaP0573/open-field-packs)) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
+A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 
 ### The words a pack includes
 
@@ -90,7 +90,7 @@ Each changes no place of the firmware and names no address of it. `python -I too
 
 ## Level 1: a call every frame
 
-The display thread draws a frame some sixty times a second. Before each frame is shown, the base's frame hook runs. It calls **the frame function of each card, in the order of the packs' file names**, our own four features' among them, and then dresses its own screens, so that they show what the frame's work has made.
+The display thread draws a frame some sixty times a second. Before each frame is shown, the base's frame hook runs. It calls **the frame function of each card, in the order of the packs' file names**, the four packs of open-field-packs among them, and then dresses its own screens, so that they show what the frame's work has made.
 
 A frame function is handed what the frame is, and answers nothing:
 
@@ -426,7 +426,7 @@ input: 'list' took 3 down, 3 up, 0 turns since the start
 
 A pack that makes the audio thread slower shows in `aud`, a page that draws slowly in `frame cost:`. `module/build_q_quiet.h` is a small gate for a pack's lines that come every few seconds: they are said while something changes, and rarely when nothing does. The three examples use it.
 
-## Our own four features
+## The four packs of open-field-packs
 
 `8 tracks`, `fx train`, `lfo` and `sidechain` are packs with cards like any other, in a repository of their own like any other, [open-field-packs](https://github.com/LaP0573/open-field-packs): read them for how a bigger pack uses what this page describes. They use only what any pack may use: their frame functions, their pictures, their folders (`fx train`'s presets are in its folder `fx`, `lfo`'s in `lfo`), their values in the tapes' and the sounds' files (level 7), and a page that stays with its mode. `fx train` offers every effect the packs registered on each of its wagons, through level 8's list, as any pack may. The base holds nothing made for one of them and knows none of them by name. What the base does not offer, each still does through its own table of changes, made from the `profile.json` in its folder there.
 

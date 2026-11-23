@@ -16,8 +16,8 @@
 // SHA-256, size, places or level, as the file says those itself. When the page opens, each followed file of the unit's
 // firmware is downloaded once (resolveFollowed), held to its entry (checkFollowed: its name, its firmware, a version at
 // least the entry's, the packs, the level of the base and the folders it needs among those the listing allows), and
-// kept: a ticked followed pack goes on the unit with exactly the bytes checked then. Nobody at open-field has reviewed
-// such a file; the page says so on its row.
+// kept: a ticked followed pack goes on the unit with exactly the bytes checked then. Such a file's new versions reach
+// the page without a review, whoever its author; the page's row says where the file comes from.
 //
 // Runs in the browser and in Node (no Node APIs in this file), so that validate-install.mjs runs the same code.
 
@@ -26,7 +26,6 @@ import { firmwareOf } from "./door.mjs";
 
 export const LISTING_FILE = "packs.json";                     // beside the page, put there by the host's pages
 export const RAW = "https://raw.githubusercontent.com/";       // the only site the page downloads from
-export const OURS = "open-field";                              // the author of open-field's own packs
 export const NOTICE = "A pack is a program that can read and write the files on your unit: take packs only from people you trust.";
 
 const REPOSITORY = /^https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/([A-Za-z0-9._-]{1,100})$/;
@@ -74,7 +73,8 @@ export function rawLink(entry) {
 export const fileName = (entry) => entry.id + ".pack";
 
 // What the page offers from a listing, for the unit's firmware (the loader's manifest names it, "1.7.3"):
-// {base, offered: Map id -> entry, categories: [{key, label, entries}], ours: Set, otherFirmware, problems}.
+// {base, offered: Map id -> entry, categories: [{key, label, entries}], otherFirmware, problems}. Every author's
+// entry is read alike: the page sets no pack apart by who made it.
 // Only `listed` entries are offered, each once, under its first category; `bundled` base.pack is shown apart, as it
 // goes on every unit. An entry the page cannot use (a field out of form) is left out and named in `problems`. A
 // followed entry is offered once resolveFollowed has taken its file; one it has not is left out and named.
@@ -82,7 +82,6 @@ export function readListing(data, firmware) {
   if (!data || typeof data !== "object" || !Array.isArray(data.packs) || !data.categories || typeof data.categories !== "object") {
     throw new Error("the listing of packs is not in form");
   }
-  const ours = new Set(Array.isArray(data.ours) ? data.ours.filter((r) => typeof r === "string") : []);
   const offered = new Map(), heldBack = new Set();
   const problems = [];
   let base = null, otherFirmware = 0;
@@ -104,13 +103,7 @@ export function readListing(data, firmware) {
   }
   const categories = Object.entries(data.categories).map(([key, label]) => ({ key, label: String(label), entries: [] }));
   for (const entry of offered.values()) categories.find((c) => c.key === entry.categories[0]).entries.push(entry);
-  return { base, offered, categories: categories.filter((c) => c.entries.length), ours, otherFirmware, problems };
-}
-
-// Whether an entry is one of open-field's own packs: by open-field, in one of the listing's own repositories. The
-// page shows NOTICE on every other.
-export function isOurs(listing, entry) {
-  return entry.author === OURS && listing.ours.has(entry.repository);
+  return { base, offered, categories: categories.filter((c) => c.entries.length), otherFirmware, problems };
 }
 
 // The packs a pack cannot run without, besides base.pack (which goes on every unit), as ids: {ids, missing}.

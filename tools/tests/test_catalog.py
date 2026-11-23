@@ -193,7 +193,7 @@ class AnEntryHeldToItsFile(unittest.TestCase):
 
 class FoldersOfSomeAuthorsFiles(unittest.TestCase):
     """With --files, an author with a file in the folders is held whole, and one with none there is held to the form:
-    the maintainer gives the folders of a build, with every file of open-field's own packs and none of another
+    the maintainer gives the folders of a build of this repository, with every file it makes and none of another
     author's, and an author gives a folder with their own file alone (docs/catalog.md)."""
 
     def setUp(self):
@@ -749,20 +749,41 @@ class TheListingAsAWhole(unittest.TestCase):
                 self.assertFalse(in_order)
                 self.assertIn("its folder's name %r is" % taken, said)
 
-    def test_fx_and_lfo_are_kept_for_open_field_s_own_packs(self):
-        for kept in ("lfo", "LFO"):
-            with self.subTest(name=kept):
-                said, in_order = run(listing(entry_for(pack(), folders=[{"name": kept, "place": "mine"}])))
+    def test_fx_and_lfo_are_kept_for_the_packs_fx_train_and_lfo(self):
+        for kept, part, other in (("lfo", "name", "place"), ("LFO", "name", "place"), ("fx", "place", "name"), ("Fx", "place", "name")):
+            with self.subTest(folder=kept, part=part):
+                said, in_order = run(listing(entry_for(pack(), folders=[{part: kept, other: "mine"}])))
                 self.assertFalse(in_order)
-                self.assertIn("its folder's name %r is kept for open-field's own packs" % kept, said)
-        ours = dict(listing(), ours=[REPOSITORY])
-        ours["packs"].append(entry_for(pack(name="fx train"), author="open-field", folders=[{"name": "fx", "place": "fx"}]))
-        said, in_order = run(ours)
-        self.assertTrue(in_order, said)
-        ours["packs"].append(entry_for(pack(name="other"), author="open-field", folders=[{"name": "fx", "place": "other"}]))
-        said, in_order = run(ours)
-        self.assertFalse(in_order)
-        self.assertIn("its folder's name 'fx' is held by 'fx train'", said)
+                self.assertIn("its folder's %s %r is kept for the pack %r" % (part, kept, check.KEPT[kept.casefold()]), said)
+
+    def test_the_entry_fx_train_takes_fx_and_lfo_takes_lfo_whoever_their_author(self):
+        for author in ("Faust", "someone"):
+            with self.subTest(author=author):
+                train = entry_for(pack(name="fx train"), author=author, folders=[{"name": "fx", "place": "fx"}])
+                lfo = entry_for(pack(name="lfo"), author=author, folders=[{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}])
+                said, in_order = run(listing(train, lfo))
+                self.assertTrue(in_order, said)
+                self.assertNotIn("kept for", said)
+
+    def test_another_entry_never_takes_fx_or_lfo_whoever_its_author(self):
+        for author in ("Faust", "someone"):
+            for name, kept_for in (("fx", "fx train"), ("lfo", "lfo")):
+                with self.subTest(author=author, folder=name):
+                    train = entry_for(pack(name="fx train"), author="Faust", folders=[{"name": "fx", "place": "fx"}])
+                    other = entry_for(pack(name="other"), author=author, folders=[{"name": name, "place": "other"}])
+                    said, in_order = run(listing(train, other))
+                    self.assertFalse(in_order)
+                    self.assertIn("REFUSED: other: its folder's name %r is kept for the pack %r" % (name, kept_for), said)
+                    self.assertIn("ok: fx train", said)
+                    alone = run(listing(other))[0]                       # refused with the pack it is kept for absent too
+                    self.assertIn("REFUSED: other: its folder's name %r is kept for the pack %r" % (name, kept_for), alone)
+
+    def test_the_lfo_entry_never_takes_fx_nor_fx_train_lfo(self):
+        for name, wrong, kept_for in (("lfo", "fx", "fx train"), ("fx train", "lfo", "lfo")):
+            with self.subTest(entry=name):
+                said, in_order = run(listing(entry_for(pack(name=name), author="Faust", folders=[{"name": wrong, "place": "elsewhere"}])))
+                self.assertFalse(in_order)
+                self.assertIn("its folder's name %r is kept for the pack %r" % (wrong, kept_for), said)
 
     def test_a_retired_entry_keeps_its_id_and_its_folders_held(self):
         retired = {"id": "old", "author": "someone", "status": "retired", "categories": ["tools"], "description": "No longer offered.",
@@ -793,49 +814,59 @@ class TheListingAsAWhole(unittest.TestCase):
                 self.assertFalse(in_order, said)
 
 
-class OurOwnPacks(unittest.TestCase):
-    """The listing's `ours`: the repositories of open-field's own packs, on which the install page shows no warning."""
+class EveryAuthorAlike(unittest.TestCase):
+    """No author and no repository is set apart: the listing names none, and every entry is held by the same rules.
+    A listing before a change may still hold the key `ours`, which listings once had: only its packs are read."""
 
-    OURS = "https://github.com/open-field-test/packs"
+    THE_PACKS = "https://github.com/open-field-test/packs"
 
-    def with_ours(self, *entries, ours=None):
-        return dict(listing(*entries), ours=[self.OURS] if ours is None else ours)
-
-    def test_an_entry_of_ours_in_one_of_ours_is_in_order(self):
-        said, in_order = run(self.with_ours(entry_for(pack(), author="open-field", repository=self.OURS)))
-        self.assertTrue(in_order, said)
-
-    def test_an_entry_of_ours_lies_in_one_of_ours(self):
-        said, in_order = run(self.with_ours(entry_for(pack(), author="open-field")))
-        self.assertFalse(in_order)
-        self.assertIn("its author is open-field, and its repository is not one of the listing's ours", said)
-
-    def test_an_entry_in_one_of_ours_is_ours(self):
-        said, in_order = run(self.with_ours(entry_for(pack(), repository=self.OURS)))
-        self.assertFalse(in_order)
-        self.assertIn("its repository is one of the listing's ours, and its author is not open-field", said)
-
-    def test_the_form_of_ours(self):
-        for bad in ("https://github.com/a/b", ["https://gitlab.com/a/b"], [self.OURS, self.OURS], [1]):
-            with self.subTest(ours=bad):
-                said, in_order = run(self.with_ours(ours=bad))
+    def test_a_listing_with_ours_is_refused(self):
+        for ours in ([self.THE_PACKS], [], "https://github.com/a/b"):
+            with self.subTest(ours=ours):
+                said, in_order = run(dict(listing(), ours=ours))
                 self.assertFalse(in_order)
-                self.assertIn("its ours is not a list of repositories", said)
+                self.assertIn("REFUSED: the listing: the listing is not an object with about, categories, packs, and nothing else", said)
 
-    def test_ours_never_changes_in_a_change(self):
-        said, in_order = run(self.with_ours(), before=listing())
+    def test_every_maker_is_held_alike_in_any_repository(self):
+        for author in ("Faust", "someone"):
+            for repository in (self.THE_PACKS, REPOSITORY):
+                with self.subTest(author=author, repository=repository):
+                    said, in_order = run(listing(entry_for(pack(), author=author, repository=repository)))
+                    self.assertTrue(in_order, said)
+
+    def test_no_pack_in_a_repository_is_listed_under_the_project_s_name(self):
+        for author in ("open-field", "Open-Field"):
+            for repository in (self.THE_PACKS, REPOSITORY):
+                with self.subTest(author=author, repository=repository):
+                    said, in_order = run(listing(entry_for(pack(), author=author, repository=repository)))
+                    self.assertFalse(in_order)
+                    self.assertIn("its author is open-field, the name of this project", said)
+
+    def test_a_listing_before_with_ours_refuses_nothing(self):
+        mine = entry_for(pack(), author="Faust", repository=self.THE_PACKS)
+        for ours in ([self.THE_PACKS], [], ["not even a repository"], 1):     # its form is not held: only its packs are read
+            with self.subTest(ours=ours):
+                before = dict(listing(dict(mine, author="open-field")), ours=ours)
+                said, in_order = run(listing(mine), before=before)
+                self.assertTrue(in_order, said)
+                self.assertNotIn("REFUSED", said)
+
+    def test_a_listing_before_with_ours_still_holds_its_packs(self):
+        before = dict(listing(entry_for(pack(), author="Faust", repository=self.THE_PACKS)), ours=[self.THE_PACKS])
+        said, in_order = run(listing(), before=before)
         self.assertFalse(in_order)
-        self.assertIn("its ours changed", said)
-        said, in_order = run(self.with_ours(), before=self.with_ours())
-        self.assertTrue(in_order, said)
+        self.assertIn("REFUSED: tester: it was taken out", said)
 
-    def test_the_tree_s_own_packs_lie_in_its_ours(self):
+    def test_the_tree_s_listing_gives_fx_and_lfo_to_their_packs_alone(self):
         with open(check.CATALOG, encoding="utf-8") as f:
             the_listing = json.load(f)
-        self.assertTrue(the_listing["ours"])
+        self.assertEqual(set(the_listing), check.TOP_KEYS)
         for entry in the_listing["packs"]:
-            if "repository" in entry:
-                self.assertEqual(entry["author"] == "open-field", entry["repository"] in the_listing["ours"], entry["id"])
+            for folder in entry.get("folders") or []:
+                for part in ("name", "place"):
+                    kept_for = check.KEPT.get(folder[part].casefold())
+                    if kept_for is not None:
+                        self.assertEqual(entry["id"], kept_for, (entry["id"], folder))
 
 
 class AChangeHeldToTheListingBefore(unittest.TestCase):

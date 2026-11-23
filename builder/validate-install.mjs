@@ -25,7 +25,7 @@ import {
   prepare, readHelper, readPacks, checkFolder, sha256,
 } from "./install.mjs";
 import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
-import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed } from "./catalog.mjs";
+import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
@@ -336,22 +336,21 @@ async function selfChecks() {
   const entry = (id, more = {}) => ({ id, author: "someone", status: "listed", categories: ["tools"], description: "A pack.", repository: "https://github.com/someone/packs",
     commit: COMMIT, path: "build/" + id + ".pack", sha256: "a".repeat(64), bytes: 100, version: 1, firmware: "1.7.3", places: 0, needs: ["base"], folders: [], ...more });
   const data = {
-    about: "test", categories: { tools: "tools", examples: "examples" }, ours: ["https://github.com/open-field-test/packs"],
+    about: "test", categories: { tools: "tools", examples: "examples" },
     packs: [
       { id: "base", author: "open-field", status: "bundled", categories: ["tools"], description: "The base.", path: "builder/base.pack" },
       entry("one"), entry("two", { needs: ["base", "one"], categories: ["examples", "tools"] }), entry("old", { firmware: "1.7.0" }),
-      entry("held", { status: "reserved" }), entry("ours", { author: "open-field", repository: "https://github.com/open-field-test/packs" }),
+      entry("held", { status: "reserved" }), entry("faust", { author: "Faust", repository: "https://github.com/open-field-test/packs" }),
       entry("bad/id"), entry("One"), entry("needy", { needs: ["nowhere"] }),
     ],
   };
   const seen = readListing(data, "1.7.3");
-  check("the listing offers only listed packs for the unit's firmware, each once", [...seen.offered.keys()].join("|") === "one|two|ours|needy", [...seen.offered.keys()].join("|"));
+  check("the listing offers only listed packs for the unit's firmware, each once", [...seen.offered.keys()].join("|") === "one|two|faust|needy", [...seen.offered.keys()].join("|"));
   check("the bundled base is shown apart", seen.base?.id === "base");
   check("a pack for another firmware is counted, not shown", seen.otherFirmware === 1);
   check("an entry out of form and a name held twice are left out and named", seen.problems.length === 2 && seen.problems.some((p) => /bad\/id/.test(p)) && seen.problems.some((p) => /One: named twice/.test(p)), seen.problems.join("; "));
-  check("each pack is shown once, under its first category", seen.categories.map((c) => c.key + ":" + c.entries.map((e) => e.id).join(",")).join(" ") === "tools:one,ours,needy examples:two");
-  check("open-field's own packs are those by open-field in the listing's own repositories", isOurs(seen, seen.offered.get("ours")) && !isOurs(seen, seen.offered.get("one")) &&
-    !isOurs({ ours: new Set() }, seen.offered.get("ours")) && !isOurs(seen, { ...seen.offered.get("one"), author: "open-field" }));
+  check("each pack is shown once, under its first category", seen.categories.map((c) => c.key + ":" + c.entries.map((e) => e.id).join(",")).join(" ") === "tools:one,faust,needy examples:two");
+  check("every author's pack is read alike: the listing keeps no list of packs set apart", !("ours" in seen) && seen.offered.get("faust").author === "Faust");
   check("the notice is the owner's line", NOTICE === "A pack is a program that can read and write the files on your unit: take packs only from people you trust.");
   check("a ticked pack brings what it needs, base.pack aside", [...withNeeds(seen, ["two"]).ids].sort().join("|") === "one|two" && withNeeds(seen, ["needy"]).missing.has("nowhere"));
   check("a pack another ticked one needs is named", neededBy(seen, new Set(["two", "one"]), "one").join() === "two" && neededBy(seen, new Set(["one"]), "one").length === 0);
