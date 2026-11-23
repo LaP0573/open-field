@@ -6,7 +6,7 @@ Extra features for the OP-1 Field, added to the firmware that is already on your
 
 **At your own risk.** Installing it changes the firmware of your unit. That is a risky process: a unit can end up unable to start for good ("bricked"), and installing it will void the warranty of your device. Whether to do it is your decision alone. Read [NOTICE.md](NOTICE.md) first.
 
-**Status: open-field 0.12, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
+**Status: open-field 0.13, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
 
 ## What it is
 
@@ -23,7 +23,7 @@ This project's own four live in a repository of their own, [open-field-packs](ht
 | `lfo.pack` | Four LFOs on a synth sound, with presets. |
 | `sidechain.pack` | One tape track turned down by another, or by the beat. |
 
-Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.12`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.12`.
+Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.13`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.13`.
 
 `base.pack` comes with the install: the install page puts it on the unit with the new firmware file, from `builder/base.pack` beside the page. The feature files are not kept in this repository, and neither are their sources. Their authors share them, and you copy them onto the unit in its disk mode ([the guide](docs/guide.md#adding-a-feature)). The four above can also be built from their sources, with one command in open-field-packs. **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
@@ -70,10 +70,10 @@ When the examples get too small to learn from, read [open-field-packs](https://g
 ## What is proven and what is not
 
 - The install without any key has been made on several units, by their owners, from Windows computers, with bootloader 1000.1.1.
-- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.12 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
+- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.13 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
 - For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
-- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, with level 10, has been proven on a computer and not yet watched on a unit. So has `fx train` 17, the version the listing offers: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
+- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 31, has run on the maintainer's unit beside the four features (`fx train` 16 there) and the examples, and a test pack that gives way was tried with it. `fx train` 17, the version the listing offers, has been proven on a computer and not yet watched on a unit: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
 
 ## What is in this repository
 

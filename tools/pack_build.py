@@ -215,6 +215,15 @@ base that offers op1f_param_heard (the value as the sound plays it), so a pack t
 in its recipe, {"level": 10, ...}, and the word in front of its card names op1f_level_10; a base of an earlier level
 then leaves the pack out for the mark. Cards of levels 1 to 9 and every pack file built before are written as they were.
 
+Since R6h (base 31, module/build_r6e_card.h) an ask of places may give way, {"kind": "places", ..., "gives_way": true}
+(false or left out: firm, as before): the head's flags are 1, OP1F_PLACES_GIVES_WAY, and the pictures it lists are served to a
+screen only when no pack serves that name firmly. A card of level 6 or later carries one firm ask of places and then one
+that gives way. Refused: gives_way that is not true or false, a giving-way ask before a firm one (bases 24 to 30 take
+the first ask of places and stop, so the firm list would be lost there; the tool does not move it, the asks' numbers
+are set), two firm asks or two that give way, a third, a name in both lists. The census of places covers both lists;
+`card` and `check` print "places 'flow', 1 name(s), giving way: signalflow.svg". Every recipe and pack file of before is
+written and read as it was.
+
 The readers are module/build_j_pack.cpp (format 1) and the bases (module/build_j5c_base.cpp for formats 2 and 3).
 A pack file holds the module's own code and whatever the module carries. Whether one holds anything of the firmware
 is what tools/publish_check.py says: a pack of format 3 whose table holds checksums and whose pictures are
@@ -383,6 +392,11 @@ ENGINE_ALIGN_LEAST = 4
 CARD_LEVELS = CARD_LEVELS + (10,)
 ASK_KINDS_OF_LEVEL[10] = dict(ASK_KINDS_OF_LEVEL[9])
 KINDS_COUNTED[10] = KINDS_COUNTED[9]
+# since R6h (base 31, module/build_r6e_card.h): a card of level 6 or later may carry a second ask of places, after a firm
+# one, with the head's flag OP1F_PLACES_GIVES_WAY: the pictures it lists are served to a screen only when no pack serves that name
+# firmly. No new level and no new mark: bases 24 to 30 leave the giving-way ask aside, with a line, and run the card.
+PLACES_GIVES_WAY = 1                                             # a places ask's flag
+ASK_KEYS_6[5] = ASK_KEYS_6[5] + ("gives_way",)
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1284,11 +1298,39 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card asks for memory %d times: the base takes %d such asks in all and leaves the next aside" % (len(memories), MEMORIES_MOST))
     if sum(ask[4]["bytes"] for ask in out if ask[0] == 4) > MEMORY_MOST:
         raise ValueError("The card's memory asks come to more than 16 MiB together: the base gives %d bytes in all and refuses the later" % MEMORY_MOST)
-    for what in (5, 6):
-        found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
-        if len(found) > 1:
-            raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
+    places_together(out)                                    # since R6h: a firm one, then one that gives way
+    found = [number for number, ask in enumerate(out, 1) if ask[0] == 6]
+    if len(found) > 1:
+        raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[6]))
     return out
+
+
+def places_together(out):
+    """Since R6h (base 31): a card's asks of places taken together, as asks_of_card_6 answers them: at most two, a firm
+    one first and then one that gives way, and no name in both lists. Bases 24 to 30 take the first ask of places and
+    stop, and leave one with a flag aside: a giving-way ask first would take the card's firm list with it there. It is
+    refused, not moved: the numbers of the asks (the memory a stage names) are set already."""
+    found = [(number, ask) for number, ask in enumerate(out, 1) if ask[0] == 5]
+    if len(found) > 2:
+        raise ValueError("Ask %d of the card is a third ask of places: the base takes a firm one and then one that gives way a card, and leaves the later aside"
+                         % found[2][0])
+    if len(found) < 2:
+        return
+    (first, firm), (second, other) = found
+    if firm[2] & PLACES_GIVES_WAY and not other[2] & PLACES_GIVES_WAY:
+        raise ValueError("Ask %d of the card, the places %r, gives way and comes before the firm places %r, ask %d: bases 24 to 30 take the first ask "
+                         "of places and stop, and leave one that gives way aside, so the firm list would be lost there; put the firm ask first"
+                         % (first, firm[1], other[1], second))
+    if firm[2] & PLACES_GIVES_WAY:
+        raise ValueError("Ask %d of the card is a second ask of places that gives way: the base takes one that gives way a card, after a firm one, "
+                         "and leaves the later aside" % second)
+    if not other[2] & PLACES_GIVES_WAY:
+        raise ValueError('Ask %d of the card is a second ask of places, and neither gives way: the base takes one firm ask of places a card and '
+                         'leaves a second firm one aside; a second may give way ("gives_way": true)' % second)
+    both = [name for name in other[4]["names"] if name in firm[4]["names"]]
+    if both:
+        raise ValueError("Ask %d of the card, the places %r, gives way for %s, which the firm places %r, ask %d, lists too: a name is firm or "
+                         "gives way, and the base, finding it in the firm list, never serves it as giving way" % (second, other[1], both[0], firm[1], first))
 
 
 def ask_of_card_6(number, ask, level=7, earlier=()):
@@ -1346,6 +1388,11 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
                 raise ValueError("%s: its name %d, %r, is not the name of a picture: one to %d plain characters ending in .svg" % (said, place, text, PLACE_NAME - 1))
             if text in names[:place - 1]:
                 raise ValueError("%s: its name %d, %r, is there before" % (said, place, text))
+        gives_way = ask.get("gives_way", False)             # since R6h (base 31)
+        if not isinstance(gives_way, bool):
+            raise ValueError("%s: its gives_way is true or false, not %r: the table's flags hold OP1F_PLACES_GIVES_WAY or nothing, "
+                             "and the base leaves aside an ask with a flag it does not know" % (said, gives_way))
+        flags = PLACES_GIVES_WAY if gives_way else 0
         extra = {"names": list(names)}
     else:
         if not a_symbol(ask.get("changed")):
@@ -1619,6 +1666,7 @@ def ask_words(what, name, flags, functions, extra=None):
     """Since R3: an ask as `check` and `card` print it: "sequencer 'echo', synth and drum, tick key run shown" or
     "notes 'ear'". Since R4: "stage 'dub' at the master after its effect, 30000 cycles a call, the memory of ask 2",
     "memory 'lines', 1048576 bytes on 4", "places 'own', 1 name(s): tape.svg", "keeps 'dub', 1 key(s): dub_time in tapes".
+    Since R6h: places that give way, "places 'flow', 1 name(s), giving way: signalflow.svg".
     Since R5: "effect 'crush' on punch, 9000 cycles a call, mono, 2 value(s): bits 1..16 from 16; rate 1..64 from 8, reset"."""
     if what == 8:                                           # since R6
         said = "engine '%s', %d cycles a voice" % (name, extra["cycles"])
@@ -1641,8 +1689,9 @@ def ask_words(what, name, flags, functions, extra=None):
         return said + (", the memory of ask %d" % extra["memory"] if extra["memory"] else "")
     if what == 4:
         return "memory '%s', %d bytes on %d" % (name, extra["bytes"], extra["align"])
-    if what == 5:
-        return "places '%s', %d name(s): %s" % (name, len(extra["names"]), " ".join(n if n is not None else "?" for n in extra["names"]))
+    if what == 5:                                           # since R6h: "places 'flow', 1 name(s), giving way: signalflow.svg"
+        return "places '%s', %d name(s)%s: %s" % (name, len(extra["names"]), ", giving way" if flags & PLACES_GIVES_WAY else "",
+                                                  " ".join(n if n is not None else "?" for n in extra["names"]))
     if what == 6:
         said = "keeps '%s', %d key(s): %s" % (name, len(extra["keys"]), "; ".join(
             "%s in %s" % (key, " and ".join(KEEP_WORDS[bit] for bit in (1, 2, 4, 8) if bits & bit) or "no file") for key, bits in extra["keys"]))
@@ -1980,7 +2029,10 @@ def ask_tables_6(data, level):
     """Since R4: each ask of a card of level 6 or 7 read from its table as linked, as ask_tables answers it; a stage,
     memory, places and keeps as (kind, name, flags, {function's word: its address}, {what else the table holds}), the
     list of names of places read from the pack. What is not in order is said as a base of that level would leave it
-    aside, the asks taken together too (the memory a stage needs, one ask of places and of keeps a card)."""
+    aside, the asks taken together too (the memory a stage needs, one ask of places and of keeps a card). Since R6h, as
+    base 31 holds them: a places ask may carry the flag that it gives way, and a second ask of places is taken when the
+    first is firm and it gives way; "a second ask of places, where the base takes one a card" still says a second firm
+    one."""
     fields, body, _extra = parse3(data)
     known = set(ASK_KINDS_OF_LEVEL[min(level, max(ASK_KINDS_OF_LEVEL))].values())     # a later level's card: the kinds this tool knows
     out = []
@@ -2033,7 +2085,7 @@ def ask_tables_6(data, level):
             wrong = "its head's bytes are not its table's"
         elif not KIND_NAME_FORM.fullmatch(text) or name[len(text):].strip(b"\0"):
             wrong = "its name is not one the base takes"
-        elif flags & ~(STAGE_LISTENS if kind == 3 else 0):
+        elif flags & ~(STAGE_LISTENS if kind == 3 else PLACES_GIVES_WAY if kind == 5 else 0):     # since R6h places may give way
             wrong = "a flag the base does not know"
         elif shown:
             wrong = "a shown, which an ask of its kind has not"
@@ -2066,8 +2118,19 @@ def ask_tables_6(data, level):
             continue
         if kind == 3 and ask[4]["memory"] and not (ask[4]["memory"] <= len(out) and out[ask[4]["memory"] - 1][0] == 4):
             out[number] = item[:4] + ("its memory names no memory ask of its card",)
-        elif kind in (5, 6) and any(other[0] == kind for other in out[:number]):
+        elif kind == 6 and any(other[0] == kind for other in out[:number]):
             out[number] = item[:4] + ("a second ask of %s, where the base takes one a card" % KIND_WORDS_6[kind],)
+        elif kind == 5:                                      # since R6h (base 31): a firm one, then one that gives way
+            before = [other for other in out[:number] if other[0] == 5]
+            if not before or (len(before) == 1 and before[0][3] is not None and not before[0][3][2] & PLACES_GIVES_WAY and ask[2] & PLACES_GIVES_WAY):
+                continue
+            if len(before) > 1:
+                said = "a third ask of places, where the base takes a firm one and then one that gives way a card"
+            elif before[0][3] is not None and before[0][3][2] & PLACES_GIVES_WAY:
+                said = "an ask of places after one that gives way, which the base leaves aside: it takes the first ask of places and, after a firm one, one that gives way"
+            else:
+                said = "a second ask of places, where the base takes one a card"
+            out[number] = item[:4] + (said,)
     return out
 
 
@@ -2790,7 +2853,8 @@ def places_census(recipe, display):
     spelt as the unit spells it, and a picture of that name the pack carries must hold every part the unit's own picture
     holds (tools/picture_make.py's census: the firmware's screen looks the parts up by their names). A name the pack
     carries no picture of is served only through its `pick`, which the census cannot follow: a recipe with no pick is
-    refused for it, and one with a pick is said. Answers the lines to print; ValueError for what is refused."""
+    refused for it, and one with a pick is said. Answers the lines to print; ValueError for what is refused. Since R6h
+    every name of both lists, the firm one's and then the giving-way one's."""
     card = card_of(recipe)
     places = [ask for ask in card_asks(recipe) if ask[0] == 5] if card is not None else []
     if not places:
@@ -2801,7 +2865,7 @@ def places_census(recipe, display):
         raise ValueError("A card that takes the place of the unit's pictures is held to the unit's own: --display names no folder of them (%s)" % display)
     carried = dict(read_pictures(recipe))
     lines = []
-    for name in places[0][4]["names"]:
+    for name in [name for ask in places for name in ask[4]["names"]]:
         own = picture_make.units_own(display, name)
         if own is None:
             raise ValueError("The places name %s, which is none of the unit's own pictures: a screen of the unit never asks for it" % name)

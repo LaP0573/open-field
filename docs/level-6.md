@@ -109,10 +109,30 @@ A screen of the unit asks for its pictures by name (`tape.svg`, `sketch.svg`). B
 
 Any other picture your pack carries is its own, whatever its name. You get it with `op1f_picture(card, name)`, and a screen of the unit that asks for that name gets the unit's own. The log says so once: `cards: '<pack>' carries a picture named <name> and does not take its place: the unit's own is shown`.
 
-- Up to 256 names, one ask of this kind a card.
+- Up to 256 names an ask. One plain ask of this kind a card, and from base 31 one that gives way after it (below).
 - For each name you list, the pack tool checks that the unit has a picture of that name, and that yours holds every part the unit's own holds. It refuses the card otherwise. Keep that check. It's the one thing standing between your picture and an owner's unit that won't start.
 - **Cards of levels 1 to 5 keep the old rule**: every picture they carry is offered to the screens by its name. An older pack that carries a picture named like one of the unit's own, by chance, can still stop a start. Build at level 6, or run `tools/picture_make.py census` on your pictures.
 - Give your own pictures names of their own anyway (`dub-page.svg`, not `page.svg`). Examples get copied, and a name that happens to clash teaches the wrong habit.
+
+### Giving way (base 31)
+
+Two packs can carry a picture for the same screen. Without anything more, the pack whose file name sorts first wins, and that is luck. Some pictures are a matter of looks, a recolour say. Others carry a working page, like `sidechain`'s duck page, which lives on the signal flow screen. If yours is the first kind, let it give way:
+
+```json
+"asks": [
+  { "kind": "places", "name": "looks", "names": [ "master.svg" ] },
+  { "kind": "places", "name": "flow", "names": [ "signalflow.svg" ], "gives_way": true }
+]
+```
+
+A name in the second list is served only when no other pack serves it. A pack that lists the name the plain way, or carries it at level 5 or lower, wins, and its picture shows. If that pack's `pick` answers 0 for the name, yours shows. You don't need to know which packs are out there, and your source names none of them.
+
+- The plain ask first, then the one that gives way. The pack tool refuses the other order: a base before 31 reads only the first `places` ask of a card, and your plain list would be lost there.
+- On a base before 31 the ask that gives way is left aside, with a line in the log, and its pictures aren't shown: the unit's own picture is. So on an older base your pack hides nobody's page, and only its looks are missing.
+- The pack tool checks both lists the same way: every part of the unit's own picture has to be in yours.
+- Two packs that both give way on one name, or both hold on to it, still go by file name, and the log says so.
+- When a pack is served over one that gives way, the log says that once: `cards: '<pack that gives way>' gives way to '<pack served>' for the picture <name>`.
+- In the header the flag is `OP1F_PLACES_GIVES_WAY`, a bit of the table head's `flags`.
 
 ## How `dub` works
 

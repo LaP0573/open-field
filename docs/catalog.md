@@ -48,6 +48,8 @@ If you have not built a pack yet, start with [a first pack](first-pack.md).
 
 The base's own entry says `offers_level` instead of `level`: the highest level it offers. A pack that needs a higher level than the listed base offers is refused.
 
+Some things a card can ask need a newer base, not a higher level. Today there is one: a `places` ask that gives way ([level 6](level-6.md#giving-way-base-31)) needs base 31 or later. An older base of the same level leaves that ask aside and runs the rest of the pack. While the listed base is older than what your card asks for, the check refuses your entry and names the version it needs.
+
 Everything from `version` on is what the file says of itself. `python -I tools/pack_build.py check --pack <your file>` prints it: `name`, `version`, `entries` (the places), `works with` (what it needs, marked `needed`), `wants` (the level, as `op1f_level_<n>`) and the card's folders. The listing's check reads the file the same way and refuses an entry that says otherwise.
 
 The same pack, following the branch `main` instead of one commit:
@@ -124,7 +126,7 @@ A ticked file goes into the folder `packs` that the page and the helper share, u
 1. **Build it and try it on your unit.** The listing's check cannot run a pack; the review asks what you tried and what the unit did.
 2. **Commit the pack file into your own public repository on GitHub**, at the path the entry names. A file in the repository, not only a release's download: the install page runs in the owner's browser, and a browser may read a file of a repository at a commit, but not a release's download from another site.
 3. **Write the entry** into `catalog/packs.json`, behind the others, with the full id of the commit that holds the file, or with the branch it follows.
-4. **Run the check**, with your file in a folder of its own: `python -I tools/catalog_check.py --files <that folder>`. It holds every entry's form, and yours to your file. Where the file's size or SHA-256 differs from the entry, it prints the file's own. The next section shows it on this repository's own packs.
+4. **Run the check**, with your file in a folder of its own: `python -I tools/catalog_check.py --files <that folder>`. It holds every entry's form, and yours to your file. Where the file's size or SHA-256 differs from the entry, it prints the file's own. The other authors' entries, whose files are not in your folder, pass on their form, and their lines say `its file not held`. If you list more than one pack, put all their files in the folder: once one of your files is there, each of your entries is held to its file, and a missing one is refused. The next section shows it on this repository's own packs.
 5. **Open a pull request that changes only `catalog/packs.json`.** Say what the pack does, how you tried it, and where its source is. The checks on the pull request (`.github/workflows/listing.yml`) hold the listing to the one before your change, download your file from the commit, or from the head of the branch, and hold your entry to it, as step 4 did.
 6. **The review.** The maintainer reads your source at that commit, or on the branch as it stands then, tries the file on a unit, and merges or says what stands in the way. Once merged, the pack is on the install page: the next publication of the page carries the listing with your entry.
 
@@ -147,7 +149,7 @@ A followed entry names a branch of your repository with `follow`, in place of a 
 7. The level of the base it needs is no higher than the listed base offers.
 8. Every folder its card asks for, name and place, is in the entry's `folders`.
 
-A file that fails one of them is not offered, and the page's log says which. The listing's check holds the same, and holds the card and the release as it does for a pinned file: run `python -I tools/catalog_check.py --fetch` after you push, or `--files` with your file in a folder.
+A file that fails one of them is not offered, and the page's log says which. The listing's check holds the same, and holds the card, the release and the base's version (above) as it does for a pinned file: run `python -I tools/catalog_check.py --fetch` after you push, or `--files` with your file in a folder.
 
 **What the owner sees** on the row of a followed pack, beside the warning: the mark `latest from <author>'s <branch> · not reviewed`. With the pointer on it, it says: "This file comes straight from <author>'s branch <branch> as it stands today: nobody at open-field has looked at this version." On one of this project's own packs, from [open-field-packs](https://github.com/LaP0573/open-field-packs), the mark is `latest from open-field's <branch>`, with no "not reviewed": a new version there is the project's own work.
 
@@ -188,6 +190,8 @@ After a build ([docs/build.md](build.md)), every entry of this project's own pac
 ```bash
 python -I tools/catalog_check.py --files out/packs --files out/examples --files <your checkout of open-field-packs>
 ```
+
+The rule for `--files`: an author with a file in one of the folders is held whole, each of their entries that names a file held to it and a missing one refused. So every entry whose `author` is `open-field` is held here, and a missing file of ours is refused. An entry by another author, whose file is not in these folders, passes on its form, and its line says `its file not held`; `--fetch` holds it to its file. Folders that hold no entry's file at all are refused: a file is looked for by the last part of its entry's `path`, or as `<id>.pack`.
 
 Every listed entry held to its file downloaded from its repository at its commit, or at the head of the branch it follows, as the install page downloads it:
 

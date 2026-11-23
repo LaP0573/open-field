@@ -16,6 +16,7 @@ import importlib.util
 import io
 import json
 import os
+import struct
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -183,10 +184,68 @@ class AnEntryHeldToItsFile(unittest.TestCase):
         self.assertFalse(in_order)
         self.assertIn("the file is no pack the loader takes", said)
 
-    def test_a_file_that_is_not_in_the_folders_is_refused(self):
-        said, in_order = run(listing(entry_for(pack())), folders=[tempfile.gettempdir() + os.sep + "no-such-folder"])
+    def test_folders_that_hold_no_entry_s_file_are_refused(self):
+        folder = tempfile.gettempdir() + os.sep + "no-such-folder"
+        said, in_order = run(listing(entry_for(pack())), folders=[folder])
         self.assertFalse(in_order)
-        self.assertIn("its file is not in", said)
+        self.assertIn("REFUSED: the folders given (%s) hold no entry's file" % folder, said)
+
+
+class FoldersOfSomeAuthorsFiles(unittest.TestCase):
+    """With --files, an author with a file in the folders is held whole, and one with none there is held to the form:
+    the maintainer gives the folders of a build, with every file of open-field's own packs and none of another
+    author's, and an author gives a folder with their own file alone (docs/catalog.md)."""
+
+    def setUp(self):
+        self.ours = [pack(name="mine"), pack(name="also mine")]
+        self.theirs = [pack(name="theirs"), pack(name="theirs too")]
+        self.followed = card_pack(name="followed")
+        self.listing = listing(*[entry_for(data, author="open-field", status="reserved", categories=["examples"]) for data in self.ours]
+                               + [entry_for(data) for data in self.theirs]
+                               + [followed_for(self.followed, folders=[{"name": "notes", "place": "notes"}])])
+        for entry in self.listing["packs"][1:3]:                # held as the examples are: a file, no repository
+            del entry["repository"], entry["commit"]
+
+    def held(self, *files):
+        with tempfile.TemporaryDirectory() as folder:
+            for data in files:
+                with open(os.path.join(folder, pb.parse(data)[0]["name"] + ".pack"), "wb") as f:
+                    f.write(data)
+            return run(self.listing, folders=[folder])
+
+    def test_the_folders_of_a_build_hold_ours_and_pass_another_author_s_entries_on_their_form(self):
+        said, in_order = self.held(*self.ours)
+        self.assertTrue(in_order, said)
+        for name in ("mine", "also mine"):
+            self.assertIn("ok: %s (reserved, its file held)" % name, said)
+        for name in ("theirs", "theirs too"):
+            self.assertIn("ok: %s (listed, its file not held: no file of someone's in the folders given)" % name, said)
+        self.assertIn("ok: followed (listed, follows main, its file not held: no file of someone's in the folders given)", said)
+
+    def test_one_of_ours_missing_is_refused(self):
+        said, in_order = self.held(self.ours[0])
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: also mine: its file is not in", said)
+        self.assertIn("ok: mine (reserved, its file held)", said)
+
+    def test_an_author_s_own_folder_holds_their_file_and_passes_ours_on_their_form(self):
+        said, in_order = self.held(*self.theirs, self.followed)
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: theirs (listed, its file held)", said)
+        self.assertIn("ok: followed (listed, follows main, its file held)", said)
+        self.assertIn("ok: mine (reserved, its file not held: no file of open-field's in the folders given)", said)
+
+    def test_an_author_with_one_file_there_and_another_missing_is_refused(self):
+        said, in_order = self.held(self.theirs[0])
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: theirs too: its file is not in", said)
+        self.assertIn("REFUSED: followed: its file is not in", said)
+        self.assertIn("ok: theirs (listed, its file held)", said)
+
+    def test_a_file_held_is_still_held_to_its_entry(self):
+        said, in_order = self.held(self.theirs[0], pack(name="theirs too", version=5), self.followed)
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: theirs too: the file's SHA-256 is", said)
 
 
 class Downloads(unittest.TestCase):
@@ -433,6 +492,97 @@ class AFollowedFile(unittest.TestCase):
             raise AssertionError("asked for %s" % url)
         said, in_order = run(listing(dict(followed_for(pack()), status="retired")), download=True, get=get)
         self.assertTrue(in_order, said)
+
+
+def places_pack(lists=((("tape.svg",), False), (("signalflow.svg",), True)), level=6, name="tester", version=2):
+    """A pack file with a card of `level` whose asks are asks of places, each (its pictures' names, whether it gives
+    way), as the base reads them: by default a firm one and then one that gives way."""
+    link, at = pb.ROOM_START, 4
+    asks = at + pb.CARD_4_BYTES
+    size = pb.TABLE_BYTES_6[5]
+    tables = asks + pb.ASK.size * len(lists)
+    end = tables + size * len(lists)                            # where the next list of names goes
+    body = bytearray(end + sum(pb.PLACE_NAME * len(names) for names, _gives in lists))
+    pb.CARD_4.pack_into(body, at, pb.CARD_MARK, pb.CARD_4_BYTES, level, version, name.encode("ascii"), 0, 0, 0, 0, 0, 0,
+                        link + asks, len(lists))
+    places = [(at + pb.CARD_3_BYTES, pb.KIND_WORD, None, link + asks)]
+    for number, (names, gives) in enumerate(lists):
+        table = tables + size * number
+        pb.ASK.pack_into(body, asks + pb.ASK.size * number, 5, size, link + table)
+        pb.KIND_HEAD.pack_into(body, table, size, b"list%d" % number, pb.PLACES_GIVES_WAY if gives else 0, 0)
+        struct.pack_into("<2I", body, table + pb.KIND_HEAD.size, len(names), link + end)
+        for n, picture in enumerate(names):
+            body[end + pb.PLACE_NAME * n:end + pb.PLACE_NAME * n + len(picture)] = picture.encode("ascii")
+        places += [(asks + pb.ASK.size * number + 8, pb.KIND_WORD, None, link + table), (table + 32, pb.KIND_WORD, None, link + end)]
+        end += pb.PLACE_NAME * len(names)
+    return pb.make3(bytes(body), link, len(body), 0, name, OS_173, (link, link), version=version,
+                    imports=[("op1f_level_%d" % level, True)], places=places, card_place=at, no_table=True)
+
+
+def versioned_base(version, level=6, firmware="1.7.3"):
+    """A base of that version held to its form, whose file is not at hand: its entry says what its file would."""
+    return dict(base_entry(level), sha256="0" * 64, bytes=1000, version=version, firmware=firmware, places=0, needs=[], folders=[])
+
+
+class ABaseOfTheVersionACardNeeds(unittest.TestCase):
+    """What a card asks that a base serves only from one of its versions on (BASE_SINCE): places that give way, which
+    base 31 serves and bases 24 to 30 leave aside."""
+
+    SAID = ("REFUSED: tester: the file's card asks for places that give way, which the base serves from its version 31, "
+            "and the listing's base for 1.7.3 is version 30")
+
+    def held(self, data, entry, *bases):
+        with tempfile.TemporaryDirectory() as folder:
+            with open(os.path.join(folder, os.path.basename(entry["path"])), "wb") as f:
+                f.write(data)
+            return run(dict(listing(), packs=list(bases) + [entry]), folders=[folder])
+
+    def test_the_file_is_read_as_its_card_asks(self):
+        self.assertTrue(check.gives_way(places_pack()))
+        self.assertEqual(check.base_needed(places_pack()), (31, "places that give way"))
+        self.assertTrue(check.gives_way(places_pack(lists=((("signalflow.svg",), True),))))
+        for data in (places_pack(lists=((("tape.svg",), False),)), card_pack(), pack()):
+            self.assertFalse(check.gives_way(data))
+            self.assertIsNone(check.base_needed(data))
+
+    def test_a_pack_that_gives_way_is_listed_beside_base_31_or_later(self):
+        data = places_pack()
+        entry = entry_for(data, level=6)
+        said, in_order = self.held(data, entry, versioned_base(30))
+        self.assertFalse(in_order, said)
+        self.assertIn(self.SAID, said)
+        for version in (31, 32):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertTrue(in_order, said)
+                self.assertIn("ok: tester (listed, its file held)", said)
+
+    def test_a_pack_with_firm_places_only_is_listed_beside_any_base(self):
+        data = places_pack(lists=((("tape.svg",), False),))
+        said, in_order = self.held(data, entry_for(data, level=6), versioned_base(24))
+        self.assertTrue(in_order, said)
+
+    def test_a_listing_whose_base_has_no_file_has_no_version(self):
+        data = places_pack()
+        said, in_order = self.held(data, entry_for(data, level=6), base_entry(6))
+        self.assertFalse(in_order, said)
+        self.assertIn("and the listing's base for 1.7.3 is none with a file", said)
+
+    def test_the_base_of_the_pack_s_own_firmware_counts_and_no_retired_one(self):
+        bases = [versioned_base(31, firmware="1.7.0"), versioned_base(30), dict(versioned_base(32), status="retired")]
+        self.assertEqual(check.base_version(bases, (), "1.7.3"), 30)
+        self.assertEqual(check.base_version(bases, (), "1.7.0"), 31)
+        self.assertEqual(check.base_version(bases, (1,), "1.7.3"), 0)          # an entry out of form is no base
+
+    def test_a_followed_file_that_gives_way_is_held_so_too(self):
+        data = places_pack()
+        entry = followed_for(data)
+        for version, in_order_then in ((30, False), (31, True)):
+            with self.subTest(version=version):
+                said, in_order = run(dict(listing(), packs=[versioned_base(version), entry]), download=True, get=lambda url: data)
+                self.assertEqual(in_order, in_order_then, said)
+                if not in_order_then:
+                    self.assertIn(self.SAID, said)
 
 
 class TheFormOfAnEntry(unittest.TestCase):

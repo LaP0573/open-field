@@ -783,7 +783,18 @@ struct Op1fMemory {
 // of one (twenty-three characters and the end).
 enum { OP1F_PLACES_MOST = 256, OP1F_PLACE_NAME = 24 };
 
-// Pictures that take a place: what its ask points at; at most one such ask a card. The head's `flags` is 0.
+// From base 31: pictures that give way. The bit of a places ask's head `flags`:
+//   OP1F_PLACES_GIVES_WAY  this ask's pictures give way: a screen is handed one of them only when no pack serves that
+//                          name firmly (from an ask of places without the bit). A screen's picture is served by the
+//                          first pack, in the order of the files' names, that has it and does not give way; only when
+//                          none does, by the first that gives way. A card may carry one firm ask of places and then
+//                          one that gives way, in that order, with no name in both lists. Bases 24 to 30 take the
+//                          first ask of places and stop: they leave the giving-way ask aside with a line on the log,
+//                          the card runs, and its giving-way pictures are not served there
+enum { OP1F_PLACES_GIVES_WAY = 1 };
+
+// Pictures that take a place: what its ask points at; at most one firm such ask a card and, from base 31, one that
+// gives way after it. The head's `flags` is 0, or OP1F_PLACES_GIVES_WAY on the ask that gives way.
 //   count  how many names the list holds, 1 to OP1F_PLACES_MOST
 //   names  the pack's own list of `count` names, constant data in the pack's body, on a word: the names of the unit's
 //          own pictures, as a screen of the unit asks for them (each ending in .svg, zero padded within its

@@ -7,8 +7,8 @@ The base is a pack like any other ([packs](packs.md)), built from `packs/base.js
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 30 |
-| Release | `0.12`: the start screen reads `1.7.3 - open-field 0.12` |
+| Version | 31 |
+| Release | `0.13`: the start screen reads `1.7.3 - open-field 0.13` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
@@ -53,7 +53,7 @@ python -I tools/pack_build.py card --recipe examples/wink/recipe.json --out <the
 | 3 | Folders and files on the unit's disk, and text on a page | 56 bytes | `op1f_level_3` |
 | 4 | [What a page needs](level-4.md): pages that stack, a blank page to paint, painting, text placed and measured, a file deleted, a key watched, the thread an event came on; and the card's list of asks | 64 bytes | `op1f_level_4` |
 | 5 | [A sequencer of the pack's own](level-5.md) in the unit's list, and the notes heard | 64 bytes | `op1f_level_5` |
-| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name | 64 bytes | `op1f_level_6` |
+| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name; from base 31, pictures that [give way](level-6.md#giving-way-base-31) to another pack's | 64 bytes | `op1f_level_6` |
 | 7 | [Values kept in tapes and sounds](level-7.md), in the unit's own files | 64 bytes | `op1f_level_7` |
 | 8 | [An effect of the pack's own](level-8.md) in the unit's lists of effects, for the sounds and the master, and the list of every pack's effects, to run inside another pack | 64 bytes | `op1f_level_8` |
 | 9 | [A synth engine of the pack's own](level-9.md) in the unit's list of engines, with sounds of its own in the sound list | 64 bytes | `op1f_level_9` |
@@ -123,7 +123,7 @@ What a frame function must keep to:
 
 A screen of the firmware loads its picture by a file name. The base stands at the entry of that loader. For a name a pack carries a picture for, the picture comes from the pack; every other name goes on in the firmware's own loader. That is how a pack changes a screen of the device, and how a page of its own gets its picture.
 
-**Who serves a name.** The base asks the cards in the order of the packs' file names, each pack's `pick` first. The first pack that has the name serves it. Where a second pack carries the same name, one line in the log says so. A card of level 6 or later serves a screen of the firmware only the names it lists ([level 6](level-6.md), "Pictures that take a place"): a picture of its own named like one of the unit's stays its own.
+**Who serves a name.** The base asks the cards in the order of the packs' file names, each pack's `pick` first. A card of level 6 or later serves a screen of the firmware only the names it lists ([level 6](level-6.md), "Pictures that take a place"): a picture of its own named like one of the unit's stays its own. The first pack that has the name serves it, unless it gives way: from base 31 a pack can list names it serves only when no other pack does ([level 6](level-6.md), "Giving way"). So a recolour of the signal flow screen can sit next to a pack whose working page lives on that screen, and neither names the other. Where two packs both hold on to one name, the first by file name serves it, and one line in the log says so.
 
 **A pack's own picture**, for a page of its own, has a name the firmware never asks for. `op1f_picture(card, name)` looks for it in that pack's directory alone, and makes it into a **document**: the picture as the firmware holds it once it is read, with parts that can be found by their names.
 
@@ -392,7 +392,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 
 | Tag | Line begins | What it says |
 | --- | --- | --- |
-| `op1f_cards` | `cards:` | The cards the loader handed over, each card's level and what it asks for; then, every 256 frames through a gate, each frame function's time |
+| `op1f_cards` | `cards:` | The cards the loader handed over, each card's level and what it asks for; a picture two packs carry, and which serves it; then, every 256 frames through a gate, each frame function's time |
 | `op1f_cards` | `page:` | A page opened, with the mode, and closed, with why |
 | `op1f_cards` | `input:` | The keys and turns that came, and how many packs took; at each change of screen, the last key down and up |
 | `op1f_folders` | `folders:` | Each folder's place and whether it is shown; what the disk mode shows; each file the computer brings or deletes |
