@@ -109,7 +109,7 @@ The install page reads the listing beside it, as `packs.json`: the workflow that
 - `base.pack`, which goes on every unit and has no tick;
 - every `listed` entry for the unit's firmware, under its first category, with its description, author, version, what it needs and its size, and a tick;
 - on every entry that is not this project's own, the warning: **a pack is a program that can read and write the files on your unit: take packs only from people you trust**;
-- on a followed entry, beside the warning, the mark `latest from <author>'s <branch> · not reviewed` ([following a branch](#following-a-branch)).
+- on a followed entry, beside the warning, the mark `latest from <author>'s <branch> · not reviewed`, and `latest from open-field's <branch>` on one of this project's own ([following a branch](#following-a-branch)).
 
 When an owner ticks a pack, the page downloads its file from `https://raw.githubusercontent.com/<owner>/<name>/<commit>/<path>`, the entry's repository at the entry's commit, and holds it to the entry's size and SHA-256. A file that differs is refused, named, and its tick taken off. A pack the ticked one needs is ticked with it.
 
@@ -149,7 +149,7 @@ A followed entry names a branch of your repository with `follow`, in place of a 
 
 A file that fails one of them is not offered, and the page's log says which. The listing's check holds the same, and holds the card and the release as it does for a pinned file: run `python -I tools/catalog_check.py --fetch` after you push, or `--files` with your file in a folder.
 
-**What the owner sees** on the row of a followed pack, beside the warning: the mark `latest from <author>'s <branch> · not reviewed`. With the pointer on it, it says: "This file comes straight from <author>'s branch <branch> as it stands today: nobody at open-field has looked at this version."
+**What the owner sees** on the row of a followed pack, beside the warning: the mark `latest from <author>'s <branch> · not reviewed`. With the pointer on it, it says: "This file comes straight from <author>'s branch <branch> as it stands today: nobody at open-field has looked at this version." On one of this project's own packs, from [open-field-packs](https://github.com/LaP0573/open-field-packs), the mark is `latest from open-field's <branch>`, with no "not reviewed": a new version there is the project's own work.
 
 **What is given up.** Know this before you choose it:
 
