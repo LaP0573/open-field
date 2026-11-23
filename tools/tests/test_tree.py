@@ -572,9 +572,10 @@ class ThePagesOnAHost(unittest.TestCase):
     def test_the_one_load_from_another_site_is_a_listed_pack_at_its_commit(self):
         """The page downloads a pack the owner ticks from its author's repository, at the commit the listing names
         (raw.githubusercontent.com, which answers any page), and holds it to the entry's size and SHA-256 before it is
-        used (docs/catalog.md). That is its only load from another site: one fetch of a built address, in
-        catalog.mjs's download, of rawLink's address, which begins with the one absolute address the page's code
-        holds."""
+        used (docs/catalog.md); a followed entry's file comes from the head of its branch on the same site, once, when
+        the page opens, and is held to its entry there. That is its only load from another site: one fetch of a built
+        address, in catalog.mjs's download, of rawLink's address, which begins with the one absolute address the
+        page's code holds."""
         built, addresses = [], []
         for name, content in self.page_files().items():
             code = "\n".join(self.SCRIPT.findall(content)) if name.endswith(".html") else content
@@ -588,6 +589,7 @@ class ThePagesOnAHost(unittest.TestCase):
         catalog = text(self.served, "catalog.mjs")
         for said in ('export const RAW = "https://raw.githubusercontent.com/"',
                      'return RAW + found[1] + "/" + found[2] + "/" + entry.commit + "/"',
+                     'return RAW + found[1] + "/" + found[2] + "/refs/heads/" + branchOf(entry) + "/"',
                      "const url = rawLink(entry);",
                      'credentials: "omit", redirect: "error"',
                      "if (bytes.length !== entry.bytes) throw",

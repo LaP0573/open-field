@@ -28,9 +28,10 @@ export const ASK_PACE_MS = 250;                     // while the unit asks or ap
 export const SILENT_STATUS_LIMIT = 3;               // three status messages in a row with no answer: the unit does not answer
 export const NOT_READY_TRIES = 10;                  // "not ready" to begin or abort 01: the same message again a second later, at most this many times
 export const MAX_TRIES = 3;                         // sends of one message when status answers and the message does not
-// Just after a start the door answers "not ready" to list, hash and remove for a fraction of a second, while the unit
-// looks for a change that was cut short. Those three act the same twice, so they are asked again every 250 ms, at
-// most this many times.
+// Just after a start the door answers "not ready" to list, hash and remove: while the unit looks for a change that was
+// cut short, and from base 31 until four seconds after the start's first screen is drawn (some six seconds after the
+// door first answers, on a unit with many packs). Those three act the same twice, so they are asked again every 250 ms, at most this
+// many times.
 export const START_WAIT_TRIES = 40;
 export const AFTER_PAGE = "after.html";             // beside index.html: the page that holds no MIDI while the unit restarts
 export const RETURN_SLOW_MS = 20000;                // back on the page: no answer within this, and the page says to quit the browser and open it again

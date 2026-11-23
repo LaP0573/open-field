@@ -20,6 +20,8 @@ The examples `sketch` and `yoyo` open with the same keys. `dub`'s file sorts fir
 | Working memory | `"kind": "memory"` | an `Op1fMemory` |
 | Pictures that take a place | `"kind": "places"` | an `Op1fPlaces` |
 
+From base 32 there's a fourth kind, `"kind": "options"`: settings of your pack's own in the unit's settings ([below](#settings-base-32)).
+
 Each table starts with the head every kind shares ([level 5](level-5.md), "Asks"). Its `name` is what the base's lines in the log call the ask. None of the three has a page, so `shown` is always 0.
 
 A card that uses one of them says level 6, and its source makes `op1f_level_6` a name your pack needs. On an older base the loader leaves your pack out and says why. As with every kind, the pack tool writes the tables from the recipe and refuses what the base would leave aside.
@@ -109,10 +111,89 @@ A screen of the unit asks for its pictures by name (`tape.svg`, `sketch.svg`). B
 
 Any other picture your pack carries is its own, whatever its name. You get it with `op1f_picture(card, name)`, and a screen of the unit that asks for that name gets the unit's own. The log says so once: `cards: '<pack>' carries a picture named <name> and does not take its place: the unit's own is shown`.
 
-- Up to 256 names, one ask of this kind a card.
+- Up to 256 names an ask. One plain ask of this kind a card, and from base 31 one that gives way after it (below).
 - For each name you list, the pack tool checks that the unit has a picture of that name, and that yours holds every part the unit's own holds. It refuses the card otherwise. Keep that check. It's the one thing standing between your picture and an owner's unit that won't start.
 - **Cards of levels 1 to 5 keep the old rule**: every picture they carry is offered to the screens by its name. An older pack that carries a picture named like one of the unit's own, by chance, can still stop a start. Build at level 6, or run `tools/picture_make.py census` on your pictures.
 - Give your own pictures names of their own anyway (`dub-page.svg`, not `page.svg`). Examples get copied, and a name that happens to clash teaches the wrong habit.
+
+### Giving way (base 31)
+
+Two packs can carry a picture for the same screen. Without anything more, the pack whose file name sorts first wins, and that is luck. Some pictures are a matter of looks, a recolour say. Others carry a working page, like `sidechain`'s duck page, which lives on the signal flow screen. If yours is the first kind, let it give way:
+
+```json
+"asks": [
+  { "kind": "places", "name": "looks", "names": [ "master.svg" ] },
+  { "kind": "places", "name": "flow", "names": [ "signalflow.svg" ], "gives_way": true }
+]
+```
+
+A name in the second list is served only when no other pack serves it. A pack that lists the name the plain way, or carries it at level 5 or lower, wins, and its picture shows. If that pack's `pick` answers 0 for the name, yours shows. You don't need to know which packs are out there, and your source names none of them.
+
+- The plain ask first, then the one that gives way. The pack tool refuses the other order: a base before 31 reads only the first `places` ask of a card, and your plain list would be lost there.
+- On a base before 31 the ask that gives way is left aside, with a line in the log, and its pictures aren't shown: the unit's own picture is. So on an older base your pack hides nobody's page, and only its looks are missing.
+- The pack tool checks both lists the same way: every part of the unit's own picture has to be in yours.
+- Two packs that both give way on one name, or both hold on to it, still go by file name, and the log says so.
+- When a pack is served over one that gives way, the log says that once: `cards: '<pack that gives way>' gives way to '<pack served>' for the picture <name>`.
+- In the header the flag is `OP1F_PLACES_GIVES_WAY`, a bit of the table head's `flags`.
+
+## Settings (base 32)
+
+Your pack can put things the owner may want to set (a speed, a number of steps, a drawing on or off) into the unit's own settings: hold **shift** and press **COM**, then **T1**. They look and turn like the unit's own items, and the base keeps them from one start to the next. hasis wrote the first form of this, in pull request 20.
+
+**The ask.** One ask of kind `options` a card, on a card of level 6 or later, with one to eight options:
+
+```json
+{ "kind": "options", "name": "mine", "changed": "mine_changed", "open": null,
+  "options": [
+    { "name": "dot",   "choices": null, "first": false, "category": "keyboard" },
+    { "name": "speed", "choices": [ "slow", "mid", "fast" ], "first": 1, "category": "midi" },
+    { "name": "depth", "low": 0, "high": 100, "first": 50 }
+  ] }
+```
+
+This one is made up for this page. An option's `name` is 1 to 15 characters of `A`-`Z`, `a`-`z`, `0`-`9`, space and `. + # % - /`. The unit shows it in its own capitals, and it has no `_`. Names differ within an ask.
+
+**The three kinds.**
+
+| Kind | In the recipe | Shown as | `first` |
+| --- | --- | --- | --- |
+| A switch | `"choices": null` | `OFF` or `ON` | `false` or `true` |
+| A list | `"choices"`: 2 to 8 words of 1 to 7 such characters | the word | the word's number, from 0 |
+| A number | `"low"` and `"high"`, whole numbers from -128 to 127, high above low, and no `choices` | the number | the number it starts at (`low` if you leave it out) |
+
+**Where they show.** `"category"` picks the row on the left of the settings:
+
+- `"keyboard"`, `"system"`, `"midi"`: after the unit's own lines in KEYBOARD, SYSTEM or MIDI. The right side holds seven lines, so there's room for four lines of the packs' in KEYBOARD, one in SYSTEM and two in MIDI. They're handed out in the order of the packs' file names. **An option that finds its category full shows on its pack's page under PACKS instead**, and the log says so once a start. So write your pack to work wherever its options end up.
+- `"packs"`, or no `category`: on your pack's page under PACKS, a row the base adds after the unit's six. Its right side lists the packs that have options there or a page of their own, a name a line.
+
+The owner turns them the way the unit's own items turn: the **ochre** knob picks a line, the **red** knob changes it. A switch or a list moves one step for four detents of the red knob, a number one step a detent, and they stop at their ends. Under PACKS, pressing the ochre knob on a pack's name shows that pack's options in the same right side, or opens the pack's own page (`open`, below). **T1** goes back to the list of packs, and on the list T1 leaves the settings as before. With more than seven lines, the seven shown follow the chosen one.
+
+`"where"` is `"unit"` (the default): one value for the whole unit. `"tape"` is held for a value kept with each tape. Base 32 doesn't do that yet and keeps such a value for the unit.
+
+**Reading them: positions.** `op1f_option(card, i)` gives option `i` (from 0, in the ask's order) as a position from 0 to 255, for every kind: a switch 0 or 1, a list its word's number, a number its distance from `low`. **Add your own `low` to get the number**: with `low` -20, a position of 17 is -3. Until the base has read its file, at the first frame, it gives the option's `first`. A card the base doesn't use, a card with no such ask (or one left aside) and an option it doesn't list give a number below 0, one of the error codes. It reads one byte, so any thread may call it.
+
+```cpp
+int p = op1f_option(&op1f_card_mine, 2);
+int depth = p < 0 ? 50 : p;                       // below 0: no such option here, keep the start
+```
+
+**When one changes.** `changed(option, value)` is called on the display thread, at the frame after the owner changed it and before any frame function, with the new position. Note what you're told and do no more there, as with level 7's `changed`. Leave it `null` if you'd rather ask `op1f_option` each frame.
+
+**A page of your own: `open`.** Name a function as `open` and your pack is listed under PACKS. When the owner presses the ochre knob on its name, the base calls `open` on the display thread, before the frame functions. Open your page there (`op1f_page_open`) and close it when you're done. The page is yours: the base shows none of your PACKS options for you, so set them from your page with `op1f_option_set(card, i, position)`. Your KEYBOARD, SYSTEM and MIDI options still show in those rows.
+
+`op1f_option_set` takes a position, as `op1f_option` gives it, and works from your own frame function only; anywhere else it answers `OP1F_NOT_NOW`. A position past the option's last (a switch 1, a list its count less one, a number `high` - `low`), or an option or card it doesn't know, gets `OP1F_BAD_NAME`. Otherwise it answers 0: the value is kept, the file written as after a change in the settings, and a settings line that shows it is written again. `changed` isn't called for a value your pack set itself.
+
+**The file.** The base keeps every pack's values in `user/pf/.options`, one line `<pack>/<option>=<position>` each. It reads the file at the first frame (lines that end in CR LF too) and writes it about a second and a half after the last change. Lines of packs that aren't on the unit this time are written back as they were, so taking a pack off and putting it back keeps its values.
+
+- **A change in the last second and a half before the unit is switched off is lost.**
+- A file over 4,096 bytes is neither read nor written over. The values then hold until the unit is switched off, and the log says so.
+- A value the file holds that's past an option's last, after you changed the option, is dropped and the option takes its `first`.
+
+**What the base checks.** It leaves the whole ask aside, with a line in the log, when it lists no option or more than eight, when an option isn't in order (a kind it doesn't know, a count or a `first` outside its kind's, a name not 1 to 15 characters), or when `changed` or `open` isn't a function of your pack. The pack tool refuses such an ask when it writes the card.
+
+**On an older base.** A base before 32 doesn't know the kind: it leaves the ask aside with its line for kinds it doesn't know and runs the rest of your pack. It doesn't offer `op1f_option` or `op1f_option_set` either. So ask for them as optional names ([packs](packs.md), "Names: how packs find each other"), and when the name is 0 or answers below 0, use each option's `first`. Your settings simply don't show there. The listing's check refuses an entry with an options ask while the listed base is older than 32 ([the listing](catalog.md)).
+
+In the header: the ask is `OP1F_ASK_OPTIONS`, its table an `Op1fOptions` (712 bytes, `open` at +708; a table of 708 bytes has no `open`), each option an `Op1fOption`, and `op1f_options_1` is the mark of a base that carries the ask out.
 
 ## How `dub` works
 
@@ -165,6 +246,11 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | `memory: '<name>' of '<pack>' is given <bytes> bytes at ...` | Your memory, and how much the unit keeps free |
 | `memory: '<name>' of '<pack>' is refused <bytes> bytes: ...` | Why not |
 | `cards: '<pack>' carries a picture named ... and does not take its place` | A screen asked for a name your pack carries and doesn't list |
+| `options: <n> pack(s) with options, <n> value(s) read from user/pf/.options ...` | From base 32, once a start: how many values the file gave, how many packs are under PACKS and how many lines went to KEYBOARD, SYSTEM and MIDI |
+| `options: '<pack>': <n> option(s) on its page under PACKS, full: ...` | Options that found their category full, and which |
+| `options: '<pack>' asks for options not in order (...): left aside` | Why your ask was left aside |
+| `options: wrote user/pf/.options, ...` | The file written after a change, or `could NOT write` |
+| `options: '<pack>' opens its page` | The owner pressed the ochre knob on your pack's name, and `open` was called |
 
 ## Limits, in one place
 
@@ -178,6 +264,7 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | Stages | 16 in all |
 | Memory | 16 MiB an ask and for all asks, 8 MiB kept free for the unit, align 4 to 4,096, 16 asks in all |
 | Names of pictures that take a place | 256, one ask a card |
+| Settings (base 32) | One ask a card, 1 to 8 options; a list 2 to 8 words; a number -128 to 127; room for 4 of the packs' lines in KEYBOARD, 1 in SYSTEM, 2 in MIDI; the file 4,096 bytes |
 
 ## Two packs at one place of the firmware
 

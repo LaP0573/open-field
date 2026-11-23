@@ -17,6 +17,7 @@
 // is played the same way: open-field-helper.py --source <that folder> --folder <folder>.
 import { readFileSync, writeFileSync, readdirSync, renameSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { crc32 } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
@@ -24,7 +25,7 @@ import {
   prepare, readHelper, readPacks, checkFolder, sha256,
 } from "./install.mjs";
 import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
-import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
+import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
@@ -103,6 +104,41 @@ function volume({ files = 40, tapeBytes = 30_000_000, osLdr = null, pk = false, 
 
 // A tiny repeatable random source, so a failing case can be found again.
 function random(seed) { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; }
+
+// A pack file of format 3 as tools/pack_build.py writes one, made here for the checks of a followed entry: a header of
+// 96 bytes, a body of 256 (one entry in its table, a card of level 3 at 64, its list of one folder at 128), the lists
+// (works: [name, needed], wants: [name, needed], offers: [name]) and nothing behind. `spoil` changes the bytes after.
+const LINK = 0x8d2f36cc;
+function packFile({ name = "veff", version = 2, osId = 0x1aeb34d1, works = [["helper", true]], wants = [["op1f_level_3", true]], offers = [],
+  folder = ["notes", "notes"], lists = null, cardPlace = 64, spoil = null } = {}) {
+  const text = (s, n) => { const b = new Uint8Array(n); b.set(new TextEncoder().encode(s).subarray(0, n)); return b; };
+  const body = new Uint8Array(256), bv = new DataView(body.buffer);
+  [0x44524143, 56, 3, version].forEach((w, n) => bv.setUint32(64 + 4 * n, w, true));
+  body.set(text(name, 16), 80);
+  bv.setUint32(112, LINK + 128, true); bv.setUint32(116, 1, true);                  // the card's folders: their address as linked, their count
+  body.set(text(folder[0], 16), 128); body.set(text(folder[1], 16), 144); bv.setUint32(160, 1, true);
+  if (!lists) {
+    const strings = [], at = (s) => { const before = strings.reduce((n, x) => n + x.length + 1, 0); strings.push(s); return before; };
+    const words = [works.length, offers.length, wants.length, 0, 0, 0];
+    const rows = [...works.flatMap(([w, needed]) => [at(w), 1, needed ? 1 : 0]), ...offers.flatMap((o) => [at(o), 0]), ...wants.flatMap(([w, needed]) => [at(w), needed ? 1 : 0])];
+    let bytes = new TextEncoder().encode(strings.map((s) => s + "\0").join(""));
+    bytes = Uint8Array.from([...bytes, ...new Uint8Array((4 - (bytes.length % 4)) % 4)]);
+    words[5] = bytes.length;
+    lists = new Uint8Array(4 * (words.length + rows.length) + bytes.length);
+    const lv = new DataView(lists.buffer);
+    [...words, ...rows].forEach((w, n) => lv.setUint32(4 * n, w, true));
+    lists.set(bytes, 4 * (words.length + rows.length));
+  }
+  const out = new Uint8Array(96 + body.length + lists.length), hv = new DataView(out.buffer);
+  out.set(new TextEncoder().encode("OP1FPACK"));
+  [3, 96, osId, LINK, body.length, body.length, 0].forEach((w, n) => hv.setUint32(8 + 4 * n, w, true));
+  hv.setUint32(36, crc32(Uint8Array.from([...body, ...lists])), true);
+  out.set(text(name, 16), 40);
+  [LINK, LINK + 20, lists.length, 0, version, 1, 4, 0, 0, cardPlace].forEach((w, n) => hv.setUint32(56 + 4 * n, w, true));
+  out.set(body, 96); out.set(lists, 96 + body.length);
+  if (spoil) spoil(out, hv);
+  return out;
+}
 
 async function selfChecks() {
   // listings
@@ -334,6 +370,98 @@ async function selfChecks() {
     ["a download that is not answered is refused", answer(fileBytes, 404), /answered 404/],
     ["a download that fails is refused", async () => { throw new Error("offline"); }, /could not be downloaded \(offline\)/],
   ]) await download(good, get).then(() => check(what, false), (e) => check(what, words.test(e.message) && e.message.startsWith("one: "), e.message));
+
+  // an entry that follows a branch of its author's repository: its file read and held to the entry when the page opens
+  const followed = (more = {}) => ({ id: "veff", author: "someone", status: "listed", categories: ["tools"], description: "A followed pack.",
+    repository: "https://github.com/someone/veff", follow: "main", path: "veff.pack", version: 2, firmware: "1.7.3", needs: ["helper"],
+    folders: [{ name: "notes", place: "notes" }], ...more });
+  const fileOf = packFile();
+  const facts = packFacts(fileOf);
+  check("a pack file's facts are read as pack_build reads them", facts.name === "veff" && facts.version === 2 && facts.firmware === "1.7.3" && facts.places === 1 &&
+    facts.needs.join() === "helper" && facts.level === 3 && facts.offersLevel === null && facts.card === 3 && JSON.stringify(facts.folders) === '[{"name":"notes","place":"notes"}]', JSON.stringify(facts));
+  const offersFacts = packFacts(packFile({ works: [["helper", false]], wants: [["op1f_level_9", false]], offers: ["op1f_level_4", "op1f_level_12", "op1f_other"] }));
+  check("only needed packs and needed levels count, and the highest level offered is read", offersFacts.needs.length === 0 && offersFacts.level === null && offersFacts.offersLevel === 12, JSON.stringify(offersFacts));
+  check("a followed entry's link is its branch's head, refs/heads, each part encoded", rawLink(followed({ path: "build/v eff.pack", follow: "dev-1.x" })) === RAW + "someone/veff/refs/heads/dev-1.x/build/v%20eff.pack");
+  for (const branch of ["", ".hidden", "-x", "a..b", "ends.", "x.lock", "a/b", "a".repeat(101), 5]) throws("a branch named " + JSON.stringify(branch) + " is refused", () => rawLink(followed({ follow: branch })), /not a branch's name/);
+  check("checkFollowed takes the file that is its entry's", checkFollowed(followed(), fileOf, 5).version === 2);
+  const big = new Uint8Array(2 * 1024 * 1024 + 1);
+  big.set(fileOf);
+  for (const [what, bytes, words, entryMore = {}, level = 5] of [
+    ["1: a followed file larger than 2 MB is refused", big, /2,097,153 bytes, more than the 2,097,152/],
+    ["2: a followed file that is no pack is refused", Uint8Array.from([...fileOf.subarray(0, 96)].map((b, n) => (n < 8 ? 0x41 : b))), /it is not a pack file/],
+    ["2: a followed file of another format is refused", packFile({ spoil: (b, v) => v.setUint32(8, 2, true) }), /not a pack of format 3/],
+    ["2: a followed file whose header's sizes are not its own is refused", Uint8Array.from([...fileOf, 0, 0, 0, 0]), new RegExp("sizes do not add up to the file's " + (fileOf.length + 4) + " bytes")],
+    ["2: a followed file whose CRC-32 is not its header's is refused", packFile({ spoil: (b) => { b[96 + 4] ^= 1; } }), /CRC-32 of its body and lists is not its header's/],
+    ["2: a followed file whose lists cannot be read is refused", packFile({ lists: new Uint8Array(28) }), /its lists cannot be read: their counts do not fit/],
+    ["2: a followed file whose card does not stand where its header says is refused", packFile({ cardPlace: 68 }), /its card does not stand where its header says/],
+    ["3: a followed file of another name is refused", packFile({ name: "other" }), /its name is "other", the listing's id is "veff"/],
+    ["4: a followed file for another firmware is refused", packFile({ osId: 0xd67577f9 }), /built for OS 1\.7\.0, the listing says 1\.7\.3/],
+    ["4: a followed file for a firmware the page does not know is refused", packFile({ osId: 0x12345678 }), /a firmware the page does not know \(0x12345678\)/],
+    ["5: a followed file older than the listing's version is refused", packFile({ version: 1 }), /its version is 1, the listing takes 2 or higher/],
+    ["6: a followed file that needs a pack the entry does not name is refused", packFile({ works: [["helper", true], ["stranger", true]] }), /needs the pack "stranger", which the listing's needs do not name/],
+    ["7: a followed file that needs a later base than the listing's is refused", fileOf, /needs level 3 of the base, and the listing's base offers 2/, {}, 2],
+    ["8: a followed file whose card asks for a folder the entry does not name is refused", packFile({ folder: ["notes", "elsewhere"] }), /asks for the folder "notes" in "elsewhere", which the listing's folders do not name/],
+  ]) throws(what, () => checkFollowed(followed(entryMore), bytes, level), new RegExp("^veff: its file on someone's branch main is refused: .*" + words.source));
+  // the resolver: the listing's data with its followed entries taken, and the refused ones named
+  const served = new Map([[RAW + "someone/veff/refs/heads/main/veff.pack", fileOf], [RAW + "someone/old/refs/heads/main/old.pack", packFile({ name: "old", version: 1 })]]);
+  const calls = [];
+  const host = async (url, options) => { calls.push({ url, options }); const b = served.get(url); return { ok: !!b, status: b ? 200 : 404, arrayBuffer: async () => (b ? b.buffer.slice(b.byteOffset, b.byteOffset + b.length) : new ArrayBuffer(0)) }; };
+  const withFollowed = { ...data, packs: [{ id: "base", author: "open-field", status: "bundled", categories: ["tools"], description: "The base.", path: "builder/base.pack", firmware: "1.7.3", offers_level: 5 },
+    entry("one"), followed(), followed({ id: "old", repository: "https://github.com/someone/old", path: "old.pack" }),
+    followed({ id: "gone", repository: "https://github.com/someone/gone", path: "gone.pack" }), followed({ id: "pinned too", commit: COMMIT }),
+    followed({ id: "other os", firmware: "1.7.0" })] };
+  const taken = await resolveFollowed(withFollowed, "1.7.3", host);
+  const veff = taken.data.packs.find((e) => e.id === "veff");
+  check("a followed file that passes is resolved with the file's facts and kept", veff.followed === true && veff.sha256 === (await sha256(fileOf)) && veff.bytes === fileOf.length &&
+    veff.version === 2 && veff.places === 1 && veff.level === 3 && veff.kept instanceof Uint8Array && veff.kept.length === fileOf.length, JSON.stringify({ ...veff, kept: undefined }));
+  check("each followed file of the unit's firmware is downloaded once, with no cookie and no redirect", calls.length === 3 && new Set(calls.map((c) => c.url)).size === 3 &&
+    calls.every((c) => c.options.credentials === "omit" && c.options.redirect === "error"), calls.map((c) => c.url).join(" "));
+  check("the resolver names each refused followed file, in plain words", taken.problems.length === 3 &&
+    taken.problems[0] === "old: its file on someone's branch main is refused: its version is 1, the listing takes 2 or higher" &&
+    /^gone: its file on someone's branch main is refused: the download answered 404/.test(taken.problems[1]) && /^pinned too: .*names its commit/.test(taken.problems[2]), taken.problems.join("; "));
+  check("the listing's own data is left as it was", withFollowed.packs[2].sha256 === undefined && withFollowed.packs[2].kept === undefined);
+  const after = readListing(taken.data, "1.7.3");
+  check("a resolved followed entry is offered, the refused ones left out", [...after.offered.keys()].join("|") === "one|veff" && after.otherFirmware === 1, [...after.offered.keys()].join("|"));
+  check("readListing names each followed entry it leaves out", after.problems.length === 3 && after.problems.some((p) => /^old: its file on someone's branch main was not read and checked/.test(p)) &&
+    ["old", "gone", "pinned too"].every((id) => after.problems.some((p) => p.startsWith(id + ": its file on someone's branch main was not read and checked"))), after.problems.join("; "));
+  const unread = readListing(withFollowed, "1.7.3");
+  check("a followed entry not resolved is left out of the listing, with its problem", !unread.offered.has("veff") && unread.problems.some((p) => p === "veff: its file on someone's branch main was not read and checked when the page opened, left out"), unread.problems.join("; "));
+  check("a followed entry with kept bytes the listing gave is not taken as resolved", !readListing({ ...data, packs: [followed({ followed: true, kept: [1, 2], sha256: "a".repeat(64), bytes: 2 })] }, "1.7.3").offered.has("veff"));
+  check("the file of a resolved followed entry is a version the page recognises", knownVersions(taken.data, "1.7.3").get(veff.sha256)?.version === 2);
+  const spare = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed({ needs: ["helper", "spare"] })] }, "1.7.3", host);
+  check("a resolved followed entry needs the packs its file needs, not every pack its entry allows", spare.data.packs[1].needs.join() === "helper", JSON.stringify(spare.data.packs[1].needs));
+  // a file whose lists mention one long name many times: refused at once, never read again for each mention
+  const listsOf = (count, name) => {
+    const s = new TextEncoder().encode(name + "\0"), strings = new Uint8Array(s.length + ((4 - (s.length % 4)) % 4));
+    strings.set(s);
+    const b = new Uint8Array(24 + 8 * count + strings.length), v = new DataView(b.buffer);
+    v.setUint32(8, count, true); v.setUint32(20, strings.length, true);
+    for (let n = 0; n < count; n++) v.setUint32(28 + 8 * n, 1, true);
+    b.set(strings, 24 + 8 * count);
+    return b;
+  };
+  let started = Date.now();
+  throws("a followed file with a name longer than the page reads is refused", () => checkFollowed(followed(), packFile({ lists: listsOf(20000, "a".repeat(256)) }), 5), /a name is longer than 255 characters/);
+  const many = packFacts(packFile({ lists: listsOf(20000, "op1f_level_3") }));
+  check("a name mentioned many times is read once, and quickly", many.level === 3 && Date.now() - started < 2000, (Date.now() - started) + " ms");
+  started = Date.now();
+  const told = { ok: true, status: 200, headers: { get: (k) => (k.toLowerCase() === "content-length" ? String(2 * 1024 * 1024 + 1) : null) }, arrayBuffer: async () => { throw new Error("read"); } };
+  const large = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed()] }, "1.7.3", async () => told);
+  check("a followed file the host says is larger than 2 MB is refused before it is read", /is refused: it has 2,097,153 bytes, more than the 2,097,152/.test(large.problems.join()), large.problems.join("; "));
+  const twice = readListing({ ...data, packs: [followed(), entry("VEFF")] }, "1.7.3");
+  check("a followed entry left out still holds its id against a later entry of the same name", !twice.offered.has("VEFF") && twice.problems.some((p) => p === "VEFF: named twice, left out"), twice.problems.join("; "));
+  const silent = async () => new Promise(() => {});                  // a host that never answers
+  const slow = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed()] }, "1.7.3", silent, 30);
+  check("a followed file that does not come in time is left out and named, and holds nothing back", slow.data.packs[1].followed === undefined &&
+    slow.problems.join() === "veff: its file on someone's branch main did not come within 0.03 s, left out", slow.problems.join("; "));
+  const before = calls.length;
+  const ticked = await download(after.offered.get("veff"), host);
+  check("a ticked followed pack goes on with the bytes checked at load, with no second download", calls.length === before && ticked.name === "veff.pack" &&
+    ticked.sha256 === veff.sha256 && ticked.bytes.length === fileOf.length && ticked.bytes.every((b, n) => b === fileOf[n]) && ticked.from === RAW + "someone/veff/refs/heads/main/veff.pack");
+  await download({ ...veff, kept: Uint8Array.from(veff.kept, (b, n) => (n === 100 ? b ^ 1 : b)) }, host).then(() => check("kept bytes that changed are refused", false),
+    (e) => check("kept bytes that changed are refused", /SHA-256 differs/.test(e.message) && calls.length === before, e.message));
+  await download(followed(), host).then(() => check("a followed entry not checked at load is not downloaded by the tick", false),
+    (e) => check("a followed entry not checked at load is not downloaded by the tick", /was not checked when the page opened/.test(e.message) && calls.length === before, e.message));
 
   // a pack's picture: the same repository at the same commit, held to its size, its SHA-256 and the PNG signature
   const png = new Uint8Array(64); png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

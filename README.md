@@ -2,11 +2,19 @@
 
 Extra features for the OP-1 Field, added to the firmware that is already on your own unit.
 
+## Install
+
+**[Open the install page: lap0573.github.io/open-field](https://lap0573.github.io/open-field/)**
+
+The page runs in your browser and takes you through the install step by step. Afterwards, the same page adds and removes packs. Plug your OP-1 Field in and press **connect**. Use Chrome, or Edge on Windows ([what you need](#what-you-need)). Read [the guide](docs/guide.md) before your first install: it says what can go wrong and how to go back.
+
+Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
+
 **Unofficial.** This project is not made, endorsed or supported by Teenage Engineering, and it is not affiliated with them.
 
 **At your own risk.** Installing it changes the firmware of your unit. That is a risky process: a unit can end up unable to start for good ("bricked"), and installing it will void the warranty of your device. Whether to do it is your decision alone. Read [NOTICE.md](NOTICE.md) first.
 
-**Status: open-field 0.12, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
+**Status: open-field 0.14, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
 
 ## What it is
 
@@ -23,7 +31,7 @@ This project's own four live in a repository of their own, [open-field-packs](ht
 | `lfo.pack` | Four LFOs on a synth sound, with presets. |
 | `sidechain.pack` | One tape track turned down by another, or by the beat. |
 
-Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.12`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.12`.
+Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.14`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.14`.
 
 `base.pack` comes with the install: the install page puts it on the unit with the new firmware file, from `builder/base.pack` beside the page. The feature files are not kept in this repository, and neither are their sources. Their authors share them, and you copy them onto the unit in its disk mode ([the guide](docs/guide.md#adding-a-feature)). The four above can also be built from their sources, with one command in open-field-packs. **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
@@ -39,7 +47,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 
 **To use it**
 
-- Install it and use it: [docs/guide.md](docs/guide.md).
+- Install it: [the install page](https://lap0573.github.io/open-field/). Use it: [docs/guide.md](docs/guide.md).
 - See exactly what the loader and the base change in the firmware: [docs/changes.md](docs/changes.md). What a pack changes is in that pack's own profile: for the four, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs).
 - Build the loader, the base and the examples yourself from the sources: [docs/build.md](docs/build.md).
 
@@ -70,10 +78,10 @@ When the examples get too small to learn from, read [open-field-packs](https://g
 ## What is proven and what is not
 
 - The install without any key has been made on several units, by their owners, from Windows computers, with bootloader 1000.1.1.
-- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.12 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
+- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.14 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
 - For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
-- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, with level 10, has been proven on a computer and not yet watched on a unit. So has `fx train` 17, the version the listing offers: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
+- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 32, has run on the maintainer's unit beside the four features and the examples, with two test packs that add settings: their settings showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart. `fx train` 17, the version the listing offers, has been proven on a computer and not yet watched on a unit: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
 
 ## What is in this repository
 

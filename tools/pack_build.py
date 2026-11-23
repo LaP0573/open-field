@@ -215,6 +215,24 @@ base that offers op1f_param_heard (the value as the sound plays it), so a pack t
 in its recipe, {"level": 10, ...}, and the word in front of its card names op1f_level_10; a base of an earlier level
 then leaves the pack out for the mark. Cards of levels 1 to 9 and every pack file built before are written as they were.
 
+Since R6h (base 31, module/build_r6e_card.h) an ask of places may give way, {"kind": "places", ..., "gives_way": true}
+(false or left out: firm, as before): the head's flags are 1, OP1F_PLACES_GIVES_WAY, and the pictures it lists are served to a
+screen only when no pack serves that name firmly. A card of level 6 or later carries one firm ask of places and then one
+that gives way. Refused: gives_way that is not true or false, a giving-way ask before a firm one (bases 24 to 30 take
+the first ask of places and stop, so the firm list would be lost there; the tool does not move it, the asks' numbers
+are set), two firm asks or two that give way, a third, a name in both lists. The census of places covers both lists;
+`card` and `check` print "places 'flow', 1 name(s), giving way: signalflow.svg". Every recipe and pack file of before is
+written and read as it was.
+
+Since R8 (base 32, module/build_r6e_card.h) a card of level 6 or later may carry one ask of options (kind 10):
+  {"kind": "options", "name": ..., "changed": a function's symbol or null, "open": a function's symbol or null (may be left
+   out: the pack's own page, Op1fOptions.open, and the table 712 bytes instead of 708), "options": [one to eight of
+   {"name": 1 to 15 of A-Z a-z 0-9 space . + # % - /, "choices": null for a switch or 2 to 8 words of 1 to 7 such
+    characters for a list, or "low" and "high" (-128 to 127, high above low) and no choices for a number, "first": the
+    choice (a switch: false or true) or the number it starts at, "category": "packs" (left out), "keyboard", "system"
+    or "midi", "where": "unit" (left out) or "tape"}]}
+`card` and `check` print "options 'trial', 2 option(s): dot on/off from off in keyboard; cents -20..20 from 0, changed, open".
+
 The readers are module/build_j_pack.cpp (format 1) and the bases (module/build_j5c_base.cpp for formats 2 and 3).
 A pack file holds the module's own code and whatever the module carries. Whether one holds anything of the firmware
 is what tools/publish_check.py says: a pack of format 3 whose table holds checksums and whose pictures are
@@ -383,6 +401,30 @@ ENGINE_ALIGN_LEAST = 4
 CARD_LEVELS = CARD_LEVELS + (10,)
 ASK_KINDS_OF_LEVEL[10] = dict(ASK_KINDS_OF_LEVEL[9])
 KINDS_COUNTED[10] = KINDS_COUNTED[9]
+# since R6h (base 31, module/build_r6e_card.h): a card of level 6 or later may carry a second ask of places, after a firm
+# one, with the head's flag OP1F_PLACES_GIVES_WAY: the pictures it lists are served to a screen only when no pack serves that name
+# firmly. No new level and no new mark: bases 24 to 30 leave the giving-way ask aside, with a line, and run the card.
+PLACES_GIVES_WAY = 1                                             # a places ask's flag
+ASK_KEYS_6[5] = ASK_KEYS_6[5] + ("gives_way",)
+# since R8 (base 32, module/build_r6e_card.h, "Options"): a card of level 6 or later may ask for one kind more, its options
+# (its table 708 bytes: the head, the function told, the count, eight options of 84 bytes). A base that does not know the
+# kind leaves the ask aside and uses the card. No new level and no new mark.
+OPTIONS = 10                                                    # not 9: packs out there ask for options as 10
+for _level in (6, 7, 8, 9, 10):
+    ASK_KINDS_OF_LEVEL[_level] = dict(ASK_KINDS_OF_LEVEL[_level], options=OPTIONS)
+KINDS_COUNTED.update({6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "nine"})     # each level's kinds, options among them
+KIND_WORDS_6[OPTIONS] = "options"
+TABLE_BYTES_6[OPTIONS] = 708                                    # without `open` (hasis's packs); with it, OPTIONS_OPEN_BYTES
+OPTIONS_OPEN_BYTES = 712                                        # since R8's design: Op1fOptions.open at +708, the ask's bytes 712
+ASK_KEYS_6[OPTIONS] = ("kind", "name", "changed", "open", "options")
+ASK_ADDRESSES_6[OPTIONS] = (("shown", 24), ("changed", 28), ("open", 708))     # `open` only in a table of 712 bytes
+OPTIONS_MOST, CHOICES_MOST, OPTION_NAME, CHOICE_NAME, OPTION_BYTES = 8, 8, 16, 8, 84
+OPTION_NAME_FORM = re.compile(r"[A-Za-z0-9 .+#%/-]{1,15}")       # an option's name: the characters the unit's letters draw (no `_`)
+CHOICE_FORM = re.compile(r"[A-Za-z0-9 .+#%/-]{1,7}")             # a choice's word, the same characters
+OPTION_SWITCH, OPTION_LIST, OPTION_NUMBER = 0, 1, 2             # Op1fOption.kind
+OPTION_WHERE = {"unit": 0, "tape": 1}                           # Op1fOption.where, bits 0 to 3 (1 reserved: kept for the unit)
+OPTION_CATEGORY = {"packs": 0, "keyboard": 1, "system": 2, "midi": 3}     # Op1fOption.where, bits 4 to 7
+OPTION_KEYS = ("name", "choices", "low", "high", "first", "category", "where")
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1244,7 +1286,8 @@ def asks_of_card_6(asks, level):
     """Since R4: a card of level 6 or 7's asks. A sequencer and the notes heard as at level 5; a stage, memory, places
     and (level 7) keeps each as (kind's number, name, flags, {function's word: symbol or None}, {what else its table
     holds}). Then what a base would leave aside across the card's asks: the memory a stage names, the counts, the
-    stages' cycles and the memory's bytes in all, one ask of places and one of keeps."""
+    stages' cycles and the memory's bytes in all, one ask of places and one of keeps (since R8, base 32: and one of
+    options)."""
     known = ASK_KINDS_OF_LEVEL[level]
     out = []
     for number, ask in enumerate(asks, 1):
@@ -1284,11 +1327,40 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card asks for memory %d times: the base takes %d such asks in all and leaves the next aside" % (len(memories), MEMORIES_MOST))
     if sum(ask[4]["bytes"] for ask in out if ask[0] == 4) > MEMORY_MOST:
         raise ValueError("The card's memory asks come to more than 16 MiB together: the base gives %d bytes in all and refuses the later" % MEMORY_MOST)
-    for what in (5, 6):
+    places_together(out)                                    # since R6h: a firm one, then one that gives way
+    for what in (6, OPTIONS):                               # since R8 (base 32): the options too
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
         if len(found) > 1:
             raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
     return out
+
+
+def places_together(out):
+    """Since R6h (base 31): a card's asks of places taken together, as asks_of_card_6 answers them: at most two, a firm
+    one first and then one that gives way, and no name in both lists. Bases 24 to 30 take the first ask of places and
+    stop, and leave one with a flag aside: a giving-way ask first would take the card's firm list with it there. It is
+    refused, not moved: the numbers of the asks (the memory a stage names) are set already."""
+    found = [(number, ask) for number, ask in enumerate(out, 1) if ask[0] == 5]
+    if len(found) > 2:
+        raise ValueError("Ask %d of the card is a third ask of places: the base takes a firm one and then one that gives way a card, and leaves the later aside"
+                         % found[2][0])
+    if len(found) < 2:
+        return
+    (first, firm), (second, other) = found
+    if firm[2] & PLACES_GIVES_WAY and not other[2] & PLACES_GIVES_WAY:
+        raise ValueError("Ask %d of the card, the places %r, gives way and comes before the firm places %r, ask %d: bases 24 to 30 take the first ask "
+                         "of places and stop, and leave one that gives way aside, so the firm list would be lost there; put the firm ask first"
+                         % (first, firm[1], other[1], second))
+    if firm[2] & PLACES_GIVES_WAY:
+        raise ValueError("Ask %d of the card is a second ask of places that gives way: the base takes one that gives way a card, after a firm one, "
+                         "and leaves the later aside" % second)
+    if not other[2] & PLACES_GIVES_WAY:
+        raise ValueError('Ask %d of the card is a second ask of places, and neither gives way: the base takes one firm ask of places a card and '
+                         'leaves a second firm one aside; a second may give way ("gives_way": true)' % second)
+    both = [name for name in other[4]["names"] if name in firm[4]["names"]]
+    if both:
+        raise ValueError("Ask %d of the card, the places %r, gives way for %s, which the firm places %r, ask %d, lists too: a name is firm or "
+                         "gives way, and the base, finding it in the firm list, never serves it as giving way" % (second, other[1], both[0], firm[1], first))
 
 
 def ask_of_card_6(number, ask, level=7, earlier=()):
@@ -1296,7 +1368,7 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
     effect, held as a base of level 8 holds it (`earlier`: the card's asks before it), and the keeps of a card of level
     8, which may name the master."""
     what = ASK_KINDS_OF_LEVEL[9][ask["kind"]]
-    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine"}[what]
+    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine", OPTIONS: "the options"}[what]
     name = ask.get("name")
     unknown = sorted(set(ask) - set(ASK_KEYS_6[what]))
     if unknown:
@@ -1346,7 +1418,25 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
                 raise ValueError("%s: its name %d, %r, is not the name of a picture: one to %d plain characters ending in .svg" % (said, place, text, PLACE_NAME - 1))
             if text in names[:place - 1]:
                 raise ValueError("%s: its name %d, %r, is there before" % (said, place, text))
+        gives_way = ask.get("gives_way", False)             # since R6h (base 31)
+        if not isinstance(gives_way, bool):
+            raise ValueError("%s: its gives_way is true or false, not %r: the table's flags hold OP1F_PLACES_GIVES_WAY or nothing, "
+                             "and the base leaves aside an ask with a flag it does not know" % (said, gives_way))
+        flags = PLACES_GIVES_WAY if gives_way else 0
         extra = {"names": list(names)}
+    elif what == OPTIONS:                                   # since R8 (base 32)
+        if not a_symbol(ask.get("changed")):
+            raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
+        if not a_symbol(ask.get("open")):                   # since R8's design: the pack's own page, Op1fOptions.open
+            raise ValueError("%s: its open is the symbol of a function of the pack, or null: %r" % (said, ask.get("open")))
+        options = ask.get("options")
+        if not isinstance(options, list) or not 1 <= len(options) <= OPTIONS_MOST:
+            raise ValueError("%s: its options are a list of one to %d options" % (said, OPTIONS_MOST))
+        held = []
+        for place, o in enumerate(options, 1):
+            held.append(option_of_card(said, place, o, [h[0] for h in held]))
+        functions = {"changed": ask.get("changed"), "open": ask.get("open")}
+        extra = {"options": held}
     else:
         if not a_symbol(ask.get("changed")):
             raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
@@ -1381,6 +1471,53 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
         functions = {"changed": ask.get("changed")}
         extra = {"keys": held}
     return what, name, flags, functions, extra
+
+
+def option_of_card(said, place, o, before):
+    """Since R8 (base 32): one option of an options ask, held as Op1fOption holds it: (name, kind, count, first, where,
+    choices). `where` is the byte, the place in bits 0 to 3 and the category in bits 4 to 7; `choices` a list's words,
+    [] for a switch, [low, high] for a number, whose `first` is then its distance from low. `before`: the names of the
+    options before it."""
+    if not isinstance(o, dict) or set(o) - set(OPTION_KEYS) or "name" not in o:
+        raise ValueError('%s: its option %d is {"name": its name, "choices": null for a switch or a list of 2 to %d words, or "low" and "high" for a number, '
+                         '"first": the choice or the number it starts at, "category": "packs", "keyboard", "system" or "midi", "where": "unit" or "tape"}'
+                         % (said, place, CHOICES_MOST))
+    if not isinstance(o["name"], str) or not OPTION_NAME_FORM.fullmatch(o["name"]):
+        raise ValueError("%s: its option %d's name, %r, is not one to fifteen characters the unit's letters draw: A-Z, a-z, 0-9, space and . + # %% - /"
+                         % (said, place, o["name"]))
+    if o["name"] in before:
+        raise ValueError("%s: its option %d's name, %r, is there before" % (said, place, o["name"]))
+    if "low" in o or "high" in o:                           # a number from low to high
+        if "choices" in o:
+            raise ValueError("%s: its option %d has low or high, a number, and choices too: a number has none (leave them out)" % (said, place))
+        low, high = o.get("low"), o.get("high")
+        if not whole(low, -128, 127) or not whole(high, -128, 127) or high <= low or high - low > 255:
+            raise ValueError("%s: its option %d is a number: its low and high are both whole numbers from -128 to 127, high above low, not %r and %r"
+                             % (said, place, low, high))
+        first = o.get("first", low)
+        if not whole(first, low, high):
+            raise ValueError("%s: its option %d's first is a number from %d to %d, not %r" % (said, place, low, high, first))
+        kind, count, first, choices = OPTION_NUMBER, 0, first - low, [low, high]
+    else:
+        choices = o.get("choices")
+        if choices is not None and (not isinstance(choices, list) or not 2 <= len(choices) <= CHOICES_MOST
+                                    or any(not isinstance(c, str) or not CHOICE_FORM.fullmatch(c) for c in choices)):
+            raise ValueError("%s: its option %d's choices are null (a switch) or a list of 2 to %d words of one to seven characters the unit's letters draw"
+                             % (said, place, CHOICES_MOST))
+        count = 2 if choices is None else len(choices)
+        first = o.get("first", 0)
+        if isinstance(first, bool):
+            first = int(first)
+        if not whole(first, 0, count - 1):
+            raise ValueError("%s: its option %d's first is a choice from 0 to %d (a switch: false or true), not %r" % (said, place, count - 1, o.get("first")))
+        kind, choices = (OPTION_SWITCH, []) if choices is None else (OPTION_LIST, list(choices))
+    category = o.get("category", "packs")
+    if not isinstance(category, str) or category not in OPTION_CATEGORY:
+        raise ValueError('%s: its option %d\'s category is "packs", "keyboard", "system" or "midi", not %r' % (said, place, category))
+    where = o.get("where", "unit")
+    if not isinstance(where, str) or where not in OPTION_WHERE:
+        raise ValueError("%s: its option %d's where is \"unit\" or \"tape\", not %r" % (said, place, where))
+    return (o["name"], kind, count, first, OPTION_WHERE[where] | OPTION_CATEGORY[category] << 4, choices)
 
 
 def word_of(value):
@@ -1619,6 +1756,7 @@ def ask_words(what, name, flags, functions, extra=None):
     """Since R3: an ask as `check` and `card` print it: "sequencer 'echo', synth and drum, tick key run shown" or
     "notes 'ear'". Since R4: "stage 'dub' at the master after its effect, 30000 cycles a call, the memory of ask 2",
     "memory 'lines', 1048576 bytes on 4", "places 'own', 1 name(s): tape.svg", "keeps 'dub', 1 key(s): dub_time in tapes".
+    Since R6h: places that give way, "places 'flow', 1 name(s), giving way: signalflow.svg".
     Since R5: "effect 'crush' on punch, 9000 cycles a call, mono, 2 value(s): bits 1..16 from 16; rate 1..64 from 8, reset"."""
     if what == 8:                                           # since R6
         said = "engine '%s', %d cycles a voice" % (name, extra["cycles"])
@@ -1641,8 +1779,13 @@ def ask_words(what, name, flags, functions, extra=None):
         return said + (", the memory of ask %d" % extra["memory"] if extra["memory"] else "")
     if what == 4:
         return "memory '%s', %d bytes on %d" % (name, extra["bytes"], extra["align"])
-    if what == 5:
-        return "places '%s', %d name(s): %s" % (name, len(extra["names"]), " ".join(n if n is not None else "?" for n in extra["names"]))
+    if what == 5:                                           # since R6h: "places 'flow', 1 name(s), giving way: signalflow.svg"
+        return "places '%s', %d name(s)%s: %s" % (name, len(extra["names"]), ", giving way" if flags & PLACES_GIVES_WAY else "",
+                                                  " ".join(n if n is not None else "?" for n in extra["names"]))
+    if what == OPTIONS:                                     # since R8 (base 32): "options 'look', 2 option(s): big on/off from off; ..."
+        return "options '%s', %d option(s): %s" % (name, len(extra["options"]), "; ".join(
+            option_words(n, k, f, cs, w) for n, k, _c, f, w, cs in extra["options"])) + "".join(
+            ", " + key for key in ("changed", "open") if functions.get(key))
     if what == 6:
         said = "keeps '%s', %d key(s): %s" % (name, len(extra["keys"]), "; ".join(
             "%s in %s" % (key, " and ".join(KEEP_WORDS[bit] for bit in (1, 2, 4, 8) if bits & bit) or "no file") for key, bits in extra["keys"]))
@@ -1654,6 +1797,32 @@ def ask_words(what, name, flags, functions, extra=None):
         said += ", every MIDI note"
     present = [key for key in ASK_FUNCTIONS[1] + ("shown",) if functions.get(key)]
     return said + (", " + " ".join(present) if present else "")
+
+
+def option_in_order(kind, count, first, choices):
+    """Since R8 (base 32): whether an option read from a table is one the base takes: a switch of two choices from 0 or
+    1, a list of 2 to 8 from one of them, a number of count 0 from low to high (high above low) from a distance within."""
+    if kind == OPTION_SWITCH:
+        return count == 2 and first < 2
+    if kind == OPTION_LIST:
+        return 2 <= count <= CHOICES_MOST and first < count
+    if kind == OPTION_NUMBER:
+        return count == 0 and choices[1] > choices[0] and first <= choices[1] - choices[0]
+    return False
+
+
+def option_words(name, kind, first, choices, where=0):
+    """Since R8 (base 32): one option as `check` and `card` print it: "big on/off from off", "size s/m/l from m",
+    "cents -20..20 from 0", and its category when it is not PACKS, "dot on/off from off in keyboard". A table read from a
+    pack file that is not in order says "?" where its first or its choices are not there."""
+    categories = {n: w for w, n in OPTION_CATEGORY.items()}
+    category = "" if not where >> 4 else " in %s" % categories.get(where >> 4, "category %d" % (where >> 4))
+    if kind == OPTION_SWITCH:
+        return "%s on/off from %s%s" % (name, ("off", "on")[first] if first < 2 else "?", category)
+    if kind == OPTION_NUMBER:                               # its choices [low, high]
+        low, high = choices
+        return "%s %d..%d from %s%s" % (name, low, high, low + first if low + first <= high else "?", category)
+    return "%s %s from %s%s" % (name, "/".join(choices) or "?", choices[first] if first < len(choices) else "?", category)
 
 
 # since R3: a named object of constant data in a generated source: its name, then its lines
@@ -1686,6 +1855,17 @@ def ask_table_words(ask, address_of=None):
         return [extra["bytes"], extra["align"]]
     if what == 5:
         return [len(extra["names"]), address(extra["names_symbol"])]
+    if what == OPTIONS:                                     # since R8 (base 32): each option its name, four bytes, its choices' words
+        words = [address(functions["changed"]), len(extra["options"])]
+        for n, k, c, f, w, cs in extra["options"]:
+            words += [n.encode("ascii").ljust(OPTION_NAME, b"\0"), k | c << 8 | f << 16 | w << 24]
+            if k == OPTION_NUMBER:                          # a number: low and high, signed bytes, in its first choice
+                words += [struct.pack("<bb", *cs).ljust(CHOICES_MOST * CHOICE_NAME, b"\0")]
+                continue
+            words += [(cs[i] if i < len(cs) else "").encode("ascii").ljust(CHOICE_NAME, b"\0") for i in range(CHOICES_MOST)]
+        left = OPTIONS_MOST - len(extra["options"])
+        words += [bytes(left * OPTION_BYTES)] if left else []
+        return words + ([address(functions["open"])] if functions.get("open") else [])     # since R8's design: `open` at +708, 712 bytes
     if what == 8:                                           # since R6: an engine, its values as signed words, its list of sounds
         words = [extra["cycles"], extra["voice_bytes"], extra["voice_align"], address(functions["render"]), address(functions["reset"]), len(extra["params"])]
         for value_name, low, high, start in extra["params"]:
@@ -1715,12 +1895,15 @@ def ask_table_source_6(label, number, ask):
         extra = dict(extra, names_symbol=table + "_names")
     if what == 8:                                           # since R6
         extra = dict(extra, sounds_symbol=table + "_sounds")
-    lines = ["    .long %d" % TABLE_BYTES_6[what], padded_text(name, 16), "    .long %d" % flags, "    .long %s" % (_functions.get("shown") or "0")]
+    lines = ["    .long %d" % table_bytes_of(ask), padded_text(name, 16), "    .long %d" % flags, "    .long %s" % (_functions.get("shown") or "0")]
     for word in ask_table_words((what, name, flags, _functions, extra)):
         if isinstance(word, bytes) and not word.strip(b"\0"):
             lines.append("    .fill %d, 1, 0" % len(word))
-        elif isinstance(word, bytes):
+        elif isinstance(word, bytes) and all(0x20 <= c < 0x7f for c in word.rstrip(b"\0")):
             lines.append(padded_text(word.rstrip(b"\0").decode("ascii"), len(word)))
+        elif isinstance(word, bytes):                       # since R8: a number's low and high, bytes as they are
+            head = word.rstrip(b"\0")
+            lines.append("    .byte %s\n    .fill %d, 1, 0" % (", ".join("%d" % c for c in head), len(word) - len(head)))
         else:
             lines.append("    .long %s" % word)
     text = DATA_OBJECT.format(table, "\n".join(lines) + "\n", "OBJECT")
@@ -1746,7 +1929,9 @@ def ascii_lines(text):
 
 
 def table_bytes_of(ask):
-    """Since R3, R4: a table's bytes at its kind's level."""
+    """Since R3, R4: a table's bytes at its kind's level. Since R8's design: an options ask that names `open`, 712."""
+    if ask[0] == OPTIONS and ask[3].get("open"):
+        return OPTIONS_OPEN_BYTES
     return TABLE_BYTES_6[ask[0]] if ask[0] > 2 else ASK_TABLE_BYTES[ask[0]]
 
 
@@ -1980,7 +2165,10 @@ def ask_tables_6(data, level):
     """Since R4: each ask of a card of level 6 or 7 read from its table as linked, as ask_tables answers it; a stage,
     memory, places and keeps as (kind, name, flags, {function's word: its address}, {what else the table holds}), the
     list of names of places read from the pack. What is not in order is said as a base of that level would leave it
-    aside, the asks taken together too (the memory a stage needs, one ask of places and of keeps a card)."""
+    aside, the asks taken together too (the memory a stage needs, one ask of places and of keeps a card). Since R6h, as
+    base 31 holds them: a places ask may carry the flag that it gives way, and a second ask of places is taken when the
+    first is firm and it gives way; "a second ask of places, where the base takes one a card" still says a second firm
+    one."""
     fields, body, _extra = parse3(data)
     known = set(ASK_KINDS_OF_LEVEL[min(level, max(ASK_KINDS_OF_LEVEL))].values())     # a later level's card: the kinds this tool knows
     out = []
@@ -1998,8 +2186,9 @@ def ask_tables_6(data, level):
             out.append(engine_table(fields, body, size, what, out))
             continue
         at = what - linked_at(fields, 0)
-        if size != TABLE_BYTES_6[kind] or not what or what % 4 or at < 0 or at + size > len(body):
-            out.append((kind, size, what, None, "its table is not of its kind's %d bytes in the pack on a word" % TABLE_BYTES_6[kind]))
+        sizes = (TABLE_BYTES_6[kind], OPTIONS_OPEN_BYTES) if kind == OPTIONS else (TABLE_BYTES_6[kind],)     # since R8's design: with `open`
+        if size not in sizes or not what or what % 4 or at < 0 or at + size > len(body):
+            out.append((kind, size, what, None, "its table is not of its kind's %s bytes in the pack on a word" % " or ".join("%d" % s for s in sizes)))
             continue
         head_bytes, name, flags, shown = KIND_HEAD.unpack_from(body, at)
         text = name.split(b"\0")[0].decode("latin-1")
@@ -2020,6 +2209,26 @@ def ask_tables_6(data, level):
                         extra["names"][-1] = None
             else:
                 wrong = "its list of names does not lie in its pack on a word"
+        elif kind == OPTIONS:                                # since R8 (base 32)
+            functions["changed"] = words[0]
+            if size == OPTIONS_OPEN_BYTES:                   # since R8's design: the pack's own page, at +708
+                functions["open"] = struct.unpack_from("<I", body, at + TABLE_BYTES_6[OPTIONS])[0]
+            held = []
+            for n in range(min(words[1], OPTIONS_MOST)):
+                o = at + 36 + OPTION_BYTES * n
+                raw = bytes(body[o:o + OPTION_NAME])
+                k, c, f, w = body[o + 16], body[o + 17], body[o + 18], body[o + 19]
+                if k == OPTION_NUMBER:                       # a number: low and high, signed bytes, in its first choice
+                    cs = list(struct.unpack_from("<bb", body, o + 20))
+                else:
+                    cs = [bytes(body[o + 20 + CHOICE_NAME * i:o + 20 + CHOICE_NAME * (i + 1)]).split(b"\0")[0].decode("latin-1")
+                          for i in range(min(c, CHOICES_MOST))] if k == OPTION_LIST else []
+                held.append((raw.split(b"\0")[0].decode("latin-1"), k, c, f, w, cs))
+            extra = {"options": held}
+            if not 1 <= words[1] <= OPTIONS_MOST:
+                wrong = "its count of options is not between 1 and %d" % OPTIONS_MOST
+            elif any(not option_in_order(k, c, f, cs) for _n, k, c, f, _w, cs in held):
+                wrong = "an option that is not in order"
         else:
             functions["changed"] = words[0]
             keys = []
@@ -2033,7 +2242,7 @@ def ask_tables_6(data, level):
             wrong = "its head's bytes are not its table's"
         elif not KIND_NAME_FORM.fullmatch(text) or name[len(text):].strip(b"\0"):
             wrong = "its name is not one the base takes"
-        elif flags & ~(STAGE_LISTENS if kind == 3 else 0):
+        elif flags & ~(STAGE_LISTENS if kind == 3 else PLACES_GIVES_WAY if kind == 5 else 0):     # since R6h places may give way
             wrong = "a flag the base does not know"
         elif shown:
             wrong = "a shown, which an ask of its kind has not"
@@ -2066,8 +2275,19 @@ def ask_tables_6(data, level):
             continue
         if kind == 3 and ask[4]["memory"] and not (ask[4]["memory"] <= len(out) and out[ask[4]["memory"] - 1][0] == 4):
             out[number] = item[:4] + ("its memory names no memory ask of its card",)
-        elif kind in (5, 6) and any(other[0] == kind for other in out[:number]):
+        elif kind in (6, OPTIONS) and any(other[0] == kind for other in out[:number]):     # since R8 (base 32): the options too
             out[number] = item[:4] + ("a second ask of %s, where the base takes one a card" % KIND_WORDS_6[kind],)
+        elif kind == 5:                                      # since R6h (base 31): a firm one, then one that gives way
+            before = [other for other in out[:number] if other[0] == 5]
+            if not before or (len(before) == 1 and before[0][3] is not None and not before[0][3][2] & PLACES_GIVES_WAY and ask[2] & PLACES_GIVES_WAY):
+                continue
+            if len(before) > 1:
+                said = "a third ask of places, where the base takes a firm one and then one that gives way a card"
+            elif before[0][3] is not None and before[0][3][2] & PLACES_GIVES_WAY:
+                said = "an ask of places after one that gives way, which the base leaves aside: it takes the first ask of places and, after a firm one, one that gives way"
+            else:
+                said = "a second ask of places, where the base takes one a card"
+            out[number] = item[:4] + (said,)
     return out
 
 
@@ -2398,7 +2618,7 @@ def linked_ask_6(number, ask, label, has, values, body, origin, code_end, places
     table = "%s_ask_%d" % (label, number)
     if not has(table) or values[table] % 4:
         raise ValueError(stale)
-    at, size = values[table], TABLE_BYTES_6[what]
+    at, size = values[table], table_bytes_of(ask)           # since R8's design: options with `open`, 712
     row = list_at - origin + ASK.size * number
     if bytes(body[row:row + ASK.size]) != ASK.pack(what, size, at) or (row + 8, KIND_WORD, None, at) not in places:
         raise ValueError(stale)
@@ -2436,6 +2656,8 @@ def linked_ask_6(number, ask, label, has, values, body, origin, code_end, places
     if len(expected) != size or bytes(body[at - origin:at - origin + size]) != expected:
         raise ValueError(stale)
     for key, offset in ASK_ADDRESSES_6[what]:
+        if offset + 4 > size:                               # since R8's design: `open` only in an options table of 712 bytes
+            continue
         address = struct.unpack_from("<I", expected, offset)[0]
         if address and (at - origin + offset, KIND_WORD, None, address) not in places:
             raise ValueError("Ask %d's %s is no address of the pack's own, which would move with the pack"
@@ -2790,7 +3012,8 @@ def places_census(recipe, display):
     spelt as the unit spells it, and a picture of that name the pack carries must hold every part the unit's own picture
     holds (tools/picture_make.py's census: the firmware's screen looks the parts up by their names). A name the pack
     carries no picture of is served only through its `pick`, which the census cannot follow: a recipe with no pick is
-    refused for it, and one with a pick is said. Answers the lines to print; ValueError for what is refused."""
+    refused for it, and one with a pick is said. Answers the lines to print; ValueError for what is refused. Since R6h
+    every name of both lists, the firm one's and then the giving-way one's."""
     card = card_of(recipe)
     places = [ask for ask in card_asks(recipe) if ask[0] == 5] if card is not None else []
     if not places:
@@ -2801,7 +3024,7 @@ def places_census(recipe, display):
         raise ValueError("A card that takes the place of the unit's pictures is held to the unit's own: --display names no folder of them (%s)" % display)
     carried = dict(read_pictures(recipe))
     lines = []
-    for name in places[0][4]["names"]:
+    for name in [name for ask in places for name in ask[4]["names"]]:
         own = picture_make.units_own(display, name)
         if own is None:
             raise ValueError("The places name %s, which is none of the unit's own pictures: a screen of the unit never asks for it" % name)

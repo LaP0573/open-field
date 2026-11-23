@@ -82,7 +82,7 @@ It finds the dot once, by its name, in the tempo screen's document, and keeps it
 2. Copy `out/examples/wink.pack` into `packs`.
 3. Leave the disk mode. Switch the unit off and on.
 
-The start screen reads `1.7.3 - open-field 0.12`, as before: it names no pack. Press the metronome key: on the tempo screen, a small red dot at the top blinks, half a second on and half a second off.
+The start screen reads `1.7.3 - open-field 0.14`, as before: it names no pack. Press the metronome key: on the tempo screen, a small red dot at the top blinks, half a second on and half a second off.
 
 Without `base.pack` on the unit the example does not run: the start screen counts it as left out, and the log says `nobody offers the name it needs, op1f_level_1`.
 

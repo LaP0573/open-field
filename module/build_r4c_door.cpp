@@ -1,4 +1,14 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// The start's window (2026-11-23): from the start until START_SETTLE_MS after the start's first frame was over (the
+// second frame call: the door's call comes first in the cards unit's frame, so by then every pack has had its first
+// frame), every message that reads or writes the disk (list, hash, begin, data, end, remove, commit, and abort 01) is
+// answered status 13 with no payload and does nothing, as a message that comes before the start looked for its note.
+// Why: twice the unit froze when a PC asked a pack's SHA-256 about 6 s into a start, before the start's first frame
+// was over (what causes it is not known). The wire is protocol 3 unchanged and
+// hello still says build 5: outside the window every answer is base 30's byte for byte. The clients already wait on
+// 13 with no payload: the install page asks list, hash and remove again 40 times 250 ms apart, begin and abort 01
+// ten times a second apart; a client of your own should do the same. A start that finishes an apply still answers 14.
+//
 // Step R4c of piece 12, base.pack 27: the door's build 5 (the door's unit of base 25, base 25's and base 26's, as it is)
 // with its test stop behind a build switch, OP1F_DOOR_TEST_STOP. Switched on (1) this file is build 5's code; switched
 // off (0, base 27's, the default below) `commit 02 k` is answered as the door answers a payload it does not know
@@ -184,6 +194,7 @@ enum {
     RING_KEEP = 512,                    // words left for the firmware's own MIDI
 
     PROTOCOL = 1, PROTOCOL_2 = 2, PROTOCOL_3 = 3, MARK = 1, DOOR_BUILD = 5,   // build 5 (S4a): the card, T-2, the note's window
+    START_SETTLE_MS = 4000,             // the start's window: no disk message taken until this long after its first frame was over
     TOTALS_MS = 300000,                 // the totals line's period: five minutes, through the quiet gate
     LONG_VISIT_MS = 60000,              // a visit that has gone on this long says so once
     KEY_EVENTS = 8,                     // T1 and T2 events taken while the page asks, kept for the frame's lines
@@ -981,6 +992,9 @@ static struct {
 } apply;
 static u32 restart_from_apply;                          // the restart to come follows an apply (5 s with no message: restart all the same)
 static u32 note_looked;                                 // the start has looked for a note
+static volatile u32 start_settled;                      // the display thread's: 1 from START_SETTLE_MS after the start's first frame was over, never 0 again
+static u32 door_frames, first_frame_over_ms;            // the display thread's: the frame calls counted to 2, and the ms of the second
+static volatile u32 window_refused;                     // main_task's: the messages answered 13 by the start's window
 static const char* aside_name;                          // a note set aside at this start: the emptying leaves it
 static u8 note_bytes[NOTE_MOST];                        // the note, made in place (the frame's)
 static volatile u32 tunnel_count, tunnel_said;          // the review's S-1: messages of the firmware's 0x66 service since the start
@@ -2520,6 +2534,10 @@ static DOOR_APART void message(u32 buffer, int length) {
         status = NO_SUCH;
     } else if (!note_looked && command != CMD_HELLO && command != CMD_STATUS) {
         status = NOT_READY;                             // the review's S-2: the start has not looked for a note yet
+    } else if (!start_settled && (command == CMD_LIST || command == CMD_HASH || command == CMD_BEGIN || command == CMD_DATA ||
+                                  command == CMD_END || command == CMD_REMOVE || command == CMD_COMMIT)) {
+        status = NOT_READY;                             // the start's window: no disk message yet, nothing done
+        ++window_refused;
     } else if (s == ASKS && command != CMD_HELLO && command != CMD_STATUS && command != CMD_ABORT) {
         status = ASKING;
     } else if (command == CMD_SINK) {
@@ -2555,8 +2573,9 @@ static DOOR_APART void message(u32 buffer, int length) {
         } else if (command == CMD_REMOVE) {
             status = remove_cmd(args_of, count, &bytes);
         } else if (command == CMD_ABORT) {
-            if (count == 1 && args_of[0] == 1 && folder_state == F_EMPTYING) {
-                status = NOT_READY;                     // review S-3: the start's emptying runs; nothing done
+            if (count == 1 && args_of[0] == 1 && (folder_state == F_EMPTYING || !start_settled)) {
+                status = NOT_READY;                     // review S-3: the start's emptying runs, or the start's window; nothing done
+                if (!start_settled) ++window_refused;
             } else if (count == 0 || (count == 1 && args_of[0] == 1)) {
                 u32 ended = 0, removed = 0, mask, now;
                 int closed = change(ASKS, IDLE);
@@ -3888,9 +3907,25 @@ static int page_up(u32 ms) {
     return 1;
 }
 
+// The start's window: the door's call comes first in the cards unit's frame, so its second call means the start's
+// first frame, with every pack's first frame call, is over; START_SETTLE_MS from then on the disk messages are taken.
+static DOOR_APART void start_window(u32 ms) {
+    if (door_frames < 2) {
+        door_frames = door_frames + 1;
+        if (door_frames == 2) first_frame_over_ms = ms;
+        return;
+    }
+    u32 since = ms - first_frame_over_ms;
+    if (since < (u32)START_SETTLE_MS) return;
+    start_settled = 1;
+    STOCK_LOG(3, LOG_FILE, 55, "door: the start's first frame was over %u ms ago: messages that read or write the disk are taken from now on, %u answered 13 before",
+              since, window_refused);
+}
+
 // Once a frame, from the cards unit's frame call (base 18's cards unit), before the top page is placed.
 extern "C" void op1f_door_frame(u32 ms) OP1F_NAMED("op1f_door_frame");
 extern "C" void op1f_door_frame(u32 ms) {
+    if (!start_settled) start_window(ms);
     if (!busy) {                                        // build 4: no file work while a message runs (4.3)
         if (!note_looked) start_note(ms);
         u32 s0 = state;

@@ -9,7 +9,7 @@
 .global op1f_art_base
 .type op1f_art_base, STT_OBJECT
 op1f_art_base:
-    .long 0x31545241, 3, 6081, 30
+    .long 0x31545241, 3, 6081, 32
     .ascii "base"
     .fill 12, 1, 0
 .global op1f_art_base_path
