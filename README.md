@@ -23,7 +23,7 @@ This project's own four live in a repository of their own, [open-field-packs](ht
 | `lfo.pack` | Four LFOs on a synth sound, with presets. |
 | `sidechain.pack` | One tape track turned down by another, or by the beat. |
 
-Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.12`: the main version, then open-field and the release of the base.
+Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.12`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.12`.
 
 `base.pack` comes with the install: the install page puts it on the unit with the new firmware file, from `builder/base.pack` beside the page. The feature files are not kept in this repository, and neither are their sources. Their authors share them, and you copy them onto the unit in its disk mode ([the guide](docs/guide.md#adding-a-feature)). The four above can also be built from their sources, with one command in open-field-packs. **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
@@ -58,18 +58,20 @@ When the examples get too small to learn from, read [open-field-packs](https://g
 
 ## What you need
 
-- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1**. Other versions are refused: every address in this project belongs to that one firmware file. The original firmware's start screen shows `1.7.3`; a build of 1.7.3 with another number behind it, such as `1.7.3+1`, is another file, and the install page refuses it.
-- A desktop computer with Chrome or Edge, and a USB cable.
+- An OP-1 Field with the original **OS 1.7.3** and bootloader **1000.1.1**, or **1000.2.0** (one install reported, see below). Other versions are refused: every address in this project belongs to that one firmware file. The start screen shows `1.7.3`, or `1.7.3+1` on a unit that is already on that version, and such a unit can use the page. That label is the unit's version record, not the firmware file's, so it does not decide: the install page holds your file to the original's SHA-256 and refuses any other.
+- A USB cable and a computer: Windows with Chrome or Edge, a Mac with Chrome, or Linux with a Chromium browser that has folder access. A Mac and Linux need a few small things more ([the guide](docs/guide.md#what-you-need)).
 
-**A unit still on OS 1.7.0** has two ways. Update it to OS 1.7.3 with Teenage Engineering's own official update, one that gives OS 1.7.3 itself and not a later build such as `1.7.3+1`, and then use the install page. Or use the page for OS 1.7.0, which the install page links to: the release of before, kept as it was, only for a unit that was never updated to 1.7.3 ([the guide](docs/guide.md), "A unit on OS 1.7.0").
+**A unit still on OS 1.7.0** is updated first, with Teenage Engineering's own official update, to OS 1.7.3 or `1.7.3+1`, and then uses the install page. `1.7.3+1` comes with a new bootloader, 1000.2.0, that is more locked down and doesn't let the unit go back to an older OS version: updating to it is at your own risk ([the guide](docs/guide.md), "A unit on OS 1.7.0").
 
-**A unit on a later OS version than 1.7.3 cannot use this yet.** The builder takes only the OS 1.7.3 file, which such a unit does not hold, and whether such a unit can be brought back to OS 1.7.3 is not known. Do not update a unit in the hope of going back. Support for a later version is work that has not been done ([methods](docs/methods.md), "Moving the work to another firmware version").
+**A unit on a later OS version than 1.7.3 cannot use this yet** (`1.7.3+1` does not count as one: such a unit can use the install page, see above). The builder takes only the OS 1.7.3 file, which such a unit does not hold, and whether such a unit can be brought back to OS 1.7.3 is not known. Do not update a unit in the hope of going back. Support for a later version is work that has not been done ([methods](docs/methods.md), "Moving the work to another firmware version").
 
 **An official update of the device replaces open-field.** It writes the maker's firmware over the one with our loader in it. The unit is then on the original firmware of the new version, and open-field is gone from it. Pack files that are still on the disk do nothing without the loader. If you want to keep open-field, do not update.
 
 ## What is proven and what is not
 
-- The install without any key has been made on several units, by their owners, from Windows computers. It has not been tried on another bootloader version, or from a Mac or Linux computer.
+- The install without any key has been made on several units, by their owners, from Windows computers, with bootloader 1000.1.1.
+- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.12 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
+- For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
 - The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, with level 10, has been proven on a computer and not yet watched on a unit. So has `fx train` 17, the version the listing offers: if it gives you trouble, `fx train` 16 is linked from the README of [open-field-packs](https://github.com/LaP0573/open-field-packs).
 

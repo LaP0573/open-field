@@ -597,10 +597,11 @@ class ThePagesOnAHost(unittest.TestCase):
     def test_every_file_the_page_fetches_by_name_is_beside_it(self):
         manifest = load(self.served, "loader.json")
         named = load(self.served, "base-pack.json")
-        for name in ("loader.json", "base-pack.json", manifest["loader"]["file"], named["file"], "open-field-helper.ps1"):
+        for name in ("loader.json", "base-pack.json", manifest["loader"]["file"], named["file"], "open-field-helper.ps1", "open-field-helper.py"):
             self.assertTrue(os.path.isfile(os.path.join(self.folder, name)), name)
         page = text(self.served, "index.html")
-        for said in ('get("loader.json")', 'get("base-pack.json")', 'new URL("./open-field-helper.ps1", location.href)', 'fetch("./" + LISTING_FILE)'):
+        for said in ('get("loader.json")', 'get("base-pack.json")', 'new URL("./open-field-helper.ps1", location.href)',
+                     'new URL("./open-field-helper.py", location.href)', 'fetch("./" + LISTING_FILE)'):
             self.assertIn(said, page)
         # the listing of packs, packs.json, is put beside the page by the pages workflow, from catalog/packs.json
         self.assertIn('export const LISTING_FILE = "packs.json"', text(self.served, "catalog.mjs"))
@@ -608,20 +609,25 @@ class ThePagesOnAHost(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(ROOT, "catalog", "packs.json")))
         self.assertFalse(os.path.isfile(os.path.join(self.folder, "packs.json")), "a copy kept beside the page would go stale: the workflow makes it")
 
-    FROZEN = "b6501e4b4351c9a9f35898dab7b38d4fe5121da9"                         # the last commit for OS 1.7.0
+    def test_the_page_waits_for_the_windows_checks_and_not_for_the_helper_s(self):
+        """The pages workflow publishes on the success of the workflow checks. The Linux and Mac jobs are a workflow of
+        their own, so that one of them, red or hung, never holds the page back."""
+        self.assertRegex(text(".github", "workflows", "pages.yml"), r"(?m)^\s*workflows: \[checks\]\s*$")
+        checks, helper = text(".github", "workflows", "checks.yml"), text(".github", "workflows", "helper.yml")
+        self.assertEqual(re.findall(r"(?m)^    runs-on:\s*(\S+)", checks), ["windows-latest"])
+        self.assertEqual(re.findall(r"(?m)^    runs-on:\s*(\S+)", helper), ["ubuntu-latest", "macos-latest"])
+        for said in ("name: helper\n", "  contents: read\n", "  group: helper-"):
+            self.assertIn(said, helper)
 
-    def test_the_page_for_os_1_7_0_comes_from_one_commit_and_no_other(self):
-        """The page for a unit still on OS 1.7.0 is that commit's builder/ with that commit's listing beside it, put
-        into 1.7.0/ by the pages workflow; nothing of it is kept in the tree, and the main page links to it."""
+    def test_no_page_for_os_1_7_0_is_served(self):
+        """The site serves the page for OS 1.7.3 alone: the pages workflow makes no page for OS 1.7.0 (the last commit
+        for it was b6501e4), nothing of one is kept in the tree, and the page links to none."""
         workflow = text(".github", "workflows", "pages.yml")
-        self.assertRegex(workflow, r"(?m)^\s*fetch-depth:\s*0\s*$")
-        self.assertEqual(set(re.findall(r"\b[0-9a-f]{40}\b", workflow)), {self.FROZEN})
-        for said in ("mkdir -p %s/1.7.0" % self.served,
-                     "git archive %s builder | tar -x -C %s/1.7.0 --strip-components=1" % (self.FROZEN, self.served),
-                     "git show %s:catalog/packs.json > %s/1.7.0/packs.json" % (self.FROZEN, self.served)):
-            self.assertIn(said, workflow)
-        self.assertFalse(os.path.exists(os.path.join(self.folder, "1.7.0")), "the page for 1.7.0 is made by the workflow, never kept")
-        self.assertIn('href="./1.7.0/"', text(self.served, "index.html"))
+        self.assertNotIn("b6501e4", workflow)
+        self.assertNotIn("1.7.0", workflow)
+        self.assertNotRegex(workflow, r"\bgit (archive|show)\b")
+        self.assertFalse(os.path.exists(os.path.join(self.folder, "1.7.0")), "no page for 1.7.0 is kept beside the page")
+        self.assertNotRegex(text(self.served, "index.html"), r"1\.7\.0/")       # no path into a 1.7.0 folder, whatever its form
 
     def test_the_helper_s_line_is_made_from_the_page_s_own_address(self):
         page = text(self.served, "index.html")
@@ -632,13 +638,21 @@ class ThePagesOnAHost(unittest.TestCase):
         self.assertIn("$FolderName = [string] $openFieldFolder", helper)                                                 # and the name it looks for the folder by
         self.assertIn("STOPPED: the install page did not choose this folder", helper)
         self.assertNotRegex(page, r"irm\s+'https?://")
+        # the line for a Mac and Linux: the same mark and name, the helper read from the page's own address and run by python3
+        self.assertIn('const pythonLine = (url, mark, name) => "curl -fsSL " + shQuoted(url) + " | python3 -I - --page " + shQuoted(mark) + " --folder-name=" + shQuoted(name);', page)
+        self.assertIn("pythonLine(pythonHelperUrl, PAGE_ID, folderHandle.name)", page)                                   # the page's mark and the folder's name
+        helper = text(self.served, "open-field-helper.py")
+        self.assertIn('ap.add_argument("--page"', helper)                                                                # which the helper takes
+        self.assertIn('ap.add_argument("--folder-name"', helper)
+        self.assertIn("STOPPED: the install page did not choose this folder", helper)
+        self.assertNotRegex(page, r"curl\s+-fsSL\s+'https?://")
 
 
 class ThePageSStorage(unittest.TestCase):
-    """The page shares its site with the page kept for OS 1.7.0 (the pages workflow serves it beside this one). So the
-    keys of the browser's storage the page writes carry its firmware, and a check of the unit it finds stored (step 1,
-    the gate) is taken again only when it was made for this firmware and its answer is still a supported one. Without
-    that, a gate one page let through could be taken by the other."""
+    """The site served a page for OS 1.7.0 before this one, and what that page stored may still be in a browser's
+    storage. So the keys of the browser's storage the page writes carry its firmware, and a check of the unit it finds
+    stored (step 1, the gate) is taken again only when it was made for this firmware and its answer is still a supported
+    one. Without that, a gate the other page let through could be taken by this one."""
 
     @classmethod
     def setUpClass(cls):
@@ -647,7 +661,7 @@ class ThePageSStorage(unittest.TestCase):
 
     def test_the_page_is_for_the_tree_s_firmware(self):
         self.assertIn('const FIRMWARE = "%s";' % self.firmware, self.page)
-        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\"];", self.page)
+        self.assertIn("const SUPPORTED_OS = [FIRMWARE, FIRMWARE + \"+0\", FIRMWARE + \"+1\"];", self.page)
         self.assertEqual(load("builder", "loader.json")["os"], self.firmware)
 
     def test_every_key_of_the_session_s_storage_carries_the_firmware(self):
@@ -664,12 +678,22 @@ class ThePageSStorage(unittest.TestCase):
         self.assertIn("SUPPORTED_OS.includes(g.os)", body)
         self.assertLess(check, body.index("if (gate && !fits(gate)) { gate = null;"))
         self.assertLess(body.index("if (gate && !fits(gate)) { gate = null;"), body.index("if (gate) {"))
-        self.assertIn("gate = { firmware: FIRMWARE, bl: id.bl_version, os: id.os_version || null };", self.page)
+        self.assertIn("g.mark === PAGE_ID", body)                                     # no gate without the mark its find made
+        self.assertIn("gate = { firmware: FIRMWARE, bl: id.bl_version, os: id.os_version || null, unit: id.serial, mark: PAGE_ID, used: null };", self.page)
 
-    def test_a_unit_on_os_1_7_0_is_sent_to_the_page_kept_for_it(self):
+    def test_a_unit_on_os_1_7_0_is_told_to_update_first(self):
         self.assertIn('const OLDER_OS = ["1.7.0", "1.7.0+0"];', self.page)
         self.assertIn("} else if (blOk && OLDER_OS.includes(id.os_version)) {", self.page)
-        self.assertIn('<a href=\\"./1.7.0/\\">the page for OS 1.7.0</a>', self.page)
+        # one refusal for every bootloader, built of nodes as the version in it comes from the device: the words of its
+        # one warn span, a sentence written over two literals read as one, ask for the update and say its risk
+        branch = re.search(r"\n      \} else if \(blOk && OLDER_OS\.includes\(id\.os_version\)\) \{\n(.*?)\n      \} else \{\n", self.page, re.S).group(1)
+        branch = re.sub(r'"\s*\+\s*"', "", branch)
+        refusal = re.findall(r'\$\("gate"\)\.replaceChildren\(spanOf\("warn", (.*?)\)\);\n', branch, re.S)
+        self.assertEqual(len(refusal), 1)
+        self.assertIn("Update it to OS 1.7.3 or 1.7.3+1 with Teenage Engineering's own update first, then come back to this page.", refusal[0])
+        self.assertIn("1.7.3+1 comes with a new bootloader, 1000.2.0, that is more locked down and doesn't let your OP-1 go back to an "
+                      "older OS version: updating to it is at your own risk.", refusal[0])
+        self.assertNotIn("innerHTML", branch)
 
 
 class TheCheckByForm(unittest.TestCase):

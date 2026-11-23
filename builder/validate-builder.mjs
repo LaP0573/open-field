@@ -14,6 +14,7 @@
 // refusal and never a bad image. Then the refusals: a wrong hash, a changed or cut file, a swapped loader's file,
 // malformed fields. Without a firmware file only the checks that need none are made, and the answer says so.
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildImage, sha256hex, ours } from "./patch.mjs";
@@ -43,6 +44,22 @@ const manText = readFileSync(manPath, "utf8");
 const manifest = JSON.parse(manText);
 const our = ours(manifest);
 const loader = u8(join(here, our.file));
+
+// 0. the install page's scripts parse: a slip in one stops the page, and no other check here runs them. Each module
+// script is given to Node's own check over its standard input, so no file is written.
+{
+  const page = readFileSync(join(here, "index.html"), "utf8");
+  const opened = page.match(/<script\s[^>]*type="module"[^>]*>/g) || [];
+  const scripts = [...page.matchAll(/<script\s[^>]*type="module"[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const broken = [];
+  scripts.forEach((script, i) => {
+    const parsed = spawnSync(process.execPath, ["--input-type=module", "--check"], { input: script, encoding: "utf8" });
+    if (parsed.status !== 0) broken.push(`script ${i + 1}: ` + String(parsed.stderr || parsed.error || "no answer").split("\n").slice(0, 5).join(" "));
+  });
+  if (!scripts.length || scripts.length !== opened.length) bad("the install page's module scripts cannot all be found");
+  else if (broken.length) bad("the install page's script does not parse: " + broken.join("; "));
+  else ok(`the install page's script parses (${scripts.length} module scripts)`);
+}
 
 // 1. the loader's file is the one the manifest names
 if (loader.length === our.bytes && (await sha256hex(loader)) === our.sha256) ok(`the loader's file is the manifest's (${loader.length} bytes)`);

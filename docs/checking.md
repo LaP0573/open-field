@@ -78,6 +78,8 @@ On every pull request and every change to `main`, the host runs `.github/workflo
 - the install page's three checks, `node builder/validate-builder.mjs` (without a firmware file), `node builder/validate-devmode.mjs` and `node builder/validate-install.mjs`;
 - the part of this check that needs no firmware, `--forms-only`, on every file of the tree.
 
+It also runs `.github/workflows/helper.yml`, two smaller jobs that need no compiler. On Linux the host runs the tree's own tests, with those of the Mac and Linux helper, which Windows skips, then `node builder/validate-devmode.mjs` and `node builder/validate-install.mjs`. On a Mac it runs that helper's tests and nothing else. The install page is published on the success of `checks` alone, so a failure of these two never holds it back.
+
 A pull request that changes the listing of packs also runs `.github/workflows/listing.yml`: `tools/catalog_check.py`, held to the listing before the change and to every pack file that changed ([the listing](catalog.md)).
 
 **A green run is not the whole check.** It cannot see bytes, texts or pictures of the firmware in a file, because a host never has the firmware to compare with. The whole check runs on the maintainer's computer, with the maintainer's own copy of the firmware, before a change goes in. A green run says nothing about a unit either: only a try on one does.

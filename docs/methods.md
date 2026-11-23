@@ -253,7 +253,7 @@ When you report what you tried, say what you did on the unit, with which pack fi
 
 Everything here is tied to one firmware file by addresses: the places of the profiles, and every function and variable the sources bind. Another version of the firmware has the same code at other addresses, and some of it changed.
 
-**Today only OS 1.7.3 is supported** (the original, `1.7.3+0`). The release before it was for OS 1.7.0: it stays in the history of this repository, at the commit `b6501e4`, and the install page keeps its page for a unit that was never updated. Every source of `module/` was moved from 1.7.0 to 1.7.3 address by address, with the method below, and each one says so on its first line. A unit on a later version cannot use open-field yet.
+**Today only OS 1.7.3 is supported** (the original, `1.7.3+0`). The release before it was for OS 1.7.0: it stays in the history of this repository, at the commit `b6501e4`. Every source of `module/` was moved from 1.7.0 to 1.7.3 address by address, with the method below, and each one says so on its first line. A unit on a later version cannot use open-field yet.
 
 A port needs the plain `os.ldr` of both versions, each copied off a unit that runs it. This looks, for every place of a profile and every address the sources name, for the same bytes in the other file:
 

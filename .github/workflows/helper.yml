@@ -1,0 +1,65 @@
+# The checks of the helper for Mac and Linux (builder/open-field-helper.py), on every pull request and every change to
+# main. They need no compiler, no firmware and no unit: linux runs the tree's own tests, that helper's among them
+# (Windows skips those), and two of the page's checks; macos runs that helper's tests and nothing else.
+#
+# They are a workflow of their own, beside checks: the install page is published on the success of checks alone
+# (pages.yml), so a job here that fails or hangs never holds the page back. A green run says nothing about a unit, or
+# about an install from a Mac or Linux: only a try does.
+name: helper
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helper-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The helper for Mac and Linux (builder/open-field-helper.py) is tested on those two systems alone. The page's checks
+  # need no compiler, so they are held on a second system too. The build stays on the Windows job.
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: The tree's own tests, with the Mac and Linux helper's
+        run: python -I -m unittest discover -s tools/tests
+
+      - name: The unit's check over USB MIDI, against a made-up bootloader
+        run: node builder/validate-devmode.mjs
+
+      - name: The install's plan
+        run: node builder/validate-install.mjs
+
+  # On a Mac, that helper's tests alone: they use no libusb and no unit.
+  # Python 3.9, as the python3 of Apple's command line tools: the oldest an owner has there.
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: The Mac and Linux helper's tests
+        run: python -I -m unittest discover -s tools/tests -p "test_linux_helper*.py"

@@ -88,7 +88,7 @@ The install page reads the listing beside it, as `packs.json`: the workflow that
 
 When an owner ticks a pack, the page downloads its file from `https://raw.githubusercontent.com/<owner>/<name>/<commit>/<path>`, the entry's repository at the entry's commit, and holds it to the entry's size and SHA-256. A file that differs is refused, named, and its tick taken off. This download is the only thing the page loads from another site, and the tree's own test holds that (`tools/tests/test_tree.py`, `ThePagesOnAHost`). A pack the ticked one needs is ticked with it.
 
-A ticked file goes into the folder `packs` that the page and the Windows helper share, under the name `<id>.pack`, and the plan of the install counts it; the helper copies it onto the unit with the rest, `base.pack` last, and reads every copy back. A file of the same name with other bytes already in `packs` is kept in the folder `replaced` first. One with the same bytes is shown ticked and goes on as it is. The way back to the original firmware puts no pack on.
+A ticked file goes into the folder `packs` that the page and the helper share, under the name `<id>.pack`, and the plan of the install counts it; the helper copies it onto the unit with the rest, `base.pack` last, and reads every copy back. A file of the same name with other bytes already in `packs` is kept in the folder `replaced` first. One with the same bytes is shown ticked and goes on as it is. The way back to the original firmware puts no pack on.
 
 ## Getting your pack listed
 

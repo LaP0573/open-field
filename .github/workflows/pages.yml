@@ -1,4 +1,4 @@
-# The install page on the host's pages: the folder builder/ as it stands on main, and the page for OS 1.7.0 as it was, served over HTTPS, which the page's
+# The install page on the host's pages: the folder builder/ as it stands on main, served over HTTPS, which the page's
 # USB MIDI and folder access need (builder/README.md, "On a host's pages"). It is published once the checks have
 # passed on main, or by hand. The host's pages are switched on once in the repository's settings, with this workflow
 # as their source.
@@ -40,15 +40,6 @@ jobs:
       # on main, so that a pull request that adds a pack changes that one file only.
       - name: The listing of packs beside the page
         run: cp catalog/packs.json builder/packs.json
-
-      # The page for OS 1.7.0, kept as it was, for a unit that was never updated to 1.7.3: the folder builder/ of the
-      # last commit for 1.7.0, with that commit's listing of packs beside it, served at 1.7.0/ beside the page. It is
-      # taken from that one commit and from no other, and nothing of it is kept in the tree.
-      - name: The page for OS 1.7.0, as it was
-        run: |
-          mkdir -p builder/1.7.0
-          git archive b6501e4b4351c9a9f35898dab7b38d4fe5121da9 builder | tar -x -C builder/1.7.0 --strip-components=1
-          git show b6501e4b4351c9a9f35898dab7b38d4fe5121da9:catalog/packs.json > builder/1.7.0/packs.json
 
       - name: The folder served
         uses: actions/upload-pages-artifact@v3
