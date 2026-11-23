@@ -476,6 +476,7 @@ async function selfChecks() {
     ["a picture of other bytes is refused", pictured, answer(new Uint8Array(64).fill(2)), /SHA-256 differs/],
     ["a picture of another size is refused", pictured, answer(new Uint8Array(63)), /63 bytes/],
     ["a picture that is no PNG is refused", wrongKind, answer(notPng), /not a PNG/],
+    ["a picture larger than the page takes is refused", pictured, answer(new Uint8Array(100 * 1024 + 1)), /more than the 102,400 the page takes for a picture/],
   ]) await downloadPicture(e, get).then(() => check(what, false), (err) => check(what, words.test(err.message), err.message));
 
   // the bootloader: every verdict names one the model knows, and none is assumed

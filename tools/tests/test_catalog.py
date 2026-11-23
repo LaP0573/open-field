@@ -315,7 +315,7 @@ class Downloads(unittest.TestCase):
         reserved = {"id": "later", "author": "someone", "status": "reserved", "categories": ["tools"], "description": "Later.",
                     "picture": {"path": "a.png", "sha256": "0" * 64, "bytes": 5}}
         said, in_order = run(listing(reserved))
-        self.assertIn("only a listed or a bundled entry has a picture", said)
+        self.assertIn("only a listed entry has a picture", said)
         followed = followed_for(data, picture={"path": "a.png", "sha256": "0" * 64, "bytes": 5})
         said, in_order = run(listing(followed))
         self.assertFalse(in_order)
