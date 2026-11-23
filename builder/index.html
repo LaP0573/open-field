@@ -1637,6 +1637,7 @@
   }
 
   function render() {
+    if (seen) seen.disconnect();   // the tiles are drawn again below: stop watching the old pictograms
     // the listing's own numbers
     const offered = listing ? listing.offered.size : 0;
     $("offerCount").textContent = offered ? offered + " to pick from" : "none listed yet";

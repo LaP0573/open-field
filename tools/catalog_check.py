@@ -103,7 +103,7 @@ FOLLOW = "follow"                                               # the branch a f
 FOLLOWED = ("repository", "path", FOLLOW, "version", "firmware", "needs", "folders")   # what a followed entry says, with ALWAYS
 PINNED = ("commit", "sha256", "bytes", "places") + OPTIONAL     # what a followed entry never says: the page reads it from the file
 FOLLOWING = ("listed", "retired")                               # the statuses that may follow a branch
-PICTURE = "picture"                                             # a listed or bundled entry's thumbnail, beside its pack
+PICTURE = "picture"                                             # a listed entry's thumbnail, beside its pack
 KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL + (FOLLOW, PICTURE))
 TOP_KEYS = {"about", "categories", "packs"}                     # a listing's keys, every one, and no other
 KEPT = {"fx": "fx train", "lfo": "lfo"}                         # a folder's name: the id of the one entry that may ask for it, whoever its author
@@ -368,8 +368,8 @@ def entry_faults(entry, categories, known_firmwares):
     if "folders" in entry:
         faults += folder_faults(entry["folders"])
     if PICTURE in entry:
-        if status not in ("listed", "bundled"):
-            faults.append("only a listed or a bundled entry has a picture")
+        if status != "listed":                                  # the base row shows no picture
+            faults.append("only a listed entry has a picture")
         elif followed:                                          # the page shows a picture only from the entry's commit
             faults.append("a followed entry has no picture: a picture lies at the commit an entry names")
         faults += picture_faults(entry[PICTURE])
