@@ -21,8 +21,9 @@ What is held, with nothing but this repository:
 
 - the form of every entry, and that it holds the fields its status asks for and no other;
 - that no two entries share an id or a folder, in small letters or capitals, and that no folder takes a name the
-  firmware, the loader or the base already shows in the disk mode; the names fx and lfo are kept for open-field's
-  own packs (an entry by open-field may take them, once);
+  firmware, the loader or the base already shows in the disk mode; the names fx and lfo are kept for the entries
+  whose ids are `fx train` and `lfo`, whoever their author (the base showed those folders itself up to version 20,
+  and from 21 they are those packs' folders; an id never changes and no two entries share one);
 - that every pack an entry needs is in the listing, and that no pack needs a level the listed base does not offer.
 
 A bundled entry is always held to its file in this repository. With a pack file at hand (`--files`, or `--fetch`,
@@ -37,9 +38,10 @@ An entry's picture (a transparent PNG thumbnail, 5:4, at most 600x480 and 100 KB
 repository at the same commit: its size, its SHA-256, and what its IHDR and chunks say.
 
 With `--files`, an author whose file lies in one of the folders is held whole: every entry of theirs that names a file
-is held to it, and one whose file is not there is refused. So open-field's own packs are all held when the folders of
-a build are given, and an author's own are when their file is. An entry of an author with no file there is held to its
-form only, and its line says so. Folders that hold no entry's file at all are refused.
+is held to it, and one whose file is not there is refused. So the entries whose files a build of this repository
+makes are all held when the folders of that build are given, and an author's own are when their file is. An entry of
+an author with no file there is held to its form only, and its line says so. Folders that hold no entry's file at all
+are refused.
 
 A followed entry's file (`--files`, or `--fetch`, which downloads it from the head of its branch) is held as the
 install page holds it in the owner's browser before it offers it: at most 2 MB; a pack of format 3 whose header's
@@ -49,16 +51,17 @@ level of the base above the one the listed base offers; no folder that the entry
 its release and the base's version it needs are held as a pinned file's are (the page does not hold the version: it
 puts the listed base on the unit with every pack).
 
-The listing's `ours` names the repositories of open-field's own packs: an entry whose author is `open-field` and
-that names a repository names one of them, and an entry in one of them has `open-field` as its author. The install
-page shows the warning on a pack that is not ours on every other entry.
+A listing holds its about, its categories and its packs, and nothing else. Every entry is held by the same rules,
+whoever its author. The author `open-field` is the base's and the examples', which lie in this repository: an entry
+that names a repository is listed under its maker's own name, never under this project's.
 
 With `--before`, the listing before the change: no entry is taken out, no status moves back, an id is never changed,
-a new file comes with a higher version, no version goes down (a followed entry's lowest included), and `ours` stays
-as it was. One new file may keep its version: the same pack built for another firmware, when the entry's `firmware`
-changed too and this repository has a profile for the new one. A pinned entry may come to follow a branch, and back:
-that is a change like any other. With `--fetch`, only the entries that are new or name another file or another
-branch are downloaded then, and a followed entry whose version, firmware, needs or folders changed.
+a new file comes with a higher version, and no version goes down (a followed entry's lowest included). Only the
+packs of the listing before are read: a key at its top that a listing no longer holds is passed over. One new file
+may keep its version: the same pack built for another firmware, when the entry's `firmware` changed too and this
+repository has a profile for the new one. A pinned entry may come to follow a branch, and back: that is a change like
+any other. With `--fetch`, only the entries that are new or name another file or another branch are downloaded then,
+and a followed entry whose version, firmware, needs or folders changed.
 
 What it does not hold, and the review does: that the source at the commit is what the author says, and that the
 pack does what its description says on a unit. Nobody holds a followed entry's later versions so: each new commit on
@@ -102,11 +105,10 @@ PINNED = ("commit", "sha256", "bytes", "places") + OPTIONAL     # what a followe
 FOLLOWING = ("listed", "retired")                               # the statuses that may follow a branch
 PICTURE = "picture"                                             # a listed entry's thumbnail, beside its pack
 KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL + (FOLLOW, PICTURE))
-TOP_KEYS = {"about", "categories", "packs"}
-TOP_OPTIONAL = {"ours"}                                         # the repositories of open-field's own packs
-OURS = "open-field"                                             # the author of open-field's own packs
-KEPT_FOR_OURS = {name: "kept for %s's own packs: the base showed it itself up to version 20, and from 21 it is the folder of the pack %r"
-                 % (OURS, pack) for name, pack in (("fx", "fx train"), ("lfo", "lfo"))}   # only an entry by open-field takes these
+TOP_KEYS = {"about", "categories", "packs"}                     # a listing's keys, every one, and no other
+KEPT = {"fx": "fx train", "lfo": "lfo"}                         # a folder's name: the id of the one entry that may ask for it, whoever its author
+KEPT_WHY = "kept for the pack %r: the base showed it itself up to version 20, and from 21 it is that pack's folder"
+PROJECT = "open-field"                                          # the author of the base and the examples, and of no pack in a repository
 
 NOT_IN_A_NAME = set('/\\:*?"<>|')                              # what no file name on the unit or on a computer holds
 AUTHOR_FORM = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")             # a GitHub user or organisation
@@ -396,16 +398,10 @@ def base_version(packs, out_of_form=(), firmware=None):
 def listing_faults(listing, known_firmwares):
     """What is not in order with the listing: (faults of the whole, {index of an entry: its faults})."""
     whole, each = [], {}
-    if not isinstance(listing, dict) or not TOP_KEYS <= set(listing) <= TOP_KEYS | TOP_OPTIONAL:
-        return ["the listing is not an object with %s, %s if it likes, and nothing else"
-                % (", ".join(sorted(TOP_KEYS)), ", ".join(sorted(TOP_OPTIONAL)))], each
+    if not isinstance(listing, dict) or set(listing) != TOP_KEYS:
+        return ["the listing is not an object with %s, and nothing else" % ", ".join(sorted(TOP_KEYS))], each
     if not plain(listing["about"], 2000):
         whole.append("its about is not one line of plain characters")
-    ours = listing.get("ours", [])
-    if (not isinstance(ours, list) or len(set(map(str, ours))) != len(ours)
-            or not all(isinstance(r, str) and REPOSITORY_FORM.fullmatch(r) for r in ours)):
-        whole.append("its ours is not a list of repositories, https://github.com/<owner>/<name>, each once")
-        ours = []
     categories = listing["categories"]
     if (not isinstance(categories, dict) or not categories
             or not all(CATEGORY_FORM.fullmatch(key) and plain(label, 30) for key, label in categories.items())):
@@ -418,10 +414,8 @@ def listing_faults(listing, known_firmwares):
         faults = entry_faults(entry, categories, known_firmwares)
         if faults:
             each[number] = faults
-        elif entry["author"] == OURS and "repository" in entry and entry["repository"] not in ours:
-            each[number] = ["its author is %s, and its repository is not one of the listing's ours" % OURS]
-        elif entry["author"] != OURS and entry.get("repository") in ours:
-            each[number] = ["its repository is one of the listing's ours, and its author is not %s" % OURS]
+        elif entry["author"].casefold() == PROJECT and "repository" in entry:      # the base and the examples name none
+            each[number] = ["its author is %s, the name of this project: a pack in a repository is listed under its maker's name" % PROJECT]
     held_ids, held_folders = {}, {}
     taken = {name.casefold(): whose for name, whose in pack_build.FOLDER_NAMES_TAKEN.items()}
     for number, entry in enumerate(packs):
@@ -436,8 +430,8 @@ def listing_faults(listing, known_firmwares):
                 word = folder[part].casefold()
                 if word in taken:
                     each.setdefault(number, []).append("its folder's %s %r is %s" % (part, folder[part], taken[word]))
-                elif word in KEPT_FOR_OURS and entry["author"] != OURS:
-                    each.setdefault(number, []).append("its folder's %s %r is %s" % (part, folder[part], KEPT_FOR_OURS[word]))
+                elif word in KEPT and entry["id"] != KEPT[word]:    # by its id alone: the author plays no part
+                    each.setdefault(number, []).append("its folder's %s %r is %s" % (part, folder[part], KEPT_WHY % KEPT[word]))
                 elif (part, word) in held_folders and held_folders[(part, word)] != entry["id"]:
                     each.setdefault(number, []).append("its folder's %s %r is held by %r" % (part, folder[part], held_folders[(part, word)]))
                 held_folders.setdefault((part, word), entry["id"])
@@ -681,10 +675,7 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
     for gone, faults in earlier.items():                        # an entry taken out has no place among today's
         if not any(isinstance(e, dict) and e.get("id") == gone for e in packs):
             lines += ["REFUSED: %s: %s" % (gone, fault) for fault in faults]
-    moved = before is not None and isinstance(listing, dict) and listing.get("ours", []) != before.get("ours", [])
-    if moved:                                                   # the maintainer changes it on main, never a pull request
-        lines.append("REFUSED: the listing: its ours changed: the repositories of open-field's own packs are the maintainer's change")
-    refused = bool(whole) or bool(earlier) or moved
+    refused = bool(whole) or bool(earlier)
     with_a_file = [number for number, entry in enumerate(packs)
                    if number not in each and (entry.get("sha256") or (entry.get("status") == "listed" and FOLLOW in entry))
                    and entry["status"] != "retired"]

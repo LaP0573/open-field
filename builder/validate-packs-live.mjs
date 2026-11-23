@@ -67,7 +67,7 @@ function listingOf(set, commit, extra = [], earlier = null) {
     packs.push(e);
   }
   for (const id of ["wink", "yoyo", "list"]) packs.push({ id, author: "open-field", status: "reserved", categories: ["examples"], description: id, path: id + ".pack", sha256: N1[id].sha256, bytes: N1[id].bytes, version: 1, firmware: OS, places: 0, needs: [], folders: [] });
-  return { about: "", categories: CATS, ours: [REPO], packs: packs.concat(extra) };
+  return { about: "", categories: CATS, packs: packs.concat(extra) };
 }
 const unitFile = (name, set, id) => ({ name, size: set[id].bytes, sha256: set[id].sha256, isPack: true, sizeUnknown: false, nameCut: false });
 const n1Unit = () => [unitFile("8 tracks.pack", N1, "8 tracks"), unitFile("base.pack", N1, "base"), unitFile("fx train.pack", N1, "fx train"), unitFile("lfo.pack", N1, "lfo"),

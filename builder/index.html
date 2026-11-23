@@ -177,7 +177,6 @@
     border-top: 1px solid var(--line); font-size: 12px; color: var(--mid); min-height: 41px; flex-wrap: wrap; }
   .tile .ft .who { color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  .caution { color: var(--red); margin-left: 4px; }
   .st { display: inline-flex; align-items: center; font: 11px var(--mono); color: var(--ink); }
   .act { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 13px; border-radius: 15px; border: 1px solid var(--ink);
     font: 500 12px var(--sans); color: var(--ink); background: transparent; white-space: nowrap; cursor: pointer; }
@@ -653,7 +652,7 @@
         </div>
         <div class="grid" id="grid"></div>
         <p class="note" id="listingNote"></p>
-        <p class="note packnote"><span class="caution" style="margin:0 4px 0 0">△</span>marks a pack made by someone other than open-field. A pack is a program that can read and write the files on your unit: take packs only from people you trust. If one acts up, hold the help key (the speech bubble) while you switch on. Your OP-1 then starts with no packs, like the original firmware, for that one start.</p>
+        <p class="note packnote">A pack is a program that can read and write the files on your unit: take packs only from people you trust. If one acts up, hold the help key (the speech bubble) while you switch on. Your OP-1 then starts with no packs, like the original firmware, for that one start.</p>
         <p class="note" data-m="connect">Connect your OP-1 above to add or take off packs.</p>
         <p class="note" data-m="found other install">Once open-field is on your OP-1, you add and take off packs here.</p>
 
@@ -1344,7 +1343,7 @@
   // and holds every file to the record it kept in the browser's storage (one record a firmware).
   import * as D from "./door.mjs";
   import * as P from "./packs-live.mjs";
-  import { readListing, knownVersions, fileName, isOurs, download, pictureOf, downloadPicture } from "./catalog.mjs";
+  import { readListing, knownVersions, fileName, download, pictureOf, downloadPicture } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
   const FW = window.openFieldFirmware;               // the firmware this page is for, from the install's own script
@@ -1700,7 +1699,6 @@
         meta.append(el("span", "", ver + " · " + kb(entry.bytes)), src);
         const ft = el("div", "ft");
         const who = el("span", "who", "by " + entry.author);
-        if (!isOurs(listing, entry)) { const c = el("span", "caution", "△"); c.title = "not open-field's own"; who.append(c); }
         const acts = el("span", "acts");
         if (live && r && v) {
           const lockWhy = v.locked ? v.why : "";
@@ -1731,11 +1729,9 @@
           if (v && v.locked && v.why) t.append(el("div", "why", v.why));
         }
         t.append(meta);
-        if (entry.followed) {   // a file taken from its author's branch when the page opened: reviewed only when it is open-field's own
-          const own = isOurs(listing, entry);
-          const mark = el("div", "why", "latest from " + entry.author + "'s " + entry.follow + (own ? "" : " · not reviewed"));
-          mark.title = "This file comes straight from " + entry.author + "'s branch " + entry.follow + " as it stands today" +
-            (own ? ": one of open-field's own packs." : ": nobody at open-field has looked at this version.");
+        if (entry.followed) {   // a file taken from its author's branch when the page opened: every author's alike
+          const mark = el("div", "why", "latest from " + entry.author + "'s " + entry.follow);
+          mark.title = "This file comes straight from " + entry.author + "'s branch " + entry.follow + " as it stands today: its new versions reach this page without a review.";
           t.append(mark);
         }
         t.append(ft);
@@ -1843,7 +1839,7 @@
         else {
           $("asksSay").textContent = (s.entry.followed ? "Taking " : "Downloading ") + s.id + " from its author's repository…";
           const got = await download(s.entry);
-          say(s.entry.followed ? "took " + got.name + " as the page checked it when it opened, from " + got.from + (listing && isOurs(listing, s.entry) ? "" : ": not reviewed by open-field")
+          say(s.entry.followed ? "took " + got.name + " as the page checked it when it opened, from " + got.from
             : "downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
           bytes = got.bytes;
         }
