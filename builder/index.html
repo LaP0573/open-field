@@ -501,8 +501,8 @@
           <div class="install-h"><h3>custom firmware install steps</h3><button type="button" class="linkish" id="closeInstall">close</button></div>
           <div class="install-top">
             <p class="note"><b>Unofficial, and at your own risk.</b> open-field isn't made, endorsed or supported by Teenage Engineering, and it isn't affiliated with them. A firmware change can leave a unit unable to start for good, and installing this will void the warranty of your device. Whether to do it is your decision alone.</p>
-            <p class="warn hidden" id="notWindows">The install only works on Windows, in Chrome or Edge, for now.</p>
-            <p class="note" id="olderOs">Still on OS 1.7.0? <a href="./1.7.0/">Use the page kept for it.</a></p>
+            <p class="warn hidden" id="notWindows" data-on="other">The install needs a computer: Windows, a Mac or Linux. It won't work on a phone or a tablet.</p>
+            <p class="warn hidden" data-on="mac">Installing from a Mac has been reported once, in Chrome, on an earlier release. This one hasn't been tried there.</p>
             <p class="note" id="loaderInfo">Loading…</p>
             <p class="warn hidden" id="loadError"></p>
           </div>
@@ -536,7 +536,7 @@
               <div class="big">2</div>
               <div>
                 <h3>open your OP-1 as a drive <span class="tick">done ✓</span></h3>
-                <p>In the bootloader menu, press <kbd>3</kbd> for the developer menu, then <kbd>2</kbd> for drive mode. Your OP-1 shows up on this computer as a drive called OP-1.</p>
+                <p>In the bootloader menu, press <kbd>3</kbd> for the developer menu, then <kbd>2</kbd> for drive mode. <span data-on="windows">Your OP-1 shows up on this computer as a drive called OP-1.</span><span class="hidden" data-on="mac">It won't show up in Finder, and that's fine. The helper finds it.</span><span class="hidden" data-on="linux">If your file manager shows it as a drive, unmount it there.</span></p>
                 <div class="stepdraw">
                   <svg class="dev" viewBox="0 0 1000 348" role="img" aria-label="The OP-1 field: the keys 3 and 2">
                     <use href="#unit-drawing" width="1000" height="348"/>
@@ -562,10 +562,14 @@
               <div class="big">4</div>
               <div>
                 <h3>run the helper <span class="tick">done ✓</span></h3>
-                <p>A web page can't reach your OP-1's files on Windows, so a small helper does that part. Open PowerShell (press the Windows key, type <code>PowerShell</code>, press Enter), paste this line and press Enter:</p>
+                <p data-on="windows">A web page can't reach your OP-1's files on Windows, so a small helper does that part. Open PowerShell (press the Windows key, type <code>PowerShell</code>, press Enter), paste this line and press Enter:</p>
+                <p class="note hidden" data-on="mac">Before you start, make sure you've got <code>python3</code> and libusb (<code>brew install libusb</code>), then quit Image Capture and Photos. The helper may end macOS's camera service so it can reach your OP-1. If macOS asks, allow Terminal to reach the folder.</p>
+                <p class="hidden" data-on="mac">A web page can't reach your OP-1's files, so a small helper does that part. Open Terminal (press Cmd and Space, type <code>Terminal</code>, press Return), paste this line and press Return:</p>
+                <p class="note hidden" data-on="linux">Before you start, make sure you've got <code>python3</code>, <code>curl</code> and <code>libusb-1.0</code>, and that the OP-1's drive is unmounted in your file manager.</p>
+                <p class="hidden" data-on="linux">A web page can't reach your OP-1's files, so a small helper does that part. Open a terminal, paste this line and press Enter:</p>
                 <pre class="cmd" id="command">Pick your folder in step 3 first.</pre>
                 <p><button type="button" class="btn line small" id="copy">copy the line</button> <span class="note" id="copied"></span></p>
-                <p class="note">Leave its window open. It finds your folder, copies your current firmware into it as a backup, moves your OP-1's log files there and clears what earlier installs left behind. Later it puts the new firmware on your OP-1 and checks every copy. <a id="readHelper" href="./open-field-helper.ps1" target="_blank" rel="noopener">Read the helper</a> first, if you like.</p>
+                <p class="note"><span data-on="windows">Leave its window open.</span><span class="hidden" data-on="mac">Leave Terminal open.</span><span class="hidden" data-on="linux">Leave the terminal open.</span> It finds your folder, copies your current firmware into it as a backup, moves your OP-1's log files there and clears what earlier installs left behind. Later it puts the new firmware on your OP-1 and checks every copy. <a id="readHelper" href="./open-field-helper.ps1" target="_blank" rel="noopener">Read the helper</a> first, if you like.</p>
               </div>
             </li>
             <li class="step later" id="s5">
@@ -584,6 +588,7 @@
                     <label><input type="radio" name="what" value="new" checked> the latest version of the open-field custom firmware</label>
                     <label><input type="radio" name="what" value="back"> my backup of the original firmware</label></p>
                   <p id="backupLine">A copy of your current firmware called <code id="stockName">os-1.7.3-yours.ldr</code> has been created in the folder you picked, make sure to back this up somewhere.</p>
+                  <p class="note hidden" id="planBl">Planned for bootloader 1000.2.0: one install reported so far, the way back untried.</p>
                   <p><button type="button" class="btn" id="go" disabled>put the files on your OP-1</button></p>
                 </div>
                 <p class="warn" id="planError"></p>
@@ -614,7 +619,8 @@
                   </svg>
                   <div class="legend"><span><span class="num">1</span>hold <b>COM</b> and switch on</span><span><span class="num">2</span><b>3</b> for the developer menu</span><span><span class="num">3</span><b>4</b> writes</span><span class="warn">never <b>1</b></span></div>
                 </div>
-                <p class="note">If small text shows up instead, naming a source file and a line (<code>rsi.c</code> and a number), the write stopped before it could install the firmware. You can switch it off. Your firmware is intact, and your OP-1 still runs the firmware it had before. You can run the install again from step 1.</p>
+                <p class="note" id="stopNote">If small text shows up instead, naming a source file and a line (<code>rsi.c</code> and a number), the write stopped before it could install the firmware. You can switch it off. Your firmware is intact, and your OP-1 still runs the firmware it had before. You can run the install again from step 1.</p>
+                <p class="note hidden" id="stopNote20">If small text shows up instead, that hasn't been seen on bootloader 1000.2.0. Don't count on the write having stopped or on your firmware being intact. Ask on open-field's GitHub before you try again.</p>
               </div>
             </li>
             <li class="step later" id="s8">
@@ -622,7 +628,7 @@
               <div>
                 <h3>start your OP-1</h3>
                 <p id="step8New">You can now start your OP-1 field normally. If the custom firmware installed properly, the splash screen will read <code id="startWords">1.7.3 - open-field 0.3</code>. If at any point your device fails to start (for example because of a faulty .pack you installed), you can hold the help key while starting to bypass the custom firmware and start as the original firmware.</p>
-                <p id="step8Back" class="hidden">You can now start your OP-1 field normally. It's back on the original firmware, and the splash screen reads 1.7.3 with nothing after it.</p>
+                <p id="step8Back" class="hidden">You can now start your OP-1 field normally. It's back on the original firmware, and the splash screen reads <span id="backStart">1.7.3</span> with nothing after it.</p>
               </div>
             </li>
           </ol>
@@ -684,16 +690,17 @@
   import { Session } from "./ferret.mjs";
   import { buildImage, ours } from "./patch.mjs";
   import { NAMES, prepare, readHelper, checkFolder, sha256 } from "./install.mjs";
-  import { LISTING_FILE, readListing } from "./catalog.mjs";
+  import { LISTING_FILE, readListing, resolveFollowed } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
-  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0"];   // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+  const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0",    // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
+    "1000.2.0", "1000.2.0+0"];                       // one install reported on it, from a Mac (2026-11-20)
   const FIRMWARE = "1.7.3";                          // the one firmware this page builds for: the original OS 1.7.3
-  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0"];
-  const OLDER_OS = ["1.7.0", "1.7.0+0"];             // a unit on it is sent to the page kept for it, ./1.7.0/
+  const SUPPORTED_OS = [FIRMWARE, FIRMWARE + "+0", FIRMWARE + "+1"];    // a label proves nothing: step 5's SHA-256 check decides
+  const OLDER_OS = ["1.7.0", "1.7.0+0"];             // a unit on it is told to update to OS 1.7.3 first
   window.openFieldFirmware = FIRMWARE;              // the live list of packs (the second script) keeps its record under it
-  // The browser's storage of this tab is shared with the page kept for OS 1.7.0 (the same site): this page's keys carry
-  // its firmware, so that neither page takes what the other one stored.
+  // The site served a page for OS 1.7.0 before, and its keys may still be in a browser's storage: this page's keys carry
+  // its firmware, so that it never takes what that page stored.
   const GATE_KEY = "open-field-gate-" + FIRMWARE, PAGE_KEY = "open-field-page-" + FIRMWARE;
   let manifest = null, loader = null, session = null, folder = null, folderHandle = null, keptStock = null;
   let basePack = null;      // the page's own base.pack, {bytes, sha256, version, release}, checked against base-pack.json
@@ -706,13 +713,16 @@
 
   // This page's mark: written into the folder it chose (page.json) and named in the helper's line, so that the helper
   // finds that folder and checks it works in the folder this page reads. Kept for the browser tab, so that a reload
-  // follows the same helper.
-  const PAGE_ID = (() => {
+  // follows the same helper. Every find that passes makes a new one.
+  let PAGE_ID = (() => {
     try { const kept = sessionStorage.getItem(PAGE_KEY); if (kept && /^[0-9a-f]{8}$/.test(kept)) return kept; } catch { /* none kept */ }
+    return newMark();
+  })();
+  function newMark() {
     const id = [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, "0")).join("");
     try { sessionStorage.setItem(PAGE_KEY, id); } catch { /* not kept */ }
     return id;
-  })();
+  }
 
   function log(msg, cls) {
     const span = document.createElement("span");
@@ -736,6 +746,62 @@
     if (cls) span.className = cls;
     span.textContent = text;
     $(id).replaceChildren(span);
+  }
+
+  // ---- whose run, whose plan ----
+  // The gate is {firmware, bl, os, unit, mark, used}: what the bootloader said, the mark its find made, and the run that
+  // went Ready with it. A run is the gate's when the helper echoes that mark (helper.json's page): a helper started
+  // before the last find carries an older one, and is never planned and never ready. No clock is read.
+  const bootloaderKey = (version) => String(version || "").replace(/\+0$/, "");        // as a plan records it
+  const belongs = (h) => !!gate && h.page === gate.mark;
+  const OLDER_WAITS = "Step 1 was run since this helper started, so stop it with Ctrl and C and run the new line of step 4.";
+  const NO_GATE = "Step 1 hasn't passed in this tab. Stop the helper with Ctrl and C, press 2 on your OP-1 to close the drive, press find my OP-1 in step 1, then press 2 again to open the drive and run the new line of step 4.";
+  const NO_WRITE = {
+    step1: "Don't write: step 1 hasn't passed in this tab, so start again from step 1.",
+    updated: "Don't write: this page was updated during your install, so run the line of step 4 again.",
+    other: (planFor, read) => "Don't write: these files were planned for bootloader " + planFor + " and step 1 read " + read + ", so run the line of step 4 again.",
+    differs: "Don't write: what's on your OP-1 doesn't match this page's plan, so run the line of step 4 again.",
+  };
+  function refusePlan(plan, asked, h) {
+    if (gate !== asked) throw new Error("step 1 changed meanwhile");
+    if (plan.run !== h.run) throw new Error("the helper has started again");
+    if (plan.bootloader !== bootloaderKey(asked.bl)) throw new Error("this page's files are from two versions, so reload the page");
+  }
+  function forgetRun() {
+    helperNow = seenRun = preview = offered = planned = checkedRun = null; ready = false;
+    $("go").disabled = true; show("planBox", false); $("planError").textContent = "";
+    status("putStatus", "", "Waiting for step 5.");
+  }
+  function dropGate() {
+    gate = null; forgetRun();
+    try { sessionStorage.removeItem(GATE_KEY); } catch { /* nothing kept */ }
+    show("devBox", false); $("gate").textContent = "";
+    showBootloader(); refresh();
+  }
+  // closing the steps or opening them afresh: the gate stays only for a run of it that is still under way
+  function leaveGate() {
+    if (gate && (gate.used || !["starting", "listed", "planned", "putting"].includes(helperNow))) dropGate();
+  }
+  function showBootloader() {
+    const os = gate && gate.os === FIRMWARE + "+1" ? gate.os : FIRMWARE, newer = !!gate && bootloaderKey(gate.bl) === "1000.2.0";
+    $("backStart").textContent = os;
+    if (basePack) $("startWords").textContent = os + " - open-field " + basePack.release;
+    show("planBl", newer); show("stopNote", !newer); show("stopNote20", newer);
+  }
+  // step 1's words are nodes, never markup: the versions in them come from the device
+  function spanOf(cls, ...parts) {
+    const span = document.createElement("span");
+    span.className = cls;
+    span.replaceChildren(...parts);
+    return span;
+  }
+  const AGAIN = "If you update this OP-1 or switch to another one, press find my OP-1 again.";
+  function passedWords(bl, os) {
+    const read = "Bootloader " + bl + ", OS " + os + ". ";
+    if (bootloaderKey(bl) !== "1000.2.0") return [spanOf("ok", read + "Both are fine. ✔"), " ", AGAIN];
+    return [spanOf("ok", read + "You can use it."), " ", spanOf("warn", "Only one install has been reported on this bootloader, from a Mac on an earlier release. " +
+      "Windows and the way back haven't been tried on it. If the placement is wrong for your OP-1, the write can fail. " +
+      "On 1000.1.1 that erases the spare copy of the firmware, and on 1000.2.0 nobody has seen what it does."), " ", AGAIN];
   }
 
   // A step is greyed only while it cannot be done yet, and marked done when what it asks for is seen to be done.
@@ -772,12 +838,29 @@
     if (scroll) $("sec-unit").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function closeInstall() {
+    leaveGate();
     history.replaceState(null, "", location.pathname + location.search);
     document.body.dataset.moment = "connect";
   }
-  for (const id of ["goInstall", "otherInstall", "reinstall"]) $(id).addEventListener("click", () => openInstall());
+  for (const id of ["goInstall", "otherInstall", "reinstall"]) $(id).addEventListener("click", () => { leaveGate(); openInstall(); });
   $("closeInstall").addEventListener("click", closeInstall);
-  const onWindows = /^win/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "");
+  // a link to a section takes #install out of the address, and a reload would come back with the steps closed
+  window.addEventListener("hashchange", () => { if (document.body.dataset.moment === "install") history.replaceState(null, "", "#install"); });
+  // Which computer. Android says Linux and an iPad says Mac: no Mac has a touch screen, and a Linux computer with one
+  // (ARM or not) still has a mouse or a touchpad as its main pointer.
+  function computerOf(nav, coarsePointer) {
+    const says = (nav.userAgentData && nav.userAgentData.platform) || nav.platform || "";
+    if (/^win/i.test(says)) return "windows";
+    if (/Android|iPhone|iPad|iPod|\bCrOS\b/.test(nav.userAgent || "") || (nav.userAgentData && nav.userAgentData.mobile)) return "other";
+    const touches = nav.maxTouchPoints || 0;
+    if (/^mac/i.test(says)) return touches > 1 ? "other" : "mac";
+    if (/^linux/i.test(says)) return touches > 0 && coarsePointer ? "other" : "linux";
+    return "other";
+  }
+  const computer = computerOf(navigator, matchMedia("(pointer: coarse)").matches);
+  const withPython = computer === "mac" || computer === "linux";       // the helper in Python, else the Windows one
+  const BROWSER_HINT = { mac: "Use Chrome.", linux: "Use Chrome, or Brave with its flag brave://flags/#file-system-access-api switched on." }[computer];
+  window.openFieldBrowserHint = BROWSER_HINT;        // the packs section's connect names the same browser
 
   // ---- the builder's files: loader.json, or a version kept beside it, asked for as ?loader=1.7.3-v2 ----
   // (the loader is our small piece inside the firmware file; the base is the pack base.pack)
@@ -804,7 +887,7 @@
       const bytes = new Uint8Array(await b.arrayBuffer());
       if (bytes.length !== named.bytes || (await sha256(bytes)) !== named.sha256) throw new Error("base.pack is not the file base-pack.json names");
       basePack = { bytes, sha256: named.sha256, version: named.version, release: named.release };
-      $("startWords").textContent = manifest.os + " - open-field " + named.release;
+      showBootloader();
       $("railOs").textContent = "OS " + manifest.os;
       $("railRelease").textContent = named.release;
       show("loaderInfo", false);
@@ -822,8 +905,11 @@
     try {
       const data = await fetch("./" + LISTING_FILE).then((r) => (r.ok ? r.json() : null));
       if (!data) throw new Error(LISTING_FILE + " is not beside this page");
-      const listing = readListing(data, manifest.os);
-      listingData = data;
+      // a pack that follows its author's branch: its file downloaded once now, held to its entry and kept
+      const followed = await resolveFollowed(data, manifest.os);
+      for (const problem of followed.problems) log("the listing: " + problem, "warn");
+      const listing = readListing(followed.data, manifest.os);
+      listingData = followed.data;
       for (const problem of listing.problems) log("the listing: " + problem, "warn");
     } catch (e) {
       log("no listing of packs: " + e.message);
@@ -839,9 +925,9 @@
   function restoreGate() {
     try { gate = JSON.parse(sessionStorage.getItem(GATE_KEY) || "null"); } catch { gate = null; }
     const fits = (g) => !!g && typeof g === "object" && g.firmware === FIRMWARE && SUPPORTED_BL.includes(g.bl || "") &&
-      (g.os === null || SUPPORTED_OS.includes(g.os));
+      (g.os === null || SUPPORTED_OS.includes(g.os)) && g.mark === PAGE_ID;
     if (gate && !fits(gate)) { gate = null; try { sessionStorage.removeItem(GATE_KEY); } catch { /* nothing kept */ } }
-    if (gate) { $("gate").innerHTML = "<span class='ok'>Bootloader " + gate.bl + ", OS " + (gate.os || "not said") + ". Both are fine. ✔</span>"; show("devBox"); }
+    if (gate) { $("gate").replaceChildren(...passedWords(gate.bl, gate.os || "not said")); show("devBox"); showBootloader(); }
     refresh();
   }
   // The page holds the bootloader's MIDI ports only while it asks it something, and gives every port of the OP-1 back
@@ -862,10 +948,10 @@
   }
   window.addEventListener("pagehide", letGoOfBootloader);
   $("find").addEventListener("click", async () => {
-    if (!navigator.requestMIDIAccess) { log("This browser has no USB MIDI. Use Chrome or Edge on a desktop computer.", "warn"); return; }
+    if (!navigator.requestMIDIAccess) { log("This browser has no USB MIDI. " + (BROWSER_HINT || "Use Chrome or Edge on a desktop computer."), "warn"); return; }
     if (talking) return;
     talking = true;
-    gate = null; sessionStorage.removeItem(GATE_KEY); show("devBox", false); $("gate").textContent = "";
+    dropGate();
     $("findStatus").textContent = "connecting…";
     letGoOfEveryPort();
     session = bootSession();
@@ -876,18 +962,23 @@
       const blOk = SUPPORTED_BL.includes(id.bl_version || "");
       const osOk = !id.os_version || SUPPORTED_OS.includes(id.os_version);
       if (blOk && osOk) {
-        gate = { firmware: FIRMWARE, bl: id.bl_version, os: id.os_version || null };
+        PAGE_ID = newMark();                         // a helper started before this find carries an older mark
+        gate = { firmware: FIRMWARE, bl: id.bl_version, os: id.os_version || null, unit: id.serial, mark: PAGE_ID, used: null };
         sessionStorage.setItem(GATE_KEY, JSON.stringify(gate));
-        $("gate").innerHTML = "<span class='ok'>Bootloader " + id.bl_version + ", OS " + (id.os_version || "not said by the bootloader (the check of your firmware file in step 5 decides)") + ". Both are fine. ✔</span>";
-        show("devBox"); refresh();
+        $("gate").replaceChildren(...passedWords(id.bl_version, id.os_version || "not said by the bootloader (the check of your firmware file in step 5 decides)"));
+        forgetRun(); show("devBox"); showBootloader(); refresh();
+        showCommand(); $("copied").textContent = "";
+        if (folderHandle) await useFolder(folderHandle);         // the new mark into the folder
       } else if (blOk && OLDER_OS.includes(id.os_version)) {
-        $("gate").innerHTML = "<span class='warn'>Your OP-1 runs OS " + id.os_version + ", and this page is for OS 1.7.3 only. Stop here on this OP-1. " +
-          "<a href=\"./1.7.0/\">the page for OS 1.7.0</a>, kept as it was, is the one for it. Or update your OP-1 to OS 1.7.3 itself " +
-          "(not a later build) with Teenage Engineering's own update first, then come back to this page.</span>";
-        log("refused: OS " + id.os_version + "; the page for it is ./1.7.0/", "warn");
+        // one refusal for every bootloader: the site served a page for OS 1.7.0 before, and no longer does
+        $("gate").replaceChildren(spanOf("warn", "Your OP-1 runs OS " + id.os_version + ", and this page is for OS 1.7.3 only. Stop here on this OP-1. " +
+          "Update it to OS 1.7.3 or 1.7.3+1 with Teenage Engineering's own update first, then come back to this page. " +
+          "1.7.3+1 comes with a new bootloader, 1000.2.0, that is more locked down and doesn't let your OP-1 go back to an older OS version: " +
+          "updating to it is at your own risk."));
+        log("refused: OS " + id.os_version + "; update to OS 1.7.3 or 1.7.3+1 first", "warn");
       } else {
-        $("gate").innerHTML = "<span class='warn'>" + (blOk ? "OS " + id.os_version + " isn't 1.7.3" : "Bootloader " + (id.bl_version || "?") + " isn't 1000.1.1") +
-          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 only. Stop here on this OP-1.</span>";
+        $("gate").replaceChildren(spanOf("warn", (blOk ? "OS " + id.os_version + " isn't 1.7.3" : "Bootloader " + (id.bl_version || "?") + " isn't 1000.1.1 or 1000.2.0") +
+          ". open-field is made for OS 1.7.3 with bootloader 1000.1.1 or 1000.2.0 only. Stop here on this OP-1."));
         log("refused: not the supported versions", "warn");
       }
     } catch (e) { $("findStatus").textContent = ""; log("couldn't reach your OP-1: " + (e.message || e), "warn"); }
@@ -901,7 +992,18 @@
     session = bootSession();
     try {
       const id = await session.connect();
-      if (!SUPPORTED_BL.includes(id.bl_version || "")) throw new Error("the bootloader answered " + (id.bl_version || "no version") + ", not 1000.1.1");
+      if (!gate || id.serial !== gate.unit) {
+        dropGate();
+        $("gate").replaceChildren(spanOf("warn", "That isn't the OP-1 step 1 found, so nothing was sent to it. Press find my OP-1 again."));
+        return;
+      }
+      // both as step 1 read them, a +0 aside (the OS by the same rule): an unsupported answer differs too
+      if (bootloaderKey(id.bl_version) !== bootloaderKey(gate.bl) || bootloaderKey(id.os_version) !== bootloaderKey(gate.os)) {
+        dropGate();
+        $("gate").replaceChildren(spanOf("warn", "Your OP-1 doesn't answer as it did in step 1, so nothing was sent to it. Press find my OP-1 again."));
+        log("couldn't switch it on: your OP-1 answered bootloader " + (id.bl_version || "no version") + ", OS " + (id.os_version || "no version") + ", not as in step 1", "warn");
+        return;
+      }
       await session.enable();
       await new Promise((r) => setTimeout(r, 500));   // the message on its way out before the port is closed
       log("sent. Reboot your OP-1 with COM held, and 3. dev menu shows", "ok");
@@ -911,13 +1013,18 @@
 
   // ---- step 4: the helper's line, made from this page's own address, with this page's mark and the folder's name ----
   // A browser tells a page a folder's name and never its path: the helper looks for a folder of that name that holds
-  // this page's mark (open-field-helper.ps1), and asks with a folder dialog when it finds none or more than one.
+  // this page's mark, and asks when it finds none or more than one (the .ps1 with a folder dialog, the .py in the terminal).
   const helperUrl = new URL("./open-field-helper.ps1", location.href).href;
+  const pythonHelperUrl = new URL("./open-field-helper.py", location.href).href;
   // inside a single-quoted PowerShell string a quote is written twice; PowerShell takes the curly ones for quotes too
   const psQuoted = (text) => String(text).replace(/['‘’‚‛]/g, (q) => q + q);
+  const shQuoted = (text) => "'" + String(text).replace(/'/g, "'\\''") + "'";        // in sh only the quote itself is special there
+  const pythonLine = (url, mark, name) => "curl -fsSL " + shQuoted(url) + " | python3 -I - --page " + shQuoted(mark) + " --folder-name=" + shQuoted(name);
   function showCommand() {
+    $("readHelper").href = withPython ? pythonHelperUrl : helperUrl;
     $("copy").disabled = !folderHandle;
     $("command").textContent = !folderHandle ? "Pick your folder in step 3 first." :
+      withPython ? pythonLine(pythonHelperUrl, PAGE_ID, folderHandle.name) :
       "$openFieldPage = '" + PAGE_ID + "'; $openFieldFolder = '" + psQuoted(folderHandle.name) + "'; irm '" + helperUrl + "' | iex";
   }
   $("copy").addEventListener("click", async () => {
@@ -983,10 +1090,15 @@
   // checks the mark before it does anything, so that the two cannot work in two different folders.
   async function useFolder(handle) {
     $("folderError").textContent = "";
-    const chosen = browserFolder(handle);
+    if (/\p{Cc}/u.test(handle.name)) {               // a pasted line break runs what follows it: never in a helper's line
+      $("folderError").textContent = "That folder's name has a control character in it, like a line break or a tab. Rename it or choose another folder.";
+      return false;
+    }
+    const chosen = browserFolder(handle), mark = PAGE_ID;
     try { await chosen.writeText(NAMES.page, JSON.stringify({ page: 1, id: PAGE_ID, made: new Date().toISOString() }, null, 1)); }
     catch (e) { $("folderError").textContent = "The page couldn't write into that folder (" + (e.message || e) + "). Pick it again, and let the browser edit its files."; return false; }
-    folderHandle = handle; folder = chosen;
+    if (mark !== PAGE_ID) return useFolder(handle);   // find made a new one meanwhile
+    folderHandle = handle; folder = chosen; forgetRun();
     await keepFolder(handle);
     status("folderName", "ok", "folder: " + handle.name + " ✔");
     show("reuse", false);
@@ -998,7 +1110,7 @@
   }
   window.openFieldUseFolder = useFolder;              // also called by a test, in place of the browser's dialog
   $("choose").addEventListener("click", async () => {
-    if (!window.showDirectoryPicker) { log("This browser can't open a folder for a page. Use Chrome or Edge.", "warn"); return; }
+    if (!window.showDirectoryPicker) { log("This browser can't open a folder for a page. " + (BROWSER_HINT || "Use Chrome or Edge."), "warn"); return; }
     try { await useFolder(await window.showDirectoryPicker({ id: "open-field", mode: "readwrite" })); }
     catch (e) { if (e.name !== "AbortError") log("no folder: " + (e.message || e), "warn"); }
   });
@@ -1042,31 +1154,40 @@
   async function tick() {
     // The helper writes its state beside the file and renames it: a read in between finds no file or half of one. Once
     // a run of this page is known, such a read changes nothing on the page; the next read a second later has it.
+    const from = folder;
     let h;
     try { h = await readHelper(folder); } catch { return; }
+    if (folder !== from) return;                     // another folder was chosen meanwhile
     if (!h && seenRun) return;
     // Only a helper run that carries this page's mark is followed: an earlier run's words stay in the folder until
     // the next run writes over them.
     if (!h || h.page !== PAGE_ID) {
       if (helperNow !== null || ready) { helperNow = null; ready = false; refresh(); }
-      status("helperStatus", "wait", h ? "The folder holds an earlier run of the helper. Run the line of step 4." : "No word from the helper yet. Run the line of step 4.");
+      const waits = gate && h && (h.state === "starting" || h.state === "listed");
+      status("helperStatus", "wait", waits ? OLDER_WAITS : h ? "The folder holds an earlier run of the helper. " + (gate ? "Run the new line of step 4." : "Start again from step 1.") : "No word from the helper yet. Run the line of step 4.");
+      status("putStatus", "", "Waiting for step 5.");
       return;
     }
     seenRun = h.run;
     logHelper(h);
-    if (h.state === "starting") { helperNow = "starting"; status("helperStatus", "wait", "Helper is working…"); refresh(); return; }
+    if (gate?.used && gate.used !== h.run) dropGate();          // one gate, one Ready: the next install starts at step 1
+    if (h.state === "starting") { helperNow = "starting"; status("helperStatus", "wait", "Helper is working…"); status("putStatus", "", "Waiting for step 5."); refresh(); return; }
     if (h.state === "listed") {
       if (planned && planned.run === h.run) { helperNow = "planned"; refresh(); return; }     // our plan is written; the helper picks it up
       helperNow = "listed"; refresh();
+      status("putStatus", "", "Waiting for step 5.");
       await offerPlan(h);
       return;
     }
     // putting, ready or stopped: the run's plan, as this page wrote it (before a reload too)
     let plan;
     try { plan = await readPlan(); } catch { return; }
+    if (folder !== from) return;
     if (!plan || plan.run !== h.run) {
       helperNow = h.state;
-      if (h.state === "stopped") status("helperStatus", "warn", "The helper stopped: " + (h.message || "") + ". Run the line of step 4 again.");
+      if (h.state === "ready") { ready = false; status("putStatus", "warn", gate ? NO_WRITE.differs : NO_WRITE.step1); }
+      else status("putStatus", "", "Waiting for step 5.");
+      if (h.state === "stopped") status("helperStatus", "warn", "The helper stopped: " + (h.message || "") + ". " + (gate ? "Run the line of step 4 again." : "Start again from step 1."));
       refresh();
       return;
     }
@@ -1077,21 +1198,33 @@
     if (h.state === "putting") { helperNow = "putting"; status("putStatus", "wait", "The helper is putting the files on your OP-1…"); refresh(); return; }
     if (h.state === "stopped") {
       helperNow = "stopped-putting";
-      status("putStatus", "warn", "The helper stopped: " + (h.message || "") + ". Its lines are in the log at the bottom of the page. Run the line of step 4 again to start over.");
+      status("putStatus", "warn", "The helper stopped: " + (h.message || "") + ". Its lines are in the log at the bottom of the page. " + (gate ? "Run the line of step 4 again to start over." : "Start again from step 1."));
       refresh();
       return;
     }
     if (h.state === "ready") {
+      const why = !belongs(h) ? NO_WRITE.step1 : !plan.bootloader ? NO_WRITE.updated :
+        plan.bootloader !== bootloaderKey(gate.bl) ? NO_WRITE.other(plan.bootloader, bootloaderKey(gate.bl)) : null;
+      if (why) {
+        helperNow = belongs(h) ? "ready" : null;          // with no gate a run ticks none of the steps
+        ready = false;
+        status("putStatus", "warn", why);
+        refresh();
+        return;
+      }
       if (checkedRun !== h.run) {                       // this page's own check of the helper's last listing, once a run
         let result;
-        try { result = await checkFolder(folder); } catch { return; }
+        const asked = gate;
+        try { result = await checkFolder(folder, { bootloader: asked.bl }); } catch { return; }
+        if (gate !== asked || folder !== from) return;
         checkedRun = h.run; checkedOk = result.ok;
         for (const line of result.lines) log("this page's check: " + line, result.ok ? "" : "warn");
       }
       helperNow = "ready";
       ready = checkedOk;
+      if (ready && gate.used !== h.run) { gate.used = h.run; sessionStorage.setItem(GATE_KEY, JSON.stringify(gate)); }
       if (ready) status("putStatus", "ok big2", "Ready to write. ✔");
-      else status("putStatus", "warn", "The helper says ready, but this page's own check doesn't agree. Don't write. Run the line of step 4 again.");
+      else status("putStatus", "warn", NO_WRITE.differs);
       refresh();
     }
   }
@@ -1126,17 +1259,23 @@
     // a dry run of prepare() on a folder that keeps its writes in memory: what the plan will be, before the owner's press
     const memory = { ...folder, writes: {}, async writeBytes(n, b) { this.writes[n] = b; }, async writeText(n, t) { this.writes[n] = t; } };
     $("planError").textContent = "";
+    if (!belongs(h)) {
+      preview = null; $("go").disabled = true; show("planBox", false);
+      $("planError").textContent = gate ? "" : NO_GATE;
+      return;
+    }
+    const asked = gate;
     try {
-      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack });
-    } catch (e) { preview = null; $("go").disabled = true; $("planError").textContent = "Something's wrong: " + e.message + ". Run the line of step 4 again to start over."; return; }
+      preview = await prepare(memory, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, bootloader: asked.bl });
+      refusePlan(preview.plan, asked, h);
+    } catch (e) { if (gate !== asked) return; preview = null; $("go").disabled = true; $("planError").textContent = "Something's wrong: " + e.message + ". Run the line of step 4 again to start over."; return; }
     const p = preview.plan;
     $("stockName").textContent = keptStock ? NAMES.stock : h.stock.file;
     log("what would be written: " + (p.wayBack ? "your backup of the original firmware, " + p.image.file : "open-field, built with the loader " + (preview.report?.loader?.version ?? "?")) +
       ", " + p.counts.files + " files and " + p.counts.folders + " folders on the disk, " + p.counts.nodeBatches + " and " + p.counts.recordBatches + " batches, " +
       (p.pad ? "the pad file " + p.pad.name + " of " + p.pad.bytes.toLocaleString() + " bytes" : "no pad file") + (p.packs.length ? ", packs: " + p.packs.map((x) => x.name).join(", ") : ""));
     show("planBox");
-    $("go").disabled = !gate;
-    if (!gate) $("planError").textContent = "Step 1 hasn't passed in this tab. On your OP-1 press 2 to close the drive, press find my OP-1 in step 1, then press 2 again to open the drive.";
+    $("go").disabled = false;
   }
   for (const radio of document.querySelectorAll("input[name=what]")) radio.addEventListener("change", async () => {
     $("go").disabled = true; preview = null;
@@ -1164,10 +1303,15 @@
   $("go").addEventListener("click", async () => {
     if (!gate || !preview) return;
     $("go").disabled = true;
+    const asked = gate, into = folder;
     try {
-      const h = await readHelper(folder);
-      if (!h || h.state !== "listed") throw new Error("the helper isn't waiting any more");
-      const done = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack });
+      const h = await readHelper(into);
+      if (!h || h.state !== "listed" || !belongs(h)) throw new Error("the helper isn't waiting any more");
+      const checked = { ...into, async writeText(name, text) {        // the plan is written last, and refused as the preview is
+        if (name === NAMES.plan) refusePlan(JSON.parse(text), asked, h);
+        await into.writeText(name, text);
+      } };
+      const done = await prepare(checked, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, bootloader: asked.bl });
       planned = done.plan;
       for (const c of done.chosen) log(c.name + " put into the folder's packs" + (c.kept ? "; the one there before is kept as " + c.kept : ""));
       if (done.base?.kept) log("the base.pack that was in the folder's packs is kept as " + done.base.kept);
@@ -1175,11 +1319,13 @@
         (planned.pad ? ", with the pad file " + planned.pad.name : ", no pad file") + (done.base ? ", with this page's base.pack" : ""), "ok");
       status("putStatus", "wait", "The helper takes it from here…");
       helperNow = "planned"; refresh();
-    } catch (e) { $("planError").textContent = "Nothing was written: " + e.message; $("go").disabled = false; }
+    } catch (e) { $("planError").textContent = "Nothing was written: " + e.message; $("go").disabled = !gate; }
   });
 
   if (location.hash === "#install") openInstall(false);
-  show("notWindows", !onWindows);
+  // the words only true on another computer are hidden; a browser that is none of the three reads the Windows ones
+  for (const el of document.querySelectorAll("[data-on]")) el.classList.toggle("hidden", el.dataset.on !== computer && (el.dataset.on !== "windows" || withPython));
+  window.openFieldUnitConnected = dropGate;          // the packs section found a unit: step 1's answer isn't this one's
   showCommand();
   restoreGate();
   loadLoader();
@@ -1290,7 +1436,7 @@
 
   async function midiAccess() {
     if (access) return access;
-    if (!navigator.requestMIDIAccess) throw new Error("This browser has no MIDI. Use Chrome or Edge on a computer.");
+    if (!navigator.requestMIDIAccess) throw new Error("This browser has no MIDI. " + (window.openFieldBrowserHint || "Use Chrome or Edge on a computer."));
     try { access = await navigator.requestMIDIAccess({ sysex: true }); }
     catch (e) { throw new Error("The browser didn't give the page MIDI (" + (e && e.name ? e.name : e) + "). Allow it in the browser's prompt or its site settings and try again."); }
     access.onstatechange = onStateChange;
@@ -1364,6 +1510,7 @@
       $("connectSay").textContent = "No OP-1 here. Is it switched on and plugged in? In disk mode it shows up as a drive, not as MIDI, so leave disk mode first. A music program can hold the port too, so close it and try again.";
       return;
     }
+    if (window.openFieldUnitConnected) window.openFieldUnitConnected();
     stopFlag = false;
     client.resume();
     const r = await client.connect();
@@ -1376,7 +1523,7 @@
     if (fw !== FW) {
       setMoment("other");
       $("otherHead").textContent = "this page is for OS " + FW;
-      $("otherWords").textContent = fw === "1.7.0" ? "Your OP-1 runs open-field on OS 1.7.0. The packs list here only works with OS " + FW + ". The page for OS 1.7.0 is kept as it was, and it has no packs list." :
+      $("otherWords").textContent = fw === "1.7.0" ? "Your OP-1 runs open-field on OS 1.7.0, and the packs list here only works with OS " + FW + ". Nothing was changed." :
         "Your OP-1 runs open-field on a firmware this page doesn't know. Nothing was changed.";
       return;
     }
@@ -1558,7 +1705,15 @@
           if (r.state === P.STATE.different) t.append(el("div", "why", r.unit && r.unit.hashError ? "Your OP-1 couldn't read it back." : "Not the listing's v" + entry.version + ". A test build or a friend's, maybe."));
           if (v && v.locked && v.why) t.append(el("div", "why", v.why));
         }
-        t.append(meta, ft);
+        t.append(meta);
+        if (entry.followed) {   // a file taken from its author's branch when the page opened: reviewed only when it is open-field's own
+          const own = isOurs(listing, entry);
+          const mark = el("div", "why", "latest from " + entry.author + "'s " + entry.follow + (own ? "" : " · not reviewed"));
+          mark.title = "This file comes straight from " + entry.author + "'s branch " + entry.follow + " as it stands today" +
+            (own ? ": one of open-field's own packs." : ": nobody at open-field has looked at this version.");
+          t.append(mark);
+        }
+        t.append(ft);
         g.append(t);
       }
     }
@@ -1661,9 +1816,10 @@
         let bytes;
         if (s.kind === "base") bytes = files.basePack.bytes;
         else {
-          $("asksSay").textContent = "Downloading " + s.id + " from its author's repository…";
+          $("asksSay").textContent = (s.entry.followed ? "Taking " : "Downloading ") + s.id + " from its author's repository…";
           const got = await download(s.entry);
-          say("downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
+          say(s.entry.followed ? "took " + got.name + " as the page checked it when it opened, from " + got.from + (listing && isOurs(listing, s.entry) ? "" : ": not reviewed by open-field")
+            : "downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
           bytes = got.bytes;
         }
         sent.push({ name: s.name, data: bytes, sha256: D.hexBytes(s.sha256), id: s.id, version: s.version });
@@ -1739,6 +1895,7 @@
     await guarded(async () => {
       const r = await D.reachDoorAgain(client, { takePorts, setTimer: (fn, ms) => setTimeout(fn, ms), clearTimer: (h) => clearTimeout(h), onSlow: () => { $("backSay").textContent = D.QUIT_BROWSER_WORDS; } });
       if (r.kind === "restarting" || leaving) return;
+      if ((r.kind === "door" || r.kind === "no door") && window.openFieldUnitConnected) window.openFieldUnitConnected();
       if (r.kind !== "door") {
         $("backSay").textContent = r.kind === "no door" ? "Your OP-1 answers, but open-field doesn't. The base didn't start. Look at its start screen." : r.kind === "stopped" ? "Stopped. Press look again." : D.QUIT_BROWSER_WORDS;
         return;

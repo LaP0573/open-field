@@ -783,7 +783,18 @@ struct Op1fMemory {
 // of one (twenty-three characters and the end).
 enum { OP1F_PLACES_MOST = 256, OP1F_PLACE_NAME = 24 };
 
-// Pictures that take a place: what its ask points at; at most one such ask a card. The head's `flags` is 0.
+// From base 31: pictures that give way. The bit of a places ask's head `flags`:
+//   OP1F_PLACES_GIVES_WAY  this ask's pictures give way: a screen is handed one of them only when no pack serves that
+//                          name firmly (from an ask of places without the bit). A screen's picture is served by the
+//                          first pack, in the order of the files' names, that has it and does not give way; only when
+//                          none does, by the first that gives way. A card may carry one firm ask of places and then
+//                          one that gives way, in that order, with no name in both lists. Bases 24 to 30 take the
+//                          first ask of places and stop: they leave the giving-way ask aside with a line on the log,
+//                          the card runs, and its giving-way pictures are not served there
+enum { OP1F_PLACES_GIVES_WAY = 1 };
+
+// Pictures that take a place: what its ask points at; at most one firm such ask a card and, from base 31, one that
+// gives way after it. The head's `flags` is 0, or OP1F_PLACES_GIVES_WAY on the ask that gives way.
 //   count  how many names the list holds, 1 to OP1F_PLACES_MOST
 //   names  the pack's own list of `count` names, constant data in the pack's body, on a word: the names of the unit's
 //          own pictures, as a screen of the unit asks for them (each ending in .svg, zero padded within its
@@ -1532,58 +1543,105 @@ extern "C" int op1f_param_heard(const Op1fCard* card, unsigned ask, unsigned pla
 // The mark of a base of level 10 (a constant 10): a pack that calls op1f_param_heard names it.
 extern "C" const unsigned op1f_level_10 OP1F_NAMED("op1f_level_10");
 
-// Base 31: options. Up to here every word is base 30's; this part only adds behind it, and a pack built for base 30 is
-// not touched by it.
+// Base 32: options. Up to here every word is base 31's; this part only adds behind it, and a pack built for base 31 or
+// earlier is not touched by it.
 //
-// A pack that has things the owner may want on or off (a full-screen drawing, a gesture, a way of working) declares
-// them in one ask of kind OP1F_ASK_OPTIONS, on a card of level 6 or later: up to eight options, each a switch (off or
-// on) or a list of up to eight choices, with the one it starts at. The base keeps the values for the whole unit, in a
-// file of its own (user/pf/.options, a line `<pack>/<option>=<choice>` each), shows every pack's options on one page,
-// and hands the values to the pack: op1f_option(card, i) from any thread, and `changed` when the owner changes one.
-// The page opens from the unit's own settings: the base adds the row "packs" to its list; with that row chosen, a click
-// of any knob opens the page. On the page the first knob moves from option to option, the second knob or a click
-// changes the one chosen, and the help key or T1 leaves.
+// A pack that has things the owner may want to set (a full-screen drawing on or off, a speed, a number of steps)
+// declares them in one ask of kind OP1F_ASK_OPTIONS, on a card of level 6 or later: up to eight options, each a switch
+// (off or on), a list of up to eight words or a number, with the one it starts at, and the place it shows in. The base
+// keeps the values for the whole unit in a file of its own (user/pf/.options, a line `<pack>/<option>=<value>` each),
+// never in the unit's own settings, and hands them to the pack: op1f_option(card, i) from any thread, and `changed` when
+// the owner changes one. A pack with a page of its own (`open`) sets its options from its own page with
+// op1f_option_set(card, i, position).
 //
-// The kind of ask a base 31 knows beside levels 5 to 9's, for a card of level 6 or later. A base that does not know it
-// (base 30) leaves the ask aside, with its line for kinds it does not know, and uses the card: a pack reads its
-// options through op1f_option imported as optional, and takes the first choice of each where the name is 0.
+// Where the owner sees them: in the unit's own settings (shift + COM, then T1), drawn and turned as the unit's own items
+// are (the ochre knob picks a line, the red knob changes it; the names ochre, the chosen one light grey, the values
+// red):
+//   KEYBOARD, SYSTEM, MIDI  an option of that category, after the unit's own lines. The right side shows seven lines in
+//                           all, so KEYBOARD takes four of the packs', SYSTEM one, MIDI two, in the order of the packs'
+//                           file names; an option that finds its category full shows on its pack's page under PACKS
+//                           instead (the log says so)
+//   PACKS                   the row the base adds behind the unit's six: its right side lists the packs that have an
+//                           option on their page or a page of their own (`open`), a name a line. The ochre knob picks a
+//                           pack; its press opens the pack's own page (`open`), or, for a pack without one, shows that
+//                           pack's options in the same right side, where the ochre knob picks and the red knob changes.
+//                           More than seven lines: the seven around the chosen one
+//
+// The kind of ask a base 32 knows beside levels 5 to 9's, for a card of level 6 or later. A base that does not know it
+// (base 31 or earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card: a pack reads its
+// options through op1f_option imported as optional, and takes the first of each where the name is 0.
 //   OP1F_ASK_OPTIONS  the pack's options: what `what` points at is an Op1fOptions
 enum { OP1F_ASK_OPTIONS = 10 };   // not 9: packs out there ask for options as 10, and 9 is proposed for files per tape
 
-// An option's kind, and where its value is kept.
-//   OP1F_OPTION_SWITCH  off (0) or on (1); the page shows OFF and ON
-//   OP1F_OPTION_LIST    one of `count` choices (2 to 8), from 0; the page shows the choice's word
-//   OP1F_OPTION_UNIT    the same value whatever the tape (the only place base 31 keeps)
-//   OP1F_OPTION_TAPE    reserved for a value kept with each tape (level 7's place): base 31 keeps it for the unit
-enum { OP1F_OPTION_SWITCH = 0, OP1F_OPTION_LIST = 1, OP1F_OPTION_UNIT = 0, OP1F_OPTION_TAPE = 1 };
+// An option's kind (Op1fOption.kind).
+//   OP1F_OPTION_SWITCH  off (0) or on (1); shown "off" and "on"; `count` 2
+//   OP1F_OPTION_LIST    one of `count` words (2 to 8), from 0; shown as the word
+//   OP1F_OPTION_NUMBER  a whole number from low to high: low and high are signed bytes (-128 to 127, high above low)
+//                       in choices[0][0] and choices[0][1]; `count` 0; `first` the starting number's distance from low;
+//                       shown as the number
+enum { OP1F_OPTION_SWITCH = 0, OP1F_OPTION_LIST = 1, OP1F_OPTION_NUMBER = 2 };
+// Where it is kept and where it shows (Op1fOption.where, one byte: the first of each list OR the second).
+//   bits 0 to 3, where it is kept: OP1F_OPTION_UNIT the same value whatever the tape (the only place base 32 keeps);
+//     OP1F_OPTION_TAPE reserved for a value kept with each tape: base 32 keeps it for the unit
+//   bits 4 to 7, its category: OP1F_OPTION_IN_PACKS its pack's page under PACKS, OP1F_OPTION_IN_KEYBOARD,
+//     OP1F_OPTION_IN_SYSTEM, OP1F_OPTION_IN_MIDI after the unit's own lines there. A category base 32 does not know
+//     shows under PACKS
+enum { OP1F_OPTION_UNIT = 0, OP1F_OPTION_TAPE = 1, OP1F_OPTION_KEPT = 0x0f,
+       OP1F_OPTION_IN_PACKS = 0x00, OP1F_OPTION_IN_KEYBOARD = 0x10, OP1F_OPTION_IN_SYSTEM = 0x20, OP1F_OPTION_IN_MIDI = 0x30,
+       OP1F_OPTION_CATEGORY = 0xf0 };
 enum { OP1F_OPTIONS_MOST = 8, OP1F_CHOICES_MOST = 8, OP1F_OPTION_NAME = 16, OP1F_CHOICE_NAME = 8 };
+// The two sizes of the table: without `open` (the first packs that asked for options) and with it.
+enum { OP1F_OPTIONS_BYTES_FIRST = 708, OP1F_OPTIONS_BYTES = 712 };
 
-// One option: its name (1 to 15 plain characters, shown as they are), its kind, how many choices (2 for a switch), the
-// choice it starts at, where it is kept, and for a list the words of its choices (1 to 7 plain characters each).
+// One option: its name (1 to 15 characters, zero padded; the unit shows it in its own capitals), its kind, how many
+// choices (2 for a switch, 2 to 8 for a list, 0 for a number), the one it starts at, where it is kept and shows, and
+// for a list the words of its choices (1 to 7 characters each), for a number its low and high.
 struct Op1fOption {
     char name[OP1F_OPTION_NAME];                        // +0
     unsigned char kind, count, first, where;            // +16
-    char choices[OP1F_CHOICES_MOST][OP1F_CHOICE_NAME];  // +20, a switch's are zeros
+    char choices[OP1F_CHOICES_MOST][OP1F_CHOICE_NAME];  // +20: a list's words; a number's low and high; a switch's zeros
 };   // 84 bytes
 
-// The options: what its ask points at; one such ask a card. The head's `flags` is 0 and its `shown` 0.
+// The options: what its ask points at; one such ask a card, its `bytes` OP1F_OPTIONS_BYTES (or
+// OP1F_OPTIONS_BYTES_FIRST: no `open`). The head's `flags` is 0 and its `shown` 0.
 //   changed  called on the display thread, outside the pack's frame function, before the frame functions of the frame
-//            after the owner changed option `option` to `value` on the page. Like level 7's `changed`, it notes what it
-//            is told and does no more. 0 for none: op1f_option answers the new value from then on either way
+//            after the owner changed option `option`; `value` is what op1f_option answers for it from then on (a
+//            position: a number's distance from its low). Like level 7's `changed`, it notes what it is told and
+//            does no more. Not called for a value the pack set itself (op1f_option_set). 0 for none
 //   count    how many options follow, 1 to OP1F_OPTIONS_MOST
+//   open     0, or the pack's own page of settings: called on the display thread, outside the pack's frame function,
+//            before the frame functions of the frame after the owner pressed the ochre knob on the pack's name under
+//            PACKS; the pack opens its page then (op1f_page_open) and closes it when it is done. With `open`, the base
+//            shows none of the pack's options under PACKS: the page is the pack's, and it sets them with
+//            op1f_option_set. Its options of KEYBOARD, SYSTEM and MIDI show there as ever
+// The base leaves the ask aside, with a line, when an option is not in order (a kind it does not know, a count or a
+// first outside its kind's, a name not 1 to 15 characters) or `changed` or `open` is not a function of the pack.
 struct Op1fOptions {
     Op1fKindHead head;                                  // +0
     void (*changed)(unsigned option, unsigned value);   // +28
     unsigned count;                                     // +32
     Op1fOption options[OP1F_OPTIONS_MOST];              // +36
-};   // 708 bytes in base 31
-static_assert(sizeof(Op1fOption) == 84 && sizeof(Op1fOptions) == 708 && OP1F_PLACE_IN(Op1fOptions, options) == 36,
-              "the table of options is 708 bytes");
+    void (*open)();                                     // +708: in a table of OP1F_OPTIONS_BYTES only
+};   // 712 bytes
+static_assert(sizeof(Op1fOption) == 84 && sizeof(Op1fOptions) == (unsigned)OP1F_OPTIONS_BYTES &&
+              OP1F_PLACE_IN(Op1fOptions, options) == 36 && OP1F_PLACE_IN(Op1fOptions, open) == (unsigned)OP1F_OPTIONS_BYTES_FIRST,
+              "the table of options is 712 bytes, `open` at +708");
 
-// The value of the card's option `option` (from 0, in the ask's order): 0 to its count - 1. Before the base has read its
-// file it answers the option's `first`; for a card with no such ask, or an option it does not list, OP1F_BAD_NAME.
-// From any thread: it reads one byte.
+// The value of the card's option `option` (from 0, in the ask's order) as a position, 0 to 255 for every kind and never
+// below 0 for a real option: a switch 0 or 1, a list its word's number from 0, a number its distance from its low (the
+// pack adds its own low: the number is low + the position). Before the base has read its file it answers the option's
+// start (`first`); for a card the base does not use, a card with no such ask (or one left aside), or an option it does
+// not list, OP1F_BAD_NAME. From any thread: it reads one byte.
 extern "C" int op1f_option(const Op1fCard* card, unsigned option) OP1F_NAMED("op1f_option");
+
+// Sets the card's option `option` to `value`, a position as op1f_option answers it (a number's distance from its low).
+// A pack with `open` sets its options from its own page with it: the base shows none of them under PACKS. From the
+// pack's own frame function only (the display thread): elsewhere OP1F_NOT_NOW. A card the base does not use, a card
+// with no such ask (or one left aside), an option it does not list, or a value past the option's last (a switch 1, a
+// list its count - 1, a number high - low): OP1F_BAD_NAME. Else 0: the value is kept, the base's file written as after
+// a change in the settings (about a second and a half later), a line of the settings that shows it written again;
+// `changed` is not called (the pack set it).
+extern "C" int op1f_option_set(const Op1fCard* card, unsigned option, unsigned value) OP1F_NAMED("op1f_option_set");
 
 // The mark of a base that carries out an ask of kind OP1F_ASK_OPTIONS (a constant 1).
 extern "C" const unsigned op1f_options_1 OP1F_NAMED("op1f_options_1");

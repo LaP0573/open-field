@@ -5,7 +5,7 @@
 // And plays the page's part on a folder the Windows helper works in, so that the helper can be run whole without a
 // unit and without a browser (open-field-helper.ps1 -Source <a folder standing for the unit's disk> -Folder <folder>):
 //
-//   node builder/validate-install.mjs --play <folder> --stock <your own os.ldr>
+//   node builder/validate-install.mjs --play <folder> --stock <your own os.ldr> --bootloader <version>
 //
 // --play waits for the helper to list the disk, builds the new firmware file with the same code as the page
 // (patch.mjs, the manifest loader.json and the loader's file beside this file), makes and writes the plan with the same
@@ -13,16 +13,19 @@
 // waits for the helper to finish, and holds its last listing against the plan with the placement model. Exit 0: the
 // helper said ready and the page's check agrees. With --way-back it plays the page's second choice: the owner's own
 // original file written back, nothing built and no pack file copied.
+// --bootloader is required (1000.1.1 or 1000.2.0): it stands for what the page reads from the unit. The other helper
+// is played the same way: open-field-helper.py --source <that folder> --folder <folder>.
 import { readFileSync, writeFileSync, readdirSync, renameSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { crc32 } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   NAMES, PACK_FOLDER, makePlan, checkAfter, compareListings, normalRows, padBytes, padName, packOrder, packNameProblem,
-  prepare, readHelper, checkFolder, sha256,
+  prepare, readHelper, readPacks, checkFolder, sha256,
 } from "./install.mjs";
-import { analyzeListing, fileTnodes } from "./placement.mjs";
-import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download } from "./catalog.mjs";
+import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
+import { RAW, NOTICE, readListing, rawLink, isOurs, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
@@ -68,6 +71,9 @@ function memoryFolder(files = {}) {
   };
 }
 
+// The bootloader the checks made before 1000.2.0 was known are for.
+const BL = Object.freeze({ bootloader: "1000.1.1" });
+
 let checks = 0, fails = 0;
 function check(what, ok, detail = "") {
   checks++;
@@ -99,6 +105,41 @@ function volume({ files = 40, tapeBytes = 30_000_000, osLdr = null, pk = false, 
 // A tiny repeatable random source, so a failing case can be found again.
 function random(seed) { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; }
 
+// A pack file of format 3 as tools/pack_build.py writes one, made here for the checks of a followed entry: a header of
+// 96 bytes, a body of 256 (one entry in its table, a card of level 3 at 64, its list of one folder at 128), the lists
+// (works: [name, needed], wants: [name, needed], offers: [name]) and nothing behind. `spoil` changes the bytes after.
+const LINK = 0x8d2f36cc;
+function packFile({ name = "veff", version = 2, osId = 0x1aeb34d1, works = [["helper", true]], wants = [["op1f_level_3", true]], offers = [],
+  folder = ["notes", "notes"], lists = null, cardPlace = 64, spoil = null } = {}) {
+  const text = (s, n) => { const b = new Uint8Array(n); b.set(new TextEncoder().encode(s).subarray(0, n)); return b; };
+  const body = new Uint8Array(256), bv = new DataView(body.buffer);
+  [0x44524143, 56, 3, version].forEach((w, n) => bv.setUint32(64 + 4 * n, w, true));
+  body.set(text(name, 16), 80);
+  bv.setUint32(112, LINK + 128, true); bv.setUint32(116, 1, true);                  // the card's folders: their address as linked, their count
+  body.set(text(folder[0], 16), 128); body.set(text(folder[1], 16), 144); bv.setUint32(160, 1, true);
+  if (!lists) {
+    const strings = [], at = (s) => { const before = strings.reduce((n, x) => n + x.length + 1, 0); strings.push(s); return before; };
+    const words = [works.length, offers.length, wants.length, 0, 0, 0];
+    const rows = [...works.flatMap(([w, needed]) => [at(w), 1, needed ? 1 : 0]), ...offers.flatMap((o) => [at(o), 0]), ...wants.flatMap(([w, needed]) => [at(w), needed ? 1 : 0])];
+    let bytes = new TextEncoder().encode(strings.map((s) => s + "\0").join(""));
+    bytes = Uint8Array.from([...bytes, ...new Uint8Array((4 - (bytes.length % 4)) % 4)]);
+    words[5] = bytes.length;
+    lists = new Uint8Array(4 * (words.length + rows.length) + bytes.length);
+    const lv = new DataView(lists.buffer);
+    [...words, ...rows].forEach((w, n) => lv.setUint32(4 * n, w, true));
+    lists.set(bytes, 4 * (words.length + rows.length));
+  }
+  const out = new Uint8Array(96 + body.length + lists.length), hv = new DataView(out.buffer);
+  out.set(new TextEncoder().encode("OP1FPACK"));
+  [3, 96, osId, LINK, body.length, body.length, 0].forEach((w, n) => hv.setUint32(8 + 4 * n, w, true));
+  hv.setUint32(36, crc32(Uint8Array.from([...body, ...lists])), true);
+  out.set(text(name, 16), 40);
+  [LINK, LINK + 20, lists.length, 0, version, 1, 4, 0, 0, cardPlace].forEach((w, n) => hv.setUint32(56 + 4 * n, w, true));
+  out.set(body, 96); out.set(lists, 96 + body.length);
+  if (spoil) spoil(out, hv);
+  return out;
+}
+
 async function selfChecks() {
   // listings
   const a = volume(), b = [...volume()].reverse();
@@ -129,12 +170,12 @@ async function selfChecks() {
   for (const osLdr of [null, 2096456, IMAGE_BYTES]) {
     for (let files = 0; files < 60; files += 25) {
       const rows = volume({ files, osLdr });
-      const plan = makePlan({ run: "r", listing: rows, image });
+      const plan = makePlan({ ...BL, run: "r", listing: rows, image });
       const top = plan.expected.filter((r) => r.path === "os.ldr");
       check("the plan has one os.ldr at the top, of the image's size", top.length === 1 && top[0].size === IMAGE_BYTES);
-      const v = analyzeListing(plan.expected);
+      const v = analyzeListing(plan.expected, BL);
       check("every plan's listing lands the write and is off a batch edge", v.current.pass && !v.onEdge, files + " files, os.ldr " + osLdr);
-      const without = analyzeListing(rows, { imageBytes: IMAGE_BYTES });
+      const without = analyzeListing(rows, { ...BL, imageBytes: IMAGE_BYTES });
       check("a pad file is planned exactly when the disk with the image would not land", (plan.pad !== null) === (!without.current.pass || without.onEdge));
       check("the plan says whether os.ldr is replaced", plan.image.replaces === (osLdr !== null));
       if (plan.pad) check("the pad file's row is in the plan", plan.expected.some((r) => r.path === plan.pad.name && r.size === plan.pad.bytes));
@@ -147,8 +188,8 @@ async function selfChecks() {
   let padded = 0;
   for (let n = 0; n < 40; n++) {
     const rows = volume({ files: Math.floor(rnd() * 1500), tapeBytes: Math.floor(rnd() * 400_000_000), osLdr: rnd() < 0.5 ? null : 2096456 });
-    const plan = makePlan({ run: "r", listing: rows, image });
-    const v = analyzeListing(plan.expected);
+    const plan = makePlan({ ...BL, run: "r", listing: rows, image });
+    const v = analyzeListing(plan.expected, BL);
     if (plan.pad) padded++;
     check("a random volume's plan lands", v.current.pass && !v.onEdge, "case " + n);
     const c2 = checkAfter(plan, plan.expected);
@@ -158,24 +199,24 @@ async function selfChecks() {
 
   // pack files in the plan
   const packs = [{ name: "base.pack", bytes: 93596, sha256: "b".repeat(64) }, { name: "8 tracks.pack", bytes: 99476, sha256: "8".repeat(64) }];
-  const p1 = makePlan({ run: "r", listing: volume(), image, packs });
+  const p1 = makePlan({ ...BL, run: "r", listing: volume(), image, packs });
   check("the pack folder is made when it is not there", p1.makeFolder === PACK_FOLDER && p1.expected.some((r) => r.path === PACK_FOLDER && r.dir));
   check("the packs are copied base.pack last", p1.packs.map((p) => p.name).join("|") === "8 tracks.pack|base.pack");
   check("each pack's row is in the plan", p1.packs.every((p) => p.expected === undefined && p1.expected.some((r) => r.path === "user/pk/" + p.name && r.size === p.bytes)));
-  const p2 = makePlan({ run: "r", listing: volume({ pk: true, extra: [{ path: "user/pk/base.pack", size: 87452, dir: false }] }), image, packs });
+  const p2 = makePlan({ ...BL, run: "r", listing: volume({ pk: true, extra: [{ path: "user/pk/base.pack", size: 87452, dir: false }] }), image, packs });
   check("the pack folder is not made again", p2.makeFolder === null);
   check("a pack that is there is replaced, its row the new size", p2.packs.find((p) => p.name === "base.pack").replaces &&
     p2.expected.filter((r) => r.path === "user/pk/base.pack").length === 1 && p2.expected.find((r) => r.path === "user/pk/base.pack").size === 93596);
-  check("the packs are counted in the placement", analyzeListing(p1.expected).counts.files === volume().filter((r) => !r.dir && r.path !== "lost+found").length + 1 + (p1.pad ? 1 : 0) + 2);
+  check("the packs are counted in the placement", analyzeListing(p1.expected, BL).counts.files === volume().filter((r) => !r.dir && r.path !== "lost+found").length + 1 + (p1.pad ? 1 : 0) + 2);
 
   // refusals
-  throws("a folder named os.ldr is refused", () => makePlan({ run: "r", listing: volume({ extra: [{ path: "os.ldr", dir: true }] }), image }), /folder named os\.ldr/);
-  throws("packs with no user folder are refused", () => makePlan({ run: "r", listing: volume().filter((r) => r.path !== "user"), image, packs }), /no folder user/);
-  throws("a pack whose name does not end in .pack is refused", () => makePlan({ run: "r", listing: volume(), image, packs: [{ name: "x.bin", bytes: 1, sha256: "" }] }), /\.pack/);
-  throws("a plan needs the helper's run", () => makePlan({ listing: volume(), image }), /run/);
+  throws("a folder named os.ldr is refused", () => makePlan({ ...BL, run: "r", listing: volume({ extra: [{ path: "os.ldr", dir: true }] }), image }), /folder named os\.ldr/);
+  throws("packs with no user folder are refused", () => makePlan({ ...BL, run: "r", listing: volume().filter((r) => r.path !== "user"), image, packs }), /no folder user/);
+  throws("a pack whose name does not end in .pack is refused", () => makePlan({ ...BL, run: "r", listing: volume(), image, packs: [{ name: "x.bin", bytes: 1, sha256: "" }] }), /\.pack/);
+  throws("a plan needs the helper's run", () => makePlan({ ...BL, listing: volume(), image }), /run/);
 
   // the check after: a missing, an added, a resized row
-  const plan = makePlan({ run: "r", listing: volume(), image });
+  const plan = makePlan({ ...BL, run: "r", listing: volume(), image });
   const bad = plan.expected.filter((r) => r.path !== "os.ldr");
   const c3 = checkAfter(plan, bad);
   check("a missing os.ldr fails the check after, and is named", !c3.ok && c3.lines.some((l) => l.includes("planned and not on the unit: F os.ldr")), c3.lines.join("; "));
@@ -195,7 +236,7 @@ async function selfChecks() {
   });
   const fakeImage = new Uint8Array(IMAGE_BYTES).fill(7);
   let given = null;
-  const { plan: made } = await prepare(folder, { build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
+  const { plan: made } = await prepare(folder, { ...BL, build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
   check("the build is given the owner's file from the folder", given && given.length === 4);
   check("the plan is for the helper's run", made.run === "2026-11-18_20-00-00");
   check("the plan names the listing it was made from by its SHA-256", made.before.sha256 === await sha256(new TextEncoder().encode(listingText)));
@@ -212,12 +253,12 @@ async function selfChecks() {
     [NAMES.packs + "/base.pack"]: new Uint8Array(93596),
   });
   let built = false;
-  const { plan: wayBack } = await prepare(back, { build: async () => { built = true; return { image: fakeImage }; }, wayBack: true });
+  const { plan: wayBack } = await prepare(back, { ...BL, build: async () => { built = true; return { image: fakeImage }; }, wayBack: true });
   check("the way back builds nothing", !built);
   check("the way back writes the owner's own file as os.ldr", wayBack.wayBack === true && wayBack.image.file === NAMES.stock && wayBack.image.bytes === STOCK_BYTES &&
     wayBack.expected.some((r) => r.path === "os.ldr" && r.size === STOCK_BYTES));
   check("the way back writes no new firmware file and copies no pack", !back.writes.includes(NAMES.image) && wayBack.packs.length === 0);
-  check("the way back's plan lands", analyzeListing(wayBack.expected).current.pass);
+  check("the way back's plan lands", analyzeListing(wayBack.expected, BL).current.pass);
   // base.pack, which comes with the page (2026-11-18, the owner's word: "base.pack is part of open-field"): put into
   // the folder's packs, counted in the placement, copied last; one of other bytes kept in the folder's replaced first;
   // the way back adds none
@@ -227,32 +268,32 @@ async function selfChecks() {
     [NAMES.helper]: JSON.stringify({ helper: 1, run, state: "listed", stock: { file: NAMES.stock } }), [NAMES.before]: listingText, [NAMES.stock]: stock, ...more });
   const stand = async () => ({ image: fakeImage, report: { loader: { version: "test" } } });
   const fresh = listed("base-1", { [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
-  const r1 = await prepare(fresh, { build: stand, base });
+  const r1 = await prepare(fresh, { ...BL, build: stand, base });
   check("the page's base.pack goes into the folder's packs", r1.base.state === "added" && (await sha256(fresh.store.get(NAMES.packs + "/base.pack"))) === base.sha256);
   check("the page's base.pack is in the plan, last, with its size and SHA-256", r1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|base.pack" &&
     r1.plan.packs[1].bytes === 107492 && r1.plan.packs[1].sha256 === base.sha256 && r1.plan.packs[1].file === NAMES.packs + "/base.pack");
   check("the page's base.pack is counted in the placement", r1.plan.expected.some((r) => r.path === "user/pk/base.pack" && r.size === 107492) &&
-    analyzeListing(r1.plan.expected).current.pass);
+    analyzeListing(r1.plan.expected, BL).current.pass);
   check("base.pack is written before the plan, and the plan last", fresh.writes.includes(NAMES.packs + "/base.pack") &&
     fresh.writes.indexOf(NAMES.packs + "/base.pack") < fresh.writes.indexOf(NAMES.plan) && fresh.writes[fresh.writes.length - 1] === NAMES.plan, fresh.writes.join(", "));
   check("the plan says where its base.pack came from", r1.plan.base?.from === "the page" && r1.plan.base.in_folder === "added" && r1.plan.base.kept === null);
   const same = listed("base-2", { [NAMES.packs + "/base.pack"]: pageBase });
-  const r2 = await prepare(same, { build: stand, base });
+  const r2 = await prepare(same, { ...BL, build: stand, base });
   check("a base.pack of the same bytes is left as it is", r2.base.state === "same" && !same.writes.includes(NAMES.packs + "/base.pack") &&
     !same.writes.some((w) => w.startsWith(NAMES.replaced + "/")) && r2.plan.packs.length === 1 && r2.plan.packs[0].sha256 === base.sha256);
   const older = new Uint8Array(93596).fill(3);
   const olderSha = await sha256(older);
   const other = listed("base-3", { [NAMES.packs + "/base.pack"]: older, [NAMES.packs + "/lfo.pack"]: new Uint8Array(375422).fill(4) });
-  const r3 = await prepare(other, { build: stand, base });
+  const r3 = await prepare(other, { ...BL, build: stand, base });
   check("a base.pack of other bytes is kept in the folder's replaced first", r3.base.state === "replaced" && r3.base.kept === NAMES.replaced + "/base-" + olderSha.slice(0, 12) + ".pack" &&
     (await sha256(other.store.get(r3.base.kept))) === olderSha && other.writes.indexOf(r3.base.kept) < other.writes.indexOf(NAMES.packs + "/base.pack"), JSON.stringify(r3.base));
   check("and the page's takes its place, once and last", (await sha256(other.store.get(NAMES.packs + "/base.pack"))) === base.sha256 &&
     r3.plan.packs.map((p) => p.name).join("|") === "lfo.pack|base.pack" && r3.plan.packs[1].sha256 === base.sha256 && r3.plan.base.kept === r3.base.kept);
   const back2 = listed("base-4", { [NAMES.packs + "/base.pack"]: older });
-  const r4 = await prepare(back2, { build: stand, wayBack: true, base });
+  const r4 = await prepare(back2, { ...BL, build: stand, wayBack: true, base });
   check("the way back adds no pack, not even the page's base.pack", r4.plan.packs.length === 0 && r4.base === null && !r4.plan.base &&
     !back2.writes.some((w) => w.startsWith(NAMES.packs + "/") || w.startsWith(NAMES.replaced + "/")), back2.writes.join(", "));
-  await prepare(listed("base-5"), { build: stand, base: { bytes: pageBase, sha256: "0".repeat(64) } }).then(() => check("a base.pack that is not the file it names is refused", false),
+  await prepare(listed("base-5"), { ...BL, build: stand, base: { bytes: pageBase, sha256: "0".repeat(64) } }).then(() => check("a base.pack that is not the file it names is refused", false),
     (e) => check("a base.pack that is not the file it names is refused", /not the file it names/.test(e.message), e.message));
   // the page's own base.pack, beside this file: the one base-pack.json names
   const own = pageOwnBase();
@@ -266,11 +307,11 @@ async function selfChecks() {
   const wink = { name: "wink.pack", bytes: winkBytes, sha256: await sha256(winkBytes), from: null };
   const oldLfo = new Uint8Array(375418).fill(13), oldLfoSha = await sha256(oldLfo);
   const withTicks = listed("tick-1", { [NAMES.packs + "/lfo.pack"]: oldLfo, [NAMES.packs + "/wink.pack"]: winkBytes, [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
-  const t1 = await prepare(withTicks, { build: stand, base, chosen: [lfo, wink] });
+  const t1 = await prepare(withTicks, { ...BL, build: stand, base, chosen: [lfo, wink] });
   check("ticked packs are in the plan with the folder's own, base.pack last", t1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|lfo.pack|wink.pack|base.pack",
     t1.plan.packs.map((p) => p.name).join("|"));
   check("a ticked pack is counted in the placement with its own size", t1.plan.expected.some((r) => r.path === "user/pk/lfo.pack" && r.size === 375422) &&
-    analyzeListing(t1.plan.expected).current.pass);
+    analyzeListing(t1.plan.expected, BL).current.pass);
   check("a ticked pack of other bytes than the folder's is put in its place, the old one kept in replaced first",
     (await sha256(withTicks.store.get(NAMES.packs + "/lfo.pack"))) === lfo.sha256 &&
     (await sha256(withTicks.store.get(NAMES.replaced + "/lfo-" + oldLfoSha.slice(0, 12) + ".pack"))) === oldLfoSha &&
@@ -281,14 +322,14 @@ async function selfChecks() {
     withTicks.writes[withTicks.writes.length - 1] === NAMES.plan, withTicks.writes.join(", "));
   check("the plan says where each ticked pack came from", t1.plan.chosen?.length === 2 && t1.plan.chosen[0].from === lfo.from && t1.plan.chosen[0].in_folder === "replaced");
   const tickBack = listed("tick-2");
-  const t2 = await prepare(tickBack, { build: stand, base, chosen: [lfo], wayBack: true });
+  const t2 = await prepare(tickBack, { ...BL, build: stand, base, chosen: [lfo], wayBack: true });
   check("the way back puts no ticked pack on", t2.plan.packs.length === 0 && !t2.plan.chosen && !tickBack.writes.some((w) => w.startsWith(NAMES.packs + "/")));
   for (const [what, chosen, words] of [
     ["a ticked pack that is not its file is refused", [{ ...lfo, sha256: "0".repeat(64) }], /not the file the listing names/],
     ["base.pack is never ticked", [{ ...lfo, name: "base.pack" }], /never ticked/],
     ["two ticked packs of one name are refused", [lfo, { ...lfo }], /two ticked packs/],
     ["a ticked pack with a name the unit cannot hold is refused", [{ ...lfo, name: "a/b.pack" }], /cannot be copied/],
-  ]) await prepare(listed("tick-x"), { build: stand, base, chosen }).then(() => check(what, false), (e) => check(what, words.test(e.message), e.message));
+  ]) await prepare(listed("tick-x"), { ...BL, build: stand, base, chosen }).then(() => check(what, false), (e) => check(what, words.test(e.message), e.message));
 
   // the listing as the page reads it (catalog.mjs), and the download of a ticked pack held to its entry
   const COMMIT = "0123456789abcdef0123456789abcdef01234567";
@@ -330,10 +371,173 @@ async function selfChecks() {
     ["a download that fails is refused", async () => { throw new Error("offline"); }, /could not be downloaded \(offline\)/],
   ]) await download(good, get).then(() => check(what, false), (e) => check(what, words.test(e.message) && e.message.startsWith("one: "), e.message));
 
+  // an entry that follows a branch of its author's repository: its file read and held to the entry when the page opens
+  const followed = (more = {}) => ({ id: "veff", author: "someone", status: "listed", categories: ["tools"], description: "A followed pack.",
+    repository: "https://github.com/someone/veff", follow: "main", path: "veff.pack", version: 2, firmware: "1.7.3", needs: ["helper"],
+    folders: [{ name: "notes", place: "notes" }], ...more });
+  const fileOf = packFile();
+  const facts = packFacts(fileOf);
+  check("a pack file's facts are read as pack_build reads them", facts.name === "veff" && facts.version === 2 && facts.firmware === "1.7.3" && facts.places === 1 &&
+    facts.needs.join() === "helper" && facts.level === 3 && facts.offersLevel === null && facts.card === 3 && JSON.stringify(facts.folders) === '[{"name":"notes","place":"notes"}]', JSON.stringify(facts));
+  const offersFacts = packFacts(packFile({ works: [["helper", false]], wants: [["op1f_level_9", false]], offers: ["op1f_level_4", "op1f_level_12", "op1f_other"] }));
+  check("only needed packs and needed levels count, and the highest level offered is read", offersFacts.needs.length === 0 && offersFacts.level === null && offersFacts.offersLevel === 12, JSON.stringify(offersFacts));
+  check("a followed entry's link is its branch's head, refs/heads, each part encoded", rawLink(followed({ path: "build/v eff.pack", follow: "dev-1.x" })) === RAW + "someone/veff/refs/heads/dev-1.x/build/v%20eff.pack");
+  for (const branch of ["", ".hidden", "-x", "a..b", "ends.", "x.lock", "a/b", "a".repeat(101), 5]) throws("a branch named " + JSON.stringify(branch) + " is refused", () => rawLink(followed({ follow: branch })), /not a branch's name/);
+  check("checkFollowed takes the file that is its entry's", checkFollowed(followed(), fileOf, 5).version === 2);
+  const big = new Uint8Array(2 * 1024 * 1024 + 1);
+  big.set(fileOf);
+  for (const [what, bytes, words, entryMore = {}, level = 5] of [
+    ["1: a followed file larger than 2 MB is refused", big, /2,097,153 bytes, more than the 2,097,152/],
+    ["2: a followed file that is no pack is refused", Uint8Array.from([...fileOf.subarray(0, 96)].map((b, n) => (n < 8 ? 0x41 : b))), /it is not a pack file/],
+    ["2: a followed file of another format is refused", packFile({ spoil: (b, v) => v.setUint32(8, 2, true) }), /not a pack of format 3/],
+    ["2: a followed file whose header's sizes are not its own is refused", Uint8Array.from([...fileOf, 0, 0, 0, 0]), new RegExp("sizes do not add up to the file's " + (fileOf.length + 4) + " bytes")],
+    ["2: a followed file whose CRC-32 is not its header's is refused", packFile({ spoil: (b) => { b[96 + 4] ^= 1; } }), /CRC-32 of its body and lists is not its header's/],
+    ["2: a followed file whose lists cannot be read is refused", packFile({ lists: new Uint8Array(28) }), /its lists cannot be read: their counts do not fit/],
+    ["2: a followed file whose card does not stand where its header says is refused", packFile({ cardPlace: 68 }), /its card does not stand where its header says/],
+    ["3: a followed file of another name is refused", packFile({ name: "other" }), /its name is "other", the listing's id is "veff"/],
+    ["4: a followed file for another firmware is refused", packFile({ osId: 0xd67577f9 }), /built for OS 1\.7\.0, the listing says 1\.7\.3/],
+    ["4: a followed file for a firmware the page does not know is refused", packFile({ osId: 0x12345678 }), /a firmware the page does not know \(0x12345678\)/],
+    ["5: a followed file older than the listing's version is refused", packFile({ version: 1 }), /its version is 1, the listing takes 2 or higher/],
+    ["6: a followed file that needs a pack the entry does not name is refused", packFile({ works: [["helper", true], ["stranger", true]] }), /needs the pack "stranger", which the listing's needs do not name/],
+    ["7: a followed file that needs a later base than the listing's is refused", fileOf, /needs level 3 of the base, and the listing's base offers 2/, {}, 2],
+    ["8: a followed file whose card asks for a folder the entry does not name is refused", packFile({ folder: ["notes", "elsewhere"] }), /asks for the folder "notes" in "elsewhere", which the listing's folders do not name/],
+  ]) throws(what, () => checkFollowed(followed(entryMore), bytes, level), new RegExp("^veff: its file on someone's branch main is refused: .*" + words.source));
+  // the resolver: the listing's data with its followed entries taken, and the refused ones named
+  const served = new Map([[RAW + "someone/veff/refs/heads/main/veff.pack", fileOf], [RAW + "someone/old/refs/heads/main/old.pack", packFile({ name: "old", version: 1 })]]);
+  const calls = [];
+  const host = async (url, options) => { calls.push({ url, options }); const b = served.get(url); return { ok: !!b, status: b ? 200 : 404, arrayBuffer: async () => (b ? b.buffer.slice(b.byteOffset, b.byteOffset + b.length) : new ArrayBuffer(0)) }; };
+  const withFollowed = { ...data, packs: [{ id: "base", author: "open-field", status: "bundled", categories: ["tools"], description: "The base.", path: "builder/base.pack", firmware: "1.7.3", offers_level: 5 },
+    entry("one"), followed(), followed({ id: "old", repository: "https://github.com/someone/old", path: "old.pack" }),
+    followed({ id: "gone", repository: "https://github.com/someone/gone", path: "gone.pack" }), followed({ id: "pinned too", commit: COMMIT }),
+    followed({ id: "other os", firmware: "1.7.0" })] };
+  const taken = await resolveFollowed(withFollowed, "1.7.3", host);
+  const veff = taken.data.packs.find((e) => e.id === "veff");
+  check("a followed file that passes is resolved with the file's facts and kept", veff.followed === true && veff.sha256 === (await sha256(fileOf)) && veff.bytes === fileOf.length &&
+    veff.version === 2 && veff.places === 1 && veff.level === 3 && veff.kept instanceof Uint8Array && veff.kept.length === fileOf.length, JSON.stringify({ ...veff, kept: undefined }));
+  check("each followed file of the unit's firmware is downloaded once, with no cookie and no redirect", calls.length === 3 && new Set(calls.map((c) => c.url)).size === 3 &&
+    calls.every((c) => c.options.credentials === "omit" && c.options.redirect === "error"), calls.map((c) => c.url).join(" "));
+  check("the resolver names each refused followed file, in plain words", taken.problems.length === 3 &&
+    taken.problems[0] === "old: its file on someone's branch main is refused: its version is 1, the listing takes 2 or higher" &&
+    /^gone: its file on someone's branch main is refused: the download answered 404/.test(taken.problems[1]) && /^pinned too: .*names its commit/.test(taken.problems[2]), taken.problems.join("; "));
+  check("the listing's own data is left as it was", withFollowed.packs[2].sha256 === undefined && withFollowed.packs[2].kept === undefined);
+  const after = readListing(taken.data, "1.7.3");
+  check("a resolved followed entry is offered, the refused ones left out", [...after.offered.keys()].join("|") === "one|veff" && after.otherFirmware === 1, [...after.offered.keys()].join("|"));
+  check("readListing names each followed entry it leaves out", after.problems.length === 3 && after.problems.some((p) => /^old: its file on someone's branch main was not read and checked/.test(p)) &&
+    ["old", "gone", "pinned too"].every((id) => after.problems.some((p) => p.startsWith(id + ": its file on someone's branch main was not read and checked"))), after.problems.join("; "));
+  const unread = readListing(withFollowed, "1.7.3");
+  check("a followed entry not resolved is left out of the listing, with its problem", !unread.offered.has("veff") && unread.problems.some((p) => p === "veff: its file on someone's branch main was not read and checked when the page opened, left out"), unread.problems.join("; "));
+  check("a followed entry with kept bytes the listing gave is not taken as resolved", !readListing({ ...data, packs: [followed({ followed: true, kept: [1, 2], sha256: "a".repeat(64), bytes: 2 })] }, "1.7.3").offered.has("veff"));
+  check("the file of a resolved followed entry is a version the page recognises", knownVersions(taken.data, "1.7.3").get(veff.sha256)?.version === 2);
+  const spare = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed({ needs: ["helper", "spare"] })] }, "1.7.3", host);
+  check("a resolved followed entry needs the packs its file needs, not every pack its entry allows", spare.data.packs[1].needs.join() === "helper", JSON.stringify(spare.data.packs[1].needs));
+  // a file whose lists mention one long name many times: refused at once, never read again for each mention
+  const listsOf = (count, name) => {
+    const s = new TextEncoder().encode(name + "\0"), strings = new Uint8Array(s.length + ((4 - (s.length % 4)) % 4));
+    strings.set(s);
+    const b = new Uint8Array(24 + 8 * count + strings.length), v = new DataView(b.buffer);
+    v.setUint32(8, count, true); v.setUint32(20, strings.length, true);
+    for (let n = 0; n < count; n++) v.setUint32(28 + 8 * n, 1, true);
+    b.set(strings, 24 + 8 * count);
+    return b;
+  };
+  let started = Date.now();
+  throws("a followed file with a name longer than the page reads is refused", () => checkFollowed(followed(), packFile({ lists: listsOf(20000, "a".repeat(256)) }), 5), /a name is longer than 255 characters/);
+  const many = packFacts(packFile({ lists: listsOf(20000, "op1f_level_3") }));
+  check("a name mentioned many times is read once, and quickly", many.level === 3 && Date.now() - started < 2000, (Date.now() - started) + " ms");
+  started = Date.now();
+  const told = { ok: true, status: 200, headers: { get: (k) => (k.toLowerCase() === "content-length" ? String(2 * 1024 * 1024 + 1) : null) }, arrayBuffer: async () => { throw new Error("read"); } };
+  const large = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed()] }, "1.7.3", async () => told);
+  check("a followed file the host says is larger than 2 MB is refused before it is read", /is refused: it has 2,097,153 bytes, more than the 2,097,152/.test(large.problems.join()), large.problems.join("; "));
+  const twice = readListing({ ...data, packs: [followed(), entry("VEFF")] }, "1.7.3");
+  check("a followed entry left out still holds its id against a later entry of the same name", !twice.offered.has("VEFF") && twice.problems.some((p) => p === "VEFF: named twice, left out"), twice.problems.join("; "));
+  const silent = async () => new Promise(() => {});                  // a host that never answers
+  const slow = await resolveFollowed({ ...withFollowed, packs: [withFollowed.packs[0], followed()] }, "1.7.3", silent, 30);
+  check("a followed file that does not come in time is left out and named, and holds nothing back", slow.data.packs[1].followed === undefined &&
+    slow.problems.join() === "veff: its file on someone's branch main did not come within 0.03 s, left out", slow.problems.join("; "));
+  const before = calls.length;
+  const ticked = await download(after.offered.get("veff"), host);
+  check("a ticked followed pack goes on with the bytes checked at load, with no second download", calls.length === before && ticked.name === "veff.pack" &&
+    ticked.sha256 === veff.sha256 && ticked.bytes.length === fileOf.length && ticked.bytes.every((b, n) => b === fileOf[n]) && ticked.from === RAW + "someone/veff/refs/heads/main/veff.pack");
+  await download({ ...veff, kept: Uint8Array.from(veff.kept, (b, n) => (n === 100 ? b ^ 1 : b)) }, host).then(() => check("kept bytes that changed are refused", false),
+    (e) => check("kept bytes that changed are refused", /SHA-256 differs/.test(e.message) && calls.length === before, e.message));
+  await download(followed(), host).then(() => check("a followed entry not checked at load is not downloaded by the tick", false),
+    (e) => check("a followed entry not checked at load is not downloaded by the tick", /was not checked when the page opened/.test(e.message) && calls.length === before, e.message));
+
+  // the bootloader: every verdict names one the model knows, and none is assumed
+  check("a version with +0 is the model's", bootloaderVersion("1000.2.0+0") === "1000.2.0" && bootloaderVersion("1000.1.1+0") === "1000.1.1" &&
+    bootloaderVersion("1000.2.0") === "1000.2.0" && bootloaderVersion("1000.1.1") === "1000.1.1");
+  const few = analyzeListing(volume(), BL).counts;
+  for (const [what, given] of [["no bootloader", undefined], ["a null bootloader", null], ["an unknown bootloader", "1000.3.0"], ["a bootloader with another build number", "1000.2.0+1"],
+    ["an empty bootloader", ""], ["a name every object has", "constructor"]]) {
+    const options = given === undefined ? {} : { bootloader: given };
+    throws("the placement refuses " + what, () => placement(few, options), /knows the bootloaders/);
+    throws("the pad search refuses " + what, () => recommendPad(few, options), /knows the bootloaders/);
+    throws("the mount's end refuses " + what, () => mountEndFor(10, 3, options), /knows the bootloaders/);
+    throws("the listing's verdict refuses " + what, () => analyzeListing(volume(), options), /knows the bootloaders/);
+    throws("a plan refuses " + what, () => makePlan({ run: "r", listing: volume(), image, bootloader: given }), /knows the bootloaders/);
+    const untouched = listed("bl-x");
+    await prepare(untouched, { build: stand, base, bootloader: given }).then(() => check("prepare refuses " + what, false),
+      (e) => check("prepare refuses " + what + ", and writes nothing", /knows the bootloaders/.test(e.message) && untouched.writes.length === 0, e.message));
+  }
+  check("a plan for 1000.1.1 records it", r1.plan.bootloader === "1000.1.1");
+  const on2 = listed("bl-2");
+  const { plan: plan2 } = await prepare(on2, { build: stand, base, bootloader: "1000.2.0+0" });
+  check("the plan records the bootloader, in the model's form", plan2.bootloader === "1000.2.0" && JSON.parse(new TextDecoder().decode(on2.store.get(NAMES.plan))).bootloader === "1000.2.0");
+  check("a plan for 1000.2.0 lands by its profile", analyzeListing(plan2.expected, { bootloader: "1000.2.0" }).current.pass && checkAfter(plan2, plan2.expected).ok);
+  // the check after uses the plan's bootloader: judged for the other one, a listing that lands stands 8 modulo 32 off
+  const as1 = checkAfter({ ...plan2, bootloader: "1000.1.1" }, plan2.expected);
+  check("the check after uses the plan's bootloader", !as1.ok && as1.analysis.current.perRest.every((r) => r.mod === 24), JSON.stringify(as1.analysis?.current.perRest));
+  const as2 = checkAfter({ ...r1.plan, bootloader: "1000.2.0" }, r1.plan.expected);
+  check("and the other way round", !as2.ok && as2.analysis.current.perRest.every((r) => r.mod === 8), JSON.stringify(as2.analysis?.current.perRest));
+  const { bootloader: _gone, ...noBl } = plan2;
+  const c4 = checkAfter(noBl, plan2.expected);
+  check("a plan that names no bootloader is not checked, with a line that says so", !c4.ok && c4.lines.length === 1 && /cannot be checked.*none/.test(c4.lines[0]), c4.lines.join("; "));
+  check("a plan that names an unknown bootloader is not checked", !checkAfter({ ...plan2, bootloader: "1000.3.0" }, plan2.expected).ok);
+  // the folder's check, with the unit's bootloader and without it
+  await on2.writeText(NAMES.after, JSON.stringify(plan2.expected));
+  check("the folder's check with no bootloader given uses the plan's", (await checkFolder(on2)).ok);
+  check("the folder's check passes for the plan's bootloader, with or without +0",
+    (await checkFolder(on2, { bootloader: "1000.2.0" })).ok && (await checkFolder(on2, { bootloader: "1000.2.0+0" })).ok);
+  const c5 = await checkFolder(on2, { bootloader: "1000.1.1+0" });
+  check("the folder's check refuses another bootloader, with a line that says so", !c5.ok && c5.lines.length === 1 && /1000\.2\.0.*1000\.1\.1/.test(c5.lines[0]), c5.lines.join("; "));
+  const c6 = await checkFolder(on2, { bootloader: "1000.3.0" });
+  check("the folder's check refuses a bootloader the model does not know", !c6.ok && /knows the bootloaders/.test(c6.lines[0]), c6.lines.join("; "));
+  await on2.writeText(NAMES.plan, JSON.stringify(noBl));
+  check("the folder's check refuses a plan with no bootloader", !(await checkFolder(on2)).ok && !(await checkFolder(on2, { bootloader: "1000.2.0" })).ok);
+  // The one write reported on 1000.2.0 (2026-11-20, it landed): its disk, with os.ldr and base.pack as the plan put
+  // them, counted 541 records and 2547 index nodes before the pad. Only these counts are kept here.
+  const landed = { records: 541, nodes: 2547, recordBatches: 6, nodeBatches: 26 };
+  const landedPad = recommendPad(landed, { bootloader: "1000.2.0" });
+  check("the counts of the write reported on 1000.2.0 get its pad, 14,400,000 bytes", landedPad?.bytes === 14_400_000, String(landedPad?.bytes));
+  check("on 1000.1.1 that disk lands with no pad", placement(landed, BL).pass && !placement(landed, { bootloader: "1000.2.0" }).pass);
+  // the two profiles differ in the heap's base alone, so a buffer of 1000.2.0's stands 0x60c8 above 1000.1.1's
+  let cases = 0, off = 0;
+  for (let nodeBatches = 0; nodeBatches <= 400; nodeBatches += 7) {
+    for (let recordBatches = 1; recordBatches <= 60; recordBatches += 3) {
+      for (const rest of SEEN_RESTS) {
+        const end1 = mountEndFor(nodeBatches, recordBatches, { ...BL, rest });
+        const end2 = mountEndFor(nodeBatches, recordBatches, { bootloader: "1000.2.0", rest });
+        for (const withComputer of [true, false]) {
+          cases++;
+          if (plainBuffer(end2, withComputer) - plainBuffer(end1, withComputer) !== 0x60c8) off++;
+        }
+      }
+    }
+  }
+  check("on 1000.2.0 every buffer stands 0x60c8 above 1000.1.1's", cases === 58 * 20 * 2 * 2 && off === 0, off + " of " + cases + " cases differ");
+
+  // what a Mac's Finder leaves in the packs folder is no pack
+  const mac = listed("mac-1", { [NAMES.packs + "/._lfo.pack"]: new Uint8Array(4096), [NAMES.packs + "/._base.pack"]: new Uint8Array(4096),
+    [NAMES.packs + "/.hidden.PACK"]: new Uint8Array(10), [NAMES.packs + "/.DS_Store"]: new Uint8Array(6148), [NAMES.packs + "/lfo.pack"]: oldLfo });
+  check("a file whose name begins with ._ is no pack, and any other dot's is, as on Windows", (await readPacks(mac)).map((p) => p.name).join("|") === ".hidden.PACK|lfo.pack");
+  const m1 = await prepare(mac, { ...BL, build: stand, base, chosen: [lfo] });
+  check("no ._ file gets into the plan or takes a pack's place", m1.plan.packs.map((p) => p.name).join("|") === ".hidden.PACK|lfo.pack|base.pack" && m1.base.state === "added" &&
+    m1.chosen[0].found === "lfo.pack" && !m1.plan.expected.some((r) => r.path.startsWith("user/pk/._")) && !mac.writes.some((w) => /(^|\/)\._/.test(w)), mac.writes.join(", "));
+
   const helperGone = memoryFolder({});
-  await prepare(helperGone, { build: async () => ({ image: fakeImage }) }).then(() => check("no helper, no plan", false), (e) => check("no helper, no plan", /written nothing/.test(e.message), e.message));
+  await prepare(helperGone, { ...BL, build: async () => ({ image: fakeImage }) }).then(() => check("no helper, no plan", false), (e) => check("no helper, no plan", /written nothing/.test(e.message), e.message));
   const notWaiting = memoryFolder({ [NAMES.helper]: JSON.stringify({ run: "x", state: "ready" }) });
-  await prepare(notWaiting, { build: async () => ({ image: fakeImage }) }).then(() => check("a helper that does not wait gets no plan", false),
+  await prepare(notWaiting, { ...BL, build: async () => ({ image: fakeImage }) }).then(() => check("a helper that does not wait gets no plan", false),
     (e) => check("a helper that does not wait gets no plan", /not waiting/.test(e.message), e.message));
 }
 
@@ -354,7 +558,9 @@ function pageOwnBase() {
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function play(root, { stockPath, manifestName = "loader.json", timeout = 900, wayBack = false }) {
+async function play(root, { stockPath, manifestName = "loader.json", timeout = 900, wayBack = false, bootloader }) {
+  try { bootloaderVersion(bootloader); }                 // asked first: nothing is waited for without it
+  catch (e) { console.log("play: no plan: " + e.message); return 1; }
   const { buildImage, ours } = await import("./patch.mjs");
   const manifest = JSON.parse(readFileSync(join(here, manifestName), "utf8"));
   const loader = new Uint8Array(readFileSync(join(here, ours(manifest).file)));
@@ -380,7 +586,7 @@ async function play(root, { stockPath, manifestName = "loader.json", timeout = 9
   if (base.problem !== null) { console.log("play: no plan: " + base.problem); return 1; }
   let plan, step;
   try {
-    ({ plan, base: step } = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock, wayBack, base }));
+    ({ plan, base: step } = await prepare(folder, { build: (s) => buildImage(s, manifest, loader), stock, wayBack, base, bootloader }));
   } catch (e) { console.log("play: no plan: " + e.message); return 1; }
   console.log("play: plan written for run " + plan.run + ": os.ldr " + plan.image.bytes + " bytes" + (plan.pad ? ", pad " + plan.pad.name + " " + plan.pad.bytes + " bytes" : ", no pad")
     + ", " + plan.packs.length + " pack(s); " + plan.counts.records + " records, " + plan.counts.nodes + " index nodes, " + plan.counts.recordBatches + " and " + plan.counts.nodeBatches + " batches");
@@ -392,7 +598,7 @@ async function play(root, { stockPath, manifestName = "loader.json", timeout = 9
     await pause(500);
   }
   if (helper.state !== "ready") { console.log("play: the helper stopped: " + helper.message); return 1; }
-  const result = await checkFolder(folder);
+  const result = await checkFolder(folder, { bootloader });
   for (const line of result.lines) console.log("play: " + line);
   console.log(result.ok ? "play: READY, the page agrees" : "play: the page does NOT agree");
   return result.ok ? 0 : 1;
@@ -402,8 +608,8 @@ const words = process.argv.slice(2);
 if (words[0] === "--play") {
   const root = words[1];
   const opt = (name) => { const i = words.indexOf(name); return i >= 0 ? words[i + 1] : undefined; };
-  if (!root || root.startsWith("--")) { console.error("usage: node validate-install.mjs --play <folder> [--stock <your own os.ldr>] [--timeout <seconds>]"); process.exitCode = 2; }
-  else process.exitCode = await play(root, { stockPath: opt("--stock"), timeout: Number(opt("--timeout") || 900), wayBack: words.includes("--way-back") });
+  if (!root || root.startsWith("--")) { console.error("usage: node validate-install.mjs --play <folder> --bootloader <version> [--stock <your own os.ldr>] [--timeout <seconds>]"); process.exitCode = 2; }
+  else process.exitCode = await play(root, { stockPath: opt("--stock"), timeout: Number(opt("--timeout") || 900), wayBack: words.includes("--way-back"), bootloader: opt("--bootloader") });
 } else {
   await selfChecks();
   console.log((fails ? "FAILED " : "ok ") + (checks - fails) + " of " + checks + " checks of install.mjs");

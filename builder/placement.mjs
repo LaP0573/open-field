@@ -2,9 +2,11 @@
 // file listing of the unit's volume. No memory reading. Runs in the browser (plain ES module, no Node
 // APIs in this file) and in Node.
 //
-// The model was worked out for te-boot 1000.1.1 and held against real writes: its constants are that
-// one bootloader's. A unit with another bootloader must not be given a verdict by it; the dev-mode step
-// reads the bootloader's version and refuses any other.
+// The model was worked out for te-boot 1000.1.1 and held against real writes.
+//
+// te-boot 1000.2.0 has a profile beside 1000.1.1's (BOOTLOADERS, below). Its numbers are a contributor's reading,
+// not read again by us, and one reported write on one unit holds them. Every verdict is for the bootloader the
+// caller names; none is assumed, and a version that is not in BOOTLOADERS gets no verdict.
 //
 // Why it matters: entry 4 reads /os.ldr into a buffer from te-boot's general allocator (8-byte aligned),
 // and its eMMC driver asserts the source is 32-byte aligned (rsi.c:311). The buffer lands 8 bytes behind
@@ -15,9 +17,35 @@
 
 // ---- constants (tools/teboot_heap.py, with the te-boot addresses it cites) ----
 
-export const HEAP_BASE = 0x88a1ca70;        // the heap table's one entry (0x889e9df8)
-export const HEAP_LENGTH = 0x01fffffc;
-const GROW = 0x200;                          // the word at 0x889eeb8c
+// The numbers the model takes from each bootloader it knows. Every other constant in this file, and every
+// address cited beside one, is 1000.1.1's and is used for both.
+export const BOOTLOADERS = Object.freeze({
+  "1000.1.1": Object.freeze({
+    heapBase: 0x88a1ca70,                    // the heap table's one entry (0x889e9df8)
+    heapLength: 0x01fffffc,
+    grow: 0x200,                             // the word at 0x889eeb8c
+  }),
+  // 1000.2.0's numbers are the reading of the contributor of open-field's pull request 10, who found them at the
+  // addresses below in that bootloader's own code. They were not read again by us. One reported write on one
+  // unit holds them (2026-11-20): it landed, with the pad file of 14,400,000 bytes that this profile chooses.
+  "1000.2.0": Object.freeze({
+    heapBase: 0x88a22b3c,                    // the heap table's one entry (0x889efec8)
+    heapLength: 0x01fffffc,
+    grow: 0x200,                             // the word at 0x889f4c5c
+  }),
+});
+
+// The bootloader's version as the model keys it: "1000.2.0", or "1000.2.0+0" as te-boot gives it. Anything
+// else, or nothing, throws a sentence the page can show: there is no default bootloader.
+export function bootloaderVersion(version) {
+  const key = typeof version === "string" ? version.replace(/\+0$/, "") : "";
+  if (!Object.hasOwn(BOOTLOADERS, key)) {
+    const given = version === undefined || version === null || version === "" ? "none" : String(version);
+    throw new Error("the placement model knows the bootloaders " + Object.keys(BOOTLOADERS).join(" and ") + " only, and was given " + given);
+  }
+  return key;
+}
+
 export const ALIGN_WANTED = 32;              // rsi.c:311
 
 const CHUNK_DATA = 4080;                      // 4096 less 16 bytes of tags inside the chunk (0x889c766c)
@@ -70,11 +98,13 @@ class Memory {
 }
 
 class Heap {
-  constructor() {
-    this.base = HEAP_BASE;
+  constructor(bootloader) {
+    const profile = BOOTLOADERS[bootloaderVersion(bootloader)];
+    this.base = profile.heapBase;
+    this.grow = profile.grow;
     this.mem = new Memory();
     this.start = alignDown(this.base + 0x23, 8);
-    this.length = HEAP_LENGTH - (this.start - this.base);
+    this.length = profile.heapLength - (this.start - this.base);
     const m = this.mem, b = this.base;
     m.w32(b, this.start); m.w32(b + 4, this.length); m.w32(b + 8, 0);
     m.w32(b + 0xc, this.start); m.w32(b + 0x10, 0); m.w32(b + 0x14, 0); m.w32(b + 0x18, 0);
@@ -101,7 +131,7 @@ class Heap {
     for (;;) {
       link = this._find(need);
       if (link) break;
-      let step = Math.max(GROW, need);
+      let step = Math.max(this.grow, need);
       let block = null;
       while (block === null) {
         block = this._sbrk(step);
@@ -234,8 +264,8 @@ class Heap {
 
 // te-boot's start as it leaves the heap for the mount: the static constructors, then one free block at
 // the top of `rest` bytes (heap_before_mount in teboot_heap.py).
-function heapBeforeMount(rest = START_REST) {
-  const heap = new Heap();
+function heapBeforeMount(rest, bootloader) {
+  const heap = new Heap(bootloader);
   for (const size of STATIC_CONSTRUCTORS) heap.malloc(size);
   const top = heap.topOfUse();
   const free = heap.freeChunks();
@@ -331,8 +361,8 @@ export function countListing(rows, { imageBytes = null } = {}) {
 // The mount's end for that many batches (mount_end_for in teboot_heap.py). The first record batch is the
 // four fake objects, already made by mountFixed, so the loop adds nodeBatches node-batches and
 // (recordBatches - 1) record-batches; the order does not change the answer.
-export function mountEndFor(nodeBatches, recordBatches, rest = START_REST) {
-  const heap = heapBeforeMount(rest);
+export function mountEndFor(nodeBatches, recordBatches, { bootloader, rest = START_REST } = {}) {
+  const heap = heapBeforeMount(rest, bootloader);
   mountFixed(heap);
   for (let i = 0; i < nodeBatches; i++) { heap.wrappedMalloc(PER_BATCH * TNODE_BYTES); heap.wrappedMalloc(8); }
   for (let i = 0; i < recordBatches - 1; i++) { heap.wrappedMalloc(PER_BATCH * OBJECT_BYTES); heap.wrappedMalloc(8); }
@@ -347,9 +377,11 @@ export function plainBuffer(mountEnd, withComputer = true) {
 // The buffer and whether it passes, for one listing's counts, over the power-on cases the unit shows.
 // With a computer on the cable (the browser), and on any populated volume (above ~30 batches), the two
 // rests agree, so `pass` is the honest verdict. `perRest` is there for the thin-volume case.
-export function placement(counts, { withComputer = true, rests = SEEN_RESTS } = {}) {
+// `bootloader` is required: the unit's version, one of BOOTLOADERS.
+export function placement(counts, { bootloader, withComputer = true, rests = SEEN_RESTS } = {}) {
+  bootloader = bootloaderVersion(bootloader);
   const perRest = rests.map((rest) => {
-    const end = mountEndFor(counts.nodeBatches, counts.recordBatches, rest);
+    const end = mountEndFor(counts.nodeBatches, counts.recordBatches, { bootloader, rest });
     const buffer = plainBuffer(end, withComputer);
     return { rest, mountEnd: end, buffer, mod: buffer % ALIGN_WANTED };
   });
@@ -371,14 +403,15 @@ function marginOf(count) { return PER_BATCH - (((count - 1) % PER_BATCH) + 1); }
 // and then, and either edge can move the write, so a safe pad keeps both away from an edge; `marginNodes`
 // and `marginRecords` report the headroom. Returns null if nothing in range passes (not expected on a real
 // volume). `step` and `max` bound the search; the defaults cover the sizes the unit has taken.
-export function recommendPad(counts, { withComputer = true, rests = SEEN_RESTS, minBytes = 1_000_000,
+export function recommendPad(counts, { bootloader, withComputer = true, rests = SEEN_RESTS, minBytes = 1_000_000,
   maxBytes = 40_000_000, step = 100_000, minMarginRecords = 3 } = {}) {
+  bootloader = bootloaderVersion(bootloader);
   let best = null, fallback = null;
   for (let bytes = minBytes; bytes <= maxBytes; bytes += step) {
     const nodes = counts.nodes + fileTnodes(bytes);
     const records = counts.records + 1;                 // the pad is one more record
     const next = { ...counts, nodes, records, nodeBatches: batchesOf(nodes), recordBatches: batchesOf(records) };
-    if (!placement(next, { withComputer, rests }).pass) continue;
+    if (!placement(next, { bootloader, withComputer, rests }).pass) continue;
     const marginNodes = marginOf(nodes), marginRecords = marginOf(records);
     if (marginNodes === 0) continue;                     // never land on the ambiguous node-batch edge
     const candidate = { bytes, counts: next, marginNodes, marginRecords };
@@ -395,8 +428,9 @@ export function recommendPad(counts, { withComputer = true, rests = SEEN_RESTS, 
 // `imageBytes` (the size of the os.ldr to be written) should be passed whenever it is known: it makes the
 // count reflect the write-visit volume with that exact image on it, whatever the listing holds (see
 // countListing). Without it the verdict is only right if the listing was taken with the intended os.ldr
-// already on the volume.
+// already on the volume. `bootloader` (the unit's version, one of BOOTLOADERS) is required.
 export function analyzeListing(rows, options = {}) {
+  bootloaderVersion(options.bootloader);
   const counts = countListing(rows, options);
   const current = placement(counts, options);
   // onNodeBatchEdge: the verdict is uncertain because the mount may take an extra node batch (see

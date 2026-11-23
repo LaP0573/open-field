@@ -1,4 +1,27 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 32 (R8), the base pack: base 31's cards, edited in place (base 31's text is release 0.13's, in this repository's history), with one kind
+// of ask more for a card of level 6 or later, a pack's options (OP1F_ASK_OPTIONS): the options unit's
+// (module/build_r8_options.cpp), whose frame work this unit calls once a frame behind the values' unit's, a weak name
+// (away: nothing of options is done), and which the line of the kinds this base does not know passes by.
+//
+// What base 31 said follows and holds.
+//
+// Base 31 (R6h), the base pack: base 30's cards, edited in place (base 30's text is release 0.12's, in this repository's history), with one rule added for
+// every pack alike:
+//
+//   Two packs that carry a picture under one screen's name. A card of level 6 may carry two asks of kind
+//   OP1F_ASK_PLACES: its first, as on base 30 but that its flags may be 0 (its list is firm) or PLACES_GIVES_WAY (its
+//   list gives way), and a second one, taken only when the first was taken firm and the second is in order with the
+//   flag PLACES_GIVES_WAY; any other later ask of the kind is left aside with base 30's line. A screen's picture is
+//   served by the first card, in the list's order, that has it and does not give way (base 30's pass, line for line:
+//   the same `pick` calls up to the same stop, the second firm one said by `twice`); only when none does, by the first
+//   card that gives way for it and has it, kept with a record of its own while the pass goes on. A firm card served
+//   where a card that gives way had the picture: noted in one masked instant, once a name, for sixteen names, and said
+//   at the next frame (line 45). `twice` raises its count in one masked instant, and the places are worked out into
+//   locals and only their final values stored (two threads may look at once).
+//
+// What base 30 said follows and holds.
+//
 // Base 30 (R6d), the base pack: the cards of base 29's second build (base 29's cards unit, which stays as it
 // was) with one thing changed, for every pack alike:
 //
@@ -633,9 +656,18 @@ const u32 op1f_level_7 = 7;
 // functions: it tells the packs what the firmware's threads took from a file, and keeps the base's store of the slots.
 extern "C" void op1f_keeps_frame() OP1F_NAMED("op1f_keeps_frame");
 
-// R8 (base 31): the options (module/build_r8_options.cpp): the file read, the page put up and painted, `changed` told;
-// before any frame function. Weak: away, nothing of options is done.
+// R8 (base 32): the options unit's (module/build_r8_options.cpp): its frame work, once a frame on the display thread
+// behind the values' unit's and before any frame function: the file read, the settings' lines filled, `changed` and
+// `open` told. And its key down, first in op1f_input_down behind the top page's: not 0 when it took the key (T1, while a
+// pack's options show under PACKS in the settings, goes back to the list of packs; the firmware's own T1 there leaves
+// the settings at its press). Weak: away, nothing of options is done. The kind of its ask is the header's
+// (module/build_r6e_card.h); this unit reads base 29's header, so it names the same number here where that header is
+// not read.
 extern "C" void __attribute__((weak)) op1f_options_frame() OP1F_NAMED("op1f_options_frame");
+extern "C" int __attribute__((weak)) op1f_options_down(unsigned key) OP1F_NAMED("op1f_options_down");
+#ifndef OP1F_BUILD_R6E_CARD_H
+enum { OP1F_ASK_OPTIONS = 10 };
+#endif
 
 // R5: the effects unit's (base 28's effects unit): its frame work, once a frame on the display thread behind the
 // values' unit's and before the frame functions; and whether an effect's page stands in for a screen now. Weak: away,
@@ -1129,7 +1161,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (kind == (u32)OP1F_ASK_SEQUENCER || kind == (u32)OP1F_ASK_NOTES) continue;
         if (six && (kind == (u32)OP1F_ASK_STAGE || kind == (u32)OP1F_ASK_MEMORY || kind == (u32)OP1F_ASK_PLACES)) continue;   // R4
         if (seven && kind == (u32)OP1F_ASK_KEEPS) continue;                         // R4b
-        if (six && kind == 10u) continue;                                           // R8: the options (OP1F_ASK_OPTIONS), the options unit's
+        if (six && kind == (u32)OP1F_ASK_OPTIONS) continue;                         // R8 (base 32): the options unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
         if (unknown == 0) first = kind;
@@ -2530,6 +2562,7 @@ extern "C" int op1f_input_down(const u32* record, int shifted) {
     input.last_down_ms = state.ms;
     count(&input.down);                                                             // M3: masked for the instant
     if (top_input(shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record)) return 1;   // S1: the base's top page
+    if (&op1f_options_down != 0 && op1f_options_down(key)) return 1;               // R8 (base 32): T1 back to the list of packs
     if (!checked() || state.inputs == 0) return 0;
     Op1fInput e;
     event_of(&e, shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record);
@@ -2907,7 +2940,7 @@ extern "C" void op1f_cards_frame() {
     op1f_memory_frame();                                    // R4: the memory unit's frame work, then the stages unit's
     op1f_stages_frame();
     op1f_keeps_frame();                                     // R4b: the values' unit's, before any frame function
-    if (&op1f_options_frame != 0) op1f_options_frame();     // R8: the options, before any frame function
+    if (&op1f_options_frame != 0) op1f_options_frame();     // R8 (base 32): the options unit's, before any frame function
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     said_passed();                                          // R4: the pictures a card of level 6 carries and a screen was not served
@@ -3035,17 +3068,23 @@ static const ArtEntry* carried(const Op1fCard* card, const char* name, int* pick
 }
 
 // Two packs carry one name: said once a name, for sixteen names. The first of the two serves it.
+// R6h (base 31): the look, the slot and the count in one masked instant (a request may come on any thread: two at fifteen
+// names could take the count past sixteen); the line said after it, at the same request, as before.
 static OP1F_APART void twice(const char* name, const char* first, const char* second) {
-    for (u32 n = 0; n < state.names; ++n) {
-        if (same_kept(name, state.name_said[n])) return;
+    u32 mask, say = 0;
+    MASK_OFF(mask);
+    u32 n = state.names, known = 0;
+    for (u32 k = 0; k < n && !known; ++k) known = (u32)same_kept(name, state.name_said[k]);
+    if (!known && n < (u32)NAMES_SAID) {                    // sixteen names were said: the log has what it needs
+        char* kept = state.name_said[n];
+        u32 i = 0;
+        for (; i < (u32)NAME_KEPT && name[i]; ++i) kept[i] = name[i];
+        kept[i] = 0;
+        state.names = n + 1u;
+        say = 1;
     }
-    if (state.names >= (u32)NAMES_SAID) return;             // sixteen names were said: the log has what it needs
-    char* kept = state.name_said[state.names];
-    u32 i = 0;
-    for (; i < (u32)NAME_KEPT && name[i]; ++i) kept[i] = name[i];
-    kept[i] = 0;
-    ++state.names;
-    STOCK_LOG(2, LOG_FILE, 6, "cards: the picture %s is carried by '%s' and by '%s': '%s' serves it", name, first, second, first);
+    MASK_ON(mask);
+    if (say) STOCK_LOG(2, LOG_FILE, 6, "cards: the picture %s is carried by '%s' and by '%s': '%s' serves it", name, first, second, first);
 }
 
 // ---------------------------------------------------------------- R4: pictures that take a place
@@ -3061,7 +3100,23 @@ static struct {
     u32 bound;                                          // a bit a slot: its card is of level 6, held to the rule
     const char (*names[MOST])[PLACE_NAME];              // the list each such card's ask names, 0 for none (no ask, or one left aside)
     u32 count[MOST];                                    // and how many names it holds
+    const char (*yields[MOST])[PLACE_NAME];             // R6h (base 31): the list each such card gives way for, 0 for none
+    u32 yield_count[MOST];                              // R6h (base 31): and how many names it holds
 } places;
+
+// R6h (base 31): the flag of an ask of kind places whose list gives way (the header's OP1F_PLACES_GIVES_WAY), and what a
+// card makes of one of its asks of the kind.
+enum { PLACES_GIVES_WAY = 1 };
+enum { ASK_ASIDE = 0, ASK_FIRM = 1, ASK_GIVES_WAY = 2 };
+
+// R6h (base 31): the names a firm card was served for where a card that gives way had the picture: noted from any thread,
+// each in one masked instant, and said by the display thread at its next frame. Sixteen names, once a name.
+static struct {
+    volatile u32 count;                                 // names noted: an entry is whole before the count that holds it
+    u32 said;                                           // the display thread's: names said
+    u32 slot[PASSED_SAID], over[PASSED_SAID];           // the card that gave way, the card that served
+    char name[PASSED_SAID][ART_NAME];
+} gave;
 
 // The names a screen asked for that a card of level 6 carries and does not list: noted from any thread, each in one
 // masked instant, and said by the display thread at its next frame. Sixteen names, once a name.
@@ -3095,7 +3150,7 @@ static int picture_name(const char* name) {
 
 // Why an ask of this kind is left aside, or 0; `a` and `b` for the line:
 //   PLACES_TABLE  (the ask's bytes, an Op1fPlaces' bytes): the table is too small or there is none; (the bytes its head
-//                 says, the ask's bytes): the two differ; (its flags, 0): a flag; (its `shown`'s place from the pack's
+//                 says, the ask's bytes): the two differ; (its flags, 0): a flag (R6h: but PLACES_GIVES_WAY); (its `shown`'s place from the pack's
 //                 first byte, 0): a `shown`; (its count, OP1F_PLACES_MOST): no name, or more than a list may hold
 //   PLACES_LIST   (the list's place from the pack's first byte, the pack's bytes): the list does not lie in the pack on
 //                 a word with all its names
@@ -3117,7 +3172,7 @@ static int places_refused(const Op1fAsk* ask, const Op1fCardSlot* slot, u32* a, 
         *b = ask->bytes;
         return PLACES_TABLE;
     }
-    if (table->head.flags != 0) {
+    if ((table->head.flags & ~(u32)PLACES_GIVES_WAY) != 0) {                      // R6h (base 31): a bit this base does not know
         *a = table->head.flags;
         *b = 0;
         return PLACES_TABLE;
@@ -3149,31 +3204,53 @@ static int places_refused(const Op1fAsk* ask, const Op1fCardSlot* slot, u32* a, 
     return PLACES_IN_ORDER;
 }
 
+// R6h (base 31): what a card makes of its ask of kind places that comes `kinds`-th (from 0) among them, `why` what
+// places_refused said of it and `firm` whether its first was taken firm: the first is the card's, firm or giving way by
+// its flag; a second is taken only behind a firm first, in order and giving way; every other is left aside.
+static int places_take(u32 kinds, int why, const Op1fAsk* ask, int firm) {
+    if (why != PLACES_IN_ORDER || kinds > 1u) return ASK_ASIDE;
+    u32 flags = ((const Op1fPlaces*)ask->what)->head.flags;
+    if (kinds == 0) return flags == 0 ? ASK_FIRM : ASK_GIVES_WAY;
+    return firm && flags == (u32)PLACES_GIVES_WAY ? ASK_GIVES_WAY : ASK_ASIDE;
+}
+
 // The asks of this kind of every card of level 6 in use, looked at once, after the check: worked out first and stored
 // then, past a barrier the word that says so; then the lines, in the list's order, behind the check's. A card of
 // level 6 with no such ask in order takes the place of no picture of the unit.
+// R6h (base 31): each slot's lists worked out into locals and only their final values stored, so that a second thread
+// that looks as well writes again what a reader may be reading, never a 0 before it; the list that gives way beside.
 static OP1F_APART void places_look() {
     u32 bound = 0;
     for (u32 i = 0; i < state.seen; ++i) {
-        places.names[i] = 0;
-        places.count[i] = 0;
-        if (((state.used >> i) & 1u) == 0) continue;
+        const char (*names)[PLACE_NAME] = 0;
+        const char (*yields)[PLACE_NAME] = 0;
+        u32 count = 0, yield_count = 0;
         const Op1fCard* card = op1f_cards.slots[i].card;
-        if (card->level < 6u) continue;                                             // the rule binds a card by its level alone, whatever its size
-        bound |= 1u << i;
-        u32 asked = 0;
-        const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
-        for (u32 k = 0; k < asked; ++k) {
-            if (asks[k].kind != (u32)OP1F_ASK_PLACES) continue;
-            u32 a = 0, b = 0;
-            int plain = 0;
-            if (places_refused(&asks[k], &op1f_cards.slots[i], &a, &b, &plain) == PLACES_IN_ORDER) {
+        if (((state.used >> i) & 1u) != 0 && card->level >= 6u) {                  // the rule binds a card by its level alone, whatever its size
+            bound |= 1u << i;
+            u32 asked = 0, kinds = 0;
+            int firm = 0;
+            const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
+            for (u32 k = 0; k < asked && kinds < 2u; ++k) {                         // the first ask of the kind is the card's; a second may give way; a later one is left aside
+                if (asks[k].kind != (u32)OP1F_ASK_PLACES) continue;
+                u32 a = 0, b = 0;
+                int plain = 0, took = places_take(kinds, places_refused(&asks[k], &op1f_cards.slots[i], &a, &b, &plain), &asks[k], firm);
                 const Op1fPlaces* table = (const Op1fPlaces*)asks[k].what;
-                places.names[i] = table->names;
-                places.count[i] = table->count;
+                if (took == ASK_FIRM) {
+                    names = table->names;
+                    count = table->count;
+                    firm = 1;
+                } else if (took == ASK_GIVES_WAY) {
+                    yields = table->names;
+                    yield_count = table->count;
+                }
+                ++kinds;
             }
-            break;                                                                  // the first ask of the kind is the card's; a later one is left aside
         }
+        places.names[i] = names;
+        places.count[i] = count;
+        places.yields[i] = yields;
+        places.yield_count[i] = yield_count;
     }
     places.bound = bound;
     BARRIER();                                                                      // all of the above is stored before the word that says it was made
@@ -3185,13 +3262,19 @@ static OP1F_APART void places_look() {
         if (((bound >> i) & 1u) == 0) continue;
         const Op1fCard* card = op1f_cards.slots[i].card;
         u32 asked = 0, kinds = 0;
+        int firm = 0;                                                               // R6h (base 31)
         const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
         for (u32 k = 0; k < asked; ++k) {
             if (asks[k].kind != (u32)OP1F_ASK_PLACES) continue;
             u32 a = 0, b = 0;
             int plain = 0, why = places_refused(&asks[k], &op1f_cards.slots[i], &a, &b, &plain);
             const char* name = plain ? ((const Op1fPlaces*)asks[k].what)->head.name : "?";
-            if (kinds++ != 0)
+            int took = places_take(kinds, why, &asks[k], firm);                    // R6h (base 31)
+            if (kinds == 0) firm = took == ASK_FIRM;
+            if (took == ASK_GIVES_WAY)                                              // R6h (base 31): a list that gives way
+                STOCK_LOG(3, LOG_FILE, 44, "places: '%s' of '%s' takes the place of %u picture(s) of the unit where no other pack's does", name, card->name,
+                          places.yield_count[i]);
+            else if (kinds != 0)
                 STOCK_LOG(2, LOG_FILE, 26, "places: '%s' of '%s' is left aside: %s", name, card->name, "an earlier ask of the card names the pictures it takes the place of");
             else if (why == PLACES_NOT_A_NAME)
                 STOCK_LOG(2, LOG_FILE, 26, "places: '%s' of '%s' is left aside: %s", name, card->name, "its name is not one the log can show");
@@ -3201,6 +3284,7 @@ static OP1F_APART void places_look() {
                                                                                        : "a name of its list is not a picture's name ending in .svg", a, b);
             else
                 STOCK_LOG(3, LOG_FILE, 25, "places: '%s' of '%s' takes the place of %u picture(s) of the unit", name, card->name, places.count[i]);
+            ++kinds;                                                                // R6h (base 31): counted after its line
         }
     }
 }
@@ -3223,6 +3307,36 @@ static int listed(u32 slot, const char* name) {
     return 0;
 }
 
+// R6h (base 31): does the list the card of this slot gives way for hold the name a screen asks for?
+static int gives_way(u32 slot, const char* name) {
+    const char (*yields)[PLACE_NAME] = places.yields[slot];
+    u32 count = places.yield_count[slot];
+    for (u32 k = 0; k < count; ++k) {
+        if (same_name(name, yields[k])) return 1;
+    }
+    return 0;
+}
+
+// R6h (base 31): a name a firm card was served for where the card of `slot` gives way and had the picture, `over` the
+// card that served: noted once a name, for sixteen names, in one masked instant (a request may come on any thread).
+static OP1F_APART void note_gave_way(u32 slot, u32 over, const char* name) {
+    u32 mask;
+    MASK_OFF(mask);
+    u32 n = gave.count, known = 0;
+    for (u32 k = 0; k < n && !known; ++k) known = (u32)same_kept(name, gave.name[k]);
+    if (!known && n < (u32)PASSED_SAID) {
+        char* kept = gave.name[n];
+        u32 i = 0;
+        for (; i < (u32)NAME_KEPT && name[i]; ++i) kept[i] = name[i];
+        kept[i] = 0;
+        gave.slot[n] = slot;
+        gave.over[n] = over;
+        BARRIER();                                                                  // the entry is whole before the count that holds it
+        gave.count = n + 1u;
+    }
+    MASK_ON(mask);
+}
+
 // A name a card of level 6 carries and does not list, asked for by a screen: noted once a name, for sixteen names, in
 // one masked instant (a request may come on any thread).
 static OP1F_APART void note_passed(u32 slot, const char* name) {
@@ -3243,14 +3357,63 @@ static OP1F_APART void note_passed(u32 slot, const char* name) {
 }
 
 // The names noted since the last frame, said on the display thread.
+// R6h (base 31): and behind them the names a card gave way for.
 static OP1F_APART void said_passed() {
     u32 n = passed.count;
+    u32 g = gave.count;                                                             // R6h (base 31)
     BARRIER();
     for (; passed.said < n; ++passed.said) {
         u32 k = passed.said;
         STOCK_LOG(3, LOG_FILE, 28, "cards: '%s' carries a picture named %s and does not take its place: the unit's own is shown",
                   op1f_cards.slots[passed.slot[k]].card->name, passed.name[k]);
     }
+    for (; gave.said < g; ++gave.said) {                                            // R6h (base 31)
+        u32 k = gave.said;
+        STOCK_LOG(3, LOG_FILE, 45, "cards: '%s' gives way to '%s' for the picture %s", op1f_cards.slots[gave.slot[k]].card->name,
+                  op1f_cards.slots[gave.over[k]].card->name, gave.name[k]);
+    }
+}
+
+// R6h (base 31): what a screen's pass keeps of the cards that give way for its name: the stand-in, the first such card
+// that has the picture, with its own record; a second such card that has it; and the firm card that served. Each a
+// slot + 1, 0 for none.
+struct Stand {
+    u32 slot, second, served;
+    int found;                                              // the stand-in's FOUND or FOUND_PICKED
+    const ArtEntry* entry;                                  // and its entry
+};
+
+// R6h (base 31): does the card of slot `i` give way for the name? Then it is asked while it could stand in, be said
+// beside the stand-in, or be the line's (`open`: no firm card served yet), and kept as the stand-in or as the second.
+static OP1F_APART int stand_by(Stand* stand, u32 i, const char* name, int open) {
+    if (!gives_way(i, name)) return 0;
+    if (stand->slot == 0 || (open && stand->second == 0)) {
+        int own = 0;                                        // its own: `carried` writes it even when it finds nothing
+        const ArtEntry* e = carried(op1f_cards.slots[i].card, name, &own);
+        if (e != 0 && stand->slot == 0) {
+            stand->slot = i + 1u;
+            stand->entry = e;
+            stand->found = own ? FOUND_PICKED : FOUND;
+        } else if (e != 0) {
+            stand->second = i + 1u;
+        }
+    }
+    return 1;
+}
+
+// R6h (base 31): after the pass, what it answers: the firm card's `found` where one served (noted for line 45 where
+// the stand-in had the picture), else the stand-in's (a second card that gives way and has it: said by `twice`).
+static OP1F_APART int stand_in(const Stand* stand, int found, const char* name, const ArtDir** dir, const ArtEntry** entry) {
+    if (stand->slot == 0) return found;
+    const Op1fCard* card = op1f_cards.slots[stand->slot - 1u].card;
+    if (found != 0) {
+        note_gave_way(stand->slot - 1u, stand->served - 1u, name);                 // a firm card served it: the line at the next frame
+        return found;
+    }
+    *dir = (const ArtDir*)card->pictures;
+    *entry = stand->entry;
+    if (stand->second != 0) twice(name, card->name, op1f_cards.slots[stand->second - 1u].card->name);
+    return stand->found;
 }
 
 // The picture loader, for a name none of its four packs has: the directory and the entry of the first card that has
@@ -3259,12 +3422,19 @@ static OP1F_APART void said_passed() {
 // R4: without `only` (a screen's request), a card of level 6 is looked into, and its `pick` asked, only for a name
 // its ask of kind OP1F_ASK_PLACES lists; it is passed by. Where no card serves the name and one of level 6 carries it
 // unlisted, the name is noted for the line.
+// R6h (base 31): the cards whose name is firm (listed in the firm list, or any name of a card below level 6) go as on
+// base 30. A card that gives way for the name and has the picture is kept as the stand-in, the first such, with its
+// own record (`carried` writes its `picked` even when it finds nothing); it never ends the pass and never serves while
+// a firm card does. After the pass: the firm card's, else the stand-in's (a second card that gives way and has it: said
+// by `twice`); a firm card's where the stand-in had it: noted for line 45. The stand-in's work is done apart
+// (stand_by, stand_in), its record kept in memory: the pass itself holds no more than base 30's in its registers.
 extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const ArtDir** dir, const ArtEntry** entry) OP1F_NAMED("op1f_cards_picture");
 extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const ArtDir** dir, const ArtEntry** entry) {
     places_ready();                                         // R4: the check, and the places after it
     int found = 0, picked = 0;
     u32 passer = 0;                                         // R4: the slot + 1 of the first card of level 6 that carries the name and does not list it
     const Op1fCard* server = 0;
+    Stand stand = {0, 0, 0, 0, 0};                          // R6h (base 31)
     if (name == 0) return 0;
     for (u32 i = 0; i < state.seen; ++i) {
         if (((state.used >> i) & 1u) == 0) continue;
@@ -3278,6 +3448,7 @@ extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const 
             return FOUND;
         }
         if (((places.bound >> i) & 1u) != 0 && !listed(i, name)) {                // R4: a card of level 6 serves a screen only the names it lists
+            if (stand_by(&stand, i, name, server == 0)) continue;                  // R6h (base 31): a card that gives way for the name
             if (passer == 0 && card->pictures != 0 && entry_of((const ArtDir*)card->pictures, name) != 0) passer = i + 1u;
             continue;
         }
@@ -3288,10 +3459,12 @@ extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const 
             break;
         }
         server = card;
+        stand.served = i + 1u;                              // R6h (base 31)
         found = picked ? FOUND_PICKED : FOUND;
         *dir = (const ArtDir*)card->pictures;
         *entry = e;
     }
+    found = stand_in(&stand, found, name, dir, entry);     // R6h (base 31): a card that gives way had the picture
     if (found == 0 && passer != 0) note_passed(passer - 1u, name);                  // R4: the unit's own is shown, and a card of level 6 carries the name
     return found;
 }

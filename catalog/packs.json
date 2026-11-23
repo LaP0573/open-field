@@ -20,11 +20,11 @@
       "categories": ["library"],
       "description": "The shared pack every other pack relies on. Every unit with open-field needs it.",
       "path": "builder/base.pack",
-      "sha256": "6abd1e4ff92db2959bf5532fd9f1050acefb8cdf2717700e3de825a72d92602c",
-      "bytes": 302825,
-      "version": 31,
+      "sha256": "b307bdbc5bedbd61b58bbd590a2b9a016810dc0cd850b017ad2048da7113d788",
+      "bytes": 303909,
+      "version": 32,
       "firmware": "1.7.3",
-      "places": 52,
+      "places": 58,
       "needs": [],
       "offers_level": 10,
       "folders": []
@@ -36,15 +36,11 @@
       "categories": ["tape"],
       "description": "Eight tape tracks instead of four, on the tape and in the mixer.",
       "repository": "https://github.com/LaP0573/open-field-packs",
-      "commit": "cb08dda83e394e8adf9a7644896c451c03ed90bc",
+      "follow": "main",
       "path": "8 tracks.pack",
-      "sha256": "4779bda0d21fc61245aebd1e434011d0c341a91e3ba16f37c759e1264c2da666",
-      "bytes": 106548,
-      "version": 10,
+      "version": 11,
       "firmware": "1.7.3",
-      "places": 71,
       "needs": [],
-      "level": 7,
       "folders": []
     },
     {
@@ -54,15 +50,11 @@
       "categories": ["effects"],
       "description": "A chain of effects on every sound, with its presets kept as files.",
       "repository": "https://github.com/LaP0573/open-field-packs",
-      "commit": "9527861016b571cd34bbe413f11d27a2ab18e03a",
+      "follow": "main",
       "path": "fx train.pack",
-      "sha256": "d02ff1b4aba79ea3b5cbfd674c178138fa272d71f2dddf7aeffd5dd9656b147d",
-      "bytes": 508460,
       "version": 17,
       "firmware": "1.7.3",
-      "places": 24,
       "needs": [],
-      "level": 8,
       "folders": [{"name": "fx", "place": "fx"}, {"name": "fx train", "place": "fxtrain"}]
     },
     {
@@ -72,15 +64,11 @@
       "categories": ["modulation"],
       "description": "Four LFOs on every sound, with their page and their presets.",
       "repository": "https://github.com/LaP0573/open-field-packs",
-      "commit": "cb08dda83e394e8adf9a7644896c451c03ed90bc",
+      "follow": "main",
       "path": "lfo.pack",
-      "sha256": "62d6464407751dd9556d4e59462e31d7c87acd8b77c6f91682a65f45035baee4",
-      "bytes": 430318,
       "version": 11,
       "firmware": "1.7.3",
-      "places": 10,
       "needs": [],
-      "level": 4,
       "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}]
     },
     {
@@ -90,15 +78,11 @@
       "categories": ["mixer"],
       "description": "One tape track ducks another, set on a page under shift and the mixer key.",
       "repository": "https://github.com/LaP0573/open-field-packs",
-      "commit": "cb08dda83e394e8adf9a7644896c451c03ed90bc",
+      "follow": "main",
       "path": "sidechain.pack",
-      "sha256": "2268639259142f81e703c24d6446e3be74406a6d5ce708b21b964cd8232f723e",
-      "bytes": 107850,
       "version": 10,
       "firmware": "1.7.3",
-      "places": 6,
       "needs": [],
-      "level": 7,
       "folders": []
     },
     {
@@ -260,6 +244,56 @@
       "needs": [],
       "level": 10,
       "folders": []
+    },
+    {
+      "id": "veffbode",
+      "author": "galfaroth",
+      "status": "listed",
+      "categories": ["effects"],
+      "description": "A Bode frequency shifter in a delay's feedback loop, in the unit's lists of effects and on fx train's wagons.",
+      "repository": "https://github.com/galfaroth/open-field-veff",
+      "commit": "83b71b50e167104dd00ebe9ef99917cc3b832ad9",
+      "path": "veffbode.pack",
+      "sha256": "5335811674d521798a6626330d9acc51a05b7c7ba68d7fcd1d956106a90bd9e2",
+      "bytes": 310206,
+      "version": 5,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "veffrosion",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A degrader in the spirit of Erosion: a tiny delay wobbled by a sine or band-passed noise, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffsaturator",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A saturator with six curves, colour, soft clip and 2x oversampling, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffshaper",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A parametric waveshaper with a drawn curve, in the unit's lists of effects.",
+      "level": 10
+    },
+    {
+      "id": "veffgrrr",
+      "author": "galfaroth",
+      "status": "reserved",
+      "categories": ["effects"],
+      "description": "A two-stage distortion with filters and a feedback loop, in the unit's lists of effects.",
+      "level": 10
     }
   ]
 }

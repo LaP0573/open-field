@@ -16,6 +16,7 @@ import importlib.util
 import io
 import json
 import os
+import struct
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -70,6 +71,30 @@ def listing(*entries):
 def run(the_listing, **options):
     lines, in_order = check.check(the_listing, FIRMWARES, **options)
     return "\n".join(lines), in_order
+
+
+def card_pack(name="tester", version=2, folders=(("notes", "notes"),), card_version=None, folders_at=None):
+    """A pack file with a card of level 3 that lists these folders, each (name, place), as the base reads one; the
+    list where the pack's body puts it, or at the linked address `folders_at`."""
+    link, at = pb.ROOM_START, 4
+    listed = at + pb.CARD_3_BYTES
+    address = link + listed if folders_at is None else folders_at
+    table = pb.folder_table([(folder_name, place, True) for folder_name, place in folders])
+    body = bytearray(listed + len(table))
+    pb.CARD_3.pack_into(body, at, pb.CARD_MARK, pb.CARD_3_BYTES, 3, version if card_version is None else card_version,
+                        name.encode("ascii"), 0, 0, 0, 0, address if folders else 0, len(folders))
+    body[listed:] = table
+    places = [(at + pb.CARD_2_BYTES, pb.KIND_WORD, None, address)] if folders else []
+    return pb.make3(bytes(body), link, len(body), 0, name, OS_173, (link, link), version=version,
+                    imports=[("op1f_level_3", True)], places=places, card_place=at, no_table=True)
+
+
+def followed_for(data, **change):
+    """A listed entry that follows the branch main of its repository, for a file that stands at its head."""
+    entry = {key: value for key, value in entry_for(data).items() if key not in ("commit", "sha256", "bytes", "places")}
+    entry["follow"] = "main"
+    entry.update(change)
+    return entry
 
 
 class TheTreesListing(unittest.TestCase):
@@ -159,10 +184,68 @@ class AnEntryHeldToItsFile(unittest.TestCase):
         self.assertFalse(in_order)
         self.assertIn("the file is no pack the loader takes", said)
 
-    def test_a_file_that_is_not_in_the_folders_is_refused(self):
-        said, in_order = run(listing(entry_for(pack())), folders=[tempfile.gettempdir() + os.sep + "no-such-folder"])
+    def test_folders_that_hold_no_entry_s_file_are_refused(self):
+        folder = tempfile.gettempdir() + os.sep + "no-such-folder"
+        said, in_order = run(listing(entry_for(pack())), folders=[folder])
         self.assertFalse(in_order)
-        self.assertIn("its file is not in", said)
+        self.assertIn("REFUSED: the folders given (%s) hold no entry's file" % folder, said)
+
+
+class FoldersOfSomeAuthorsFiles(unittest.TestCase):
+    """With --files, an author with a file in the folders is held whole, and one with none there is held to the form:
+    the maintainer gives the folders of a build, with every file of open-field's own packs and none of another
+    author's, and an author gives a folder with their own file alone (docs/catalog.md)."""
+
+    def setUp(self):
+        self.ours = [pack(name="mine"), pack(name="also mine")]
+        self.theirs = [pack(name="theirs"), pack(name="theirs too")]
+        self.followed = card_pack(name="followed")
+        self.listing = listing(*[entry_for(data, author="open-field", status="reserved", categories=["examples"]) for data in self.ours]
+                               + [entry_for(data) for data in self.theirs]
+                               + [followed_for(self.followed, folders=[{"name": "notes", "place": "notes"}])])
+        for entry in self.listing["packs"][1:3]:                # held as the examples are: a file, no repository
+            del entry["repository"], entry["commit"]
+
+    def held(self, *files):
+        with tempfile.TemporaryDirectory() as folder:
+            for data in files:
+                with open(os.path.join(folder, pb.parse(data)[0]["name"] + ".pack"), "wb") as f:
+                    f.write(data)
+            return run(self.listing, folders=[folder])
+
+    def test_the_folders_of_a_build_hold_ours_and_pass_another_author_s_entries_on_their_form(self):
+        said, in_order = self.held(*self.ours)
+        self.assertTrue(in_order, said)
+        for name in ("mine", "also mine"):
+            self.assertIn("ok: %s (reserved, its file held)" % name, said)
+        for name in ("theirs", "theirs too"):
+            self.assertIn("ok: %s (listed, its file not held: no file of someone's in the folders given)" % name, said)
+        self.assertIn("ok: followed (listed, follows main, its file not held: no file of someone's in the folders given)", said)
+
+    def test_one_of_ours_missing_is_refused(self):
+        said, in_order = self.held(self.ours[0])
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: also mine: its file is not in", said)
+        self.assertIn("ok: mine (reserved, its file held)", said)
+
+    def test_an_author_s_own_folder_holds_their_file_and_passes_ours_on_their_form(self):
+        said, in_order = self.held(*self.theirs, self.followed)
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: theirs (listed, its file held)", said)
+        self.assertIn("ok: followed (listed, follows main, its file held)", said)
+        self.assertIn("ok: mine (reserved, its file not held: no file of open-field's in the folders given)", said)
+
+    def test_an_author_with_one_file_there_and_another_missing_is_refused(self):
+        said, in_order = self.held(self.theirs[0])
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: theirs too: its file is not in", said)
+        self.assertIn("REFUSED: followed: its file is not in", said)
+        self.assertIn("ok: theirs (listed, its file held)", said)
+
+    def test_a_file_held_is_still_held_to_its_entry(self):
+        said, in_order = self.held(self.theirs[0], pack(name="theirs too", version=5), self.followed)
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: theirs too: the file's SHA-256 is", said)
 
 
 class Downloads(unittest.TestCase):
@@ -208,6 +291,378 @@ class Downloads(unittest.TestCase):
             raise AssertionError("asked for %s" % url)
         said, in_order = run(listing(), download=True, get=get)
         self.assertTrue(in_order, said)
+
+    def test_with_the_listing_before_a_followed_entry_is_downloaded_only_when_it_changed(self):
+        data = pack(version=3)
+        old = followed_for(data)
+        asked = []
+
+        def get(url):
+            asked.append(url)
+            return data
+        for new in (old, dict(old, version=3, description="Said again.")):    # its file is read again when the page opens, not here
+            with self.subTest(new=new):
+                said, in_order = run(listing(new), before=listing(old), download=True, get=get)
+                self.assertTrue(in_order, said)
+                self.assertEqual(asked, [])
+        for new, link in ((dict(old, follow="release"), "/refs/heads/release/build/tester.pack"),
+                          (dict(old, path="packs/tester.pack"), "/refs/heads/main/packs/tester.pack"),
+                          (dict(old, needs=["base"]), "/refs/heads/main/build/tester.pack"),         # what the file is held to changed: held again
+                          (dict(old, folders=[{"name": "notes", "place": "notes"}]), "/refs/heads/main/build/tester.pack"),
+                          (dict(old, version=2), None),
+                          (dict(old, repository="https://github.com/someone/other-pack"), "/other-pack/refs/heads/main/"),
+                          (followed_for(data, id="new one"), None)):
+            with self.subTest(new=new):
+                del asked[:]
+                said, in_order = run(listing(new), before=listing(old), download=True, get=get)
+                self.assertEqual(len(asked), 1, said)
+                if link:
+                    self.assertIn(link, asked[0])
+                    self.assertTrue(in_order, said)
+        del asked[:]
+        pinned = entry_for(pack(version=2))
+        said, in_order = run(listing(old), before=listing(pinned), download=True, get=get)       # a pinned entry comes to follow
+        self.assertTrue(in_order, said)
+        self.assertEqual(asked, ["https://raw.githubusercontent.com/someone/some-pack/refs/heads/main/build/tester.pack"])
+
+
+class AFollowedEntry(unittest.TestCase):
+    """An entry that follows a branch of its author's repository: the install page reads its file at the head of the
+    branch each time it opens, so a new version needs no pull request."""
+
+    def refused(self, entry, words):
+        said, in_order = run(listing(entry))
+        self.assertFalse(in_order, said)
+        self.assertIn(words, said)
+
+    def test_it_names_its_branch_and_what_the_file_may_ask_for(self):
+        entry = followed_for(pack())
+        self.assertEqual(sorted(entry), sorted(check.ALWAYS + ("repository", "path", "follow", "version", "firmware", "needs", "folders")))
+        said, in_order = run(listing(entry))
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: tester (listed, follows main)", said)
+        for key in ("repository", "path", "version", "firmware", "needs", "folders"):
+            with self.subTest(lacks=key):
+                self.refused({k: v for k, v in entry.items() if k != key}, "it lacks %s" % key)
+        said, in_order = run(listing(dict(entry, status="retired")))
+        self.assertTrue(in_order, said)
+
+    def test_it_names_nothing_of_a_pinned_file(self):
+        for key, value in (("commit", COMMIT), ("sha256", "0" * 64), ("bytes", 1000), ("places", 0), ("level", 3), ("offers_level", 3)):
+            with self.subTest(names=key):
+                self.refused(dict(followed_for(pack()), **{key: value}), "a followed entry names no %s" % key)
+
+    def test_only_a_listed_or_a_retired_entry_follows_a_branch(self):
+        reserved = {"id": "later", "author": "someone", "status": "reserved", "categories": ["tools"], "description": "Held.", "follow": "main"}
+        self.refused(reserved, "only a listed or a retired entry follows a branch")
+        bundled = dict(followed_for(pack(), path="builder/tester.pack"), status="bundled")
+        del bundled["repository"]
+        self.refused(bundled, "only a listed or a retired entry follows a branch")
+
+    def test_the_form_of_a_branch_s_name(self):
+        for good in ("main", "release-1.x", "v2_0", "_x", "9", "a" * 100, "lock"):
+            with self.subTest(follow=good):
+                self.assertEqual(check.entry_faults(followed_for(pack(), follow=good), {"tools": "tools"}, FIRMWARES), [])
+        for bad in ("", ".hidden", "-x", "a..b", "ends.", "x.lock", "a/b", "refs/heads/main", "a" * 101, "two words", "é", 5, None, ["main"]):
+            with self.subTest(follow=bad):
+                self.refused(followed_for(pack(), follow=bad), "its follow is not a branch's name")
+
+    def test_its_link_is_the_head_of_its_branch(self):
+        entry = followed_for(pack(), path="packs/two words.pack", follow="v2.x")
+        self.assertEqual(check.raw_link(entry), "https://raw.githubusercontent.com/someone/some-pack/refs/heads/v2.x/packs/two%20words.pack")
+        self.assertEqual(check.raw_link(entry_for(pack())), "https://raw.githubusercontent.com/someone/some-pack/%s/build/tester.pack" % COMMIT)
+
+
+class AFollowedFile(unittest.TestCase):
+    """The file at the head of a followed entry's branch, held as the install page holds it before it offers it."""
+
+    def fetched(self, data, entry, *others):
+        asked = []
+
+        def get(url):
+            asked.append(url)
+            return data
+        said, in_order = run(listing(entry, *others), download=True, get=get)
+        self.assertEqual(asked, [check.raw_link(entry)])
+        return said, in_order
+
+    def refused(self, data, entry, words, *others):
+        said, in_order = self.fetched(data, entry, *others)
+        self.assertFalse(in_order, said)
+        self.assertIn(words, said)
+
+    def test_a_file_that_keeps_to_its_entry_is_offered(self):
+        data = card_pack(version=7)
+        said, in_order = self.fetched(data, followed_for(data, version=5, folders=[{"name": "notes", "place": "notes"}]))
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: tester (listed, follows main, its file held)", said)
+
+    def test_1_at_most_2_mb(self):
+        data = pack()
+        large = data + bytes(check.LARGEST + 1 - len(data))
+        self.refused(large, followed_for(data), "the file has 2097153 bytes, and a pack has at most 2097152")
+
+    def test_2_a_pack_of_format_3_whose_header_is_its_file_s(self):
+        data = pack()
+        entry = followed_for(data)
+        broken = bytearray(data)
+        broken[-1] ^= 1
+        for other, words in ((b"no pack at all, " * 8, "the file is no pack the loader takes: Not a pack file"),
+                             (data + bytes(4), "the file is no pack the loader takes: The header's sizes do not fit the file"),
+                             (bytes(broken), "the file is no pack the loader takes: The checksum"),
+                             (pb.make(bytes(64), pb.ROOM_START, 64, 0, "tester", OS_173), "the file is a pack of format 1, which the loader no longer takes")):
+            with self.subTest(words=words):
+                self.refused(other, entry, words)
+
+    def test_3_its_name_is_the_entry_s_id(self):
+        self.refused(pack(name="other"), followed_for(pack()), 'the file\'s name is "other", the entry\'s id is "tester"')
+
+    def test_4_it_is_built_for_the_entry_s_firmware(self):
+        self.refused(pack(target_os=0x12345678), followed_for(pack()),
+                     "the file's firmware is one this repository has no profile for (0x12345678), the entry says 1.7.3")
+
+    def test_5_its_version_is_the_entry_s_at_the_least(self):
+        self.refused(pack(version=4), followed_for(pack(), version=5), "the file's version is 4, the listing takes 5 or higher")
+        for version in (5, 6):
+            with self.subTest(version=version):
+                said, in_order = self.fetched(pack(version=version), followed_for(pack(), version=5))
+                self.assertTrue(in_order, said)
+
+    def test_6_it_needs_no_pack_its_entry_does_not_name(self):
+        data = pack(works=[("base", 2, True), ("other", 1, False)])
+        self.refused(data, followed_for(data), 'the file needs "base", which the entry\'s needs do not name')
+        said, in_order = self.fetched(data, followed_for(data, needs=["base"]))
+        self.assertTrue(in_order, said)
+
+    def test_7_it_needs_no_level_the_listed_base_does_not_offer(self):
+        data = pack(imports=[("op1f_level_4", True)])
+        self.refused(data, followed_for(data), "the file needs level 4 of the base, and the listing's base offers 3")
+        for imports in ([("op1f_level_3", True)], [("op1f_level_9", False)]):     # an optional name is no need
+            with self.subTest(imports=imports):
+                data = pack(imports=imports)
+                said, in_order = self.fetched(data, followed_for(data))
+                self.assertTrue(in_order, said)
+
+    def test_2_a_name_longer_than_the_page_takes_is_refused_before_the_file_is_read(self):
+        data = pack(imports=[("a" * (check.NAME_MOST + 1), True)] * 50)        # one long name mentioned many times
+        self.refused(data, followed_for(data), "a name in its lists is longer than %d characters" % check.NAME_MOST)
+        data = pack(imports=[("a" * check.NAME_MOST, False)])
+        said, in_order = self.fetched(data, followed_for(data))
+        self.assertTrue(in_order, said)
+
+    def test_8_a_list_of_folders_outside_the_body_is_refused(self):
+        data = card_pack(folders_at=pb.ROOM_START - pb.FOLDER.size)
+        self.refused(data, followed_for(data, folders=[{"name": "notes", "place": "notes"}]),
+                     "the file's card lists folders that cannot be read: its list does not lie in its body")
+
+    def test_8_its_card_asks_for_no_folder_its_entry_does_not_name(self):
+        data = card_pack(folders=[("notes", "notes"), ("more", "kept")])
+        entry = followed_for(data, folders=[{"name": "notes", "place": "notes"}])
+        self.refused(data, entry, 'the file\'s card asks for the folder {"name": "more", "place": "kept"}, which the entry\'s folders do not name')
+        self.refused(data, dict(entry, folders=[{"name": "notes", "place": "notes"}, {"name": "more", "place": "more"}]),
+                     '{"name": "more", "place": "kept"}')
+        said, in_order = self.fetched(data, dict(entry, folders=[{"name": "more", "place": "kept"}, {"name": "notes", "place": "notes"},
+                                                                 {"name": "spare", "place": "spare"}]))
+        self.assertTrue(in_order, said)
+
+    def test_its_card_is_held_as_a_pinned_file_s(self):
+        data = card_pack(card_version=1, folders=())
+        self.refused(data, followed_for(data), "its card: its version is not the pack's, 2")
+
+    def test_what_cannot_be_read_in_it_is_a_fault_never_a_stop(self):
+        data = card_pack(folders_at=pb.ROOM_START + 4096)                 # a list of folders outside the body
+        entry = followed_for(data, folders=[{"name": "notes", "place": "notes"}])
+        self.refused(data, entry, "the file's card lists folders that cannot be read")
+        self.refused(data, entry, "its card cannot be read")
+
+    def test_a_file_in_the_folders_given_is_held_the_same_way(self):
+        data = pack(version=4)
+        with tempfile.TemporaryDirectory() as folder:
+            with open(os.path.join(folder, "tester.pack"), "wb") as f:
+                f.write(data)
+            said, in_order = run(listing(followed_for(data, version=5)), folders=[folder])
+            self.assertFalse(in_order)
+            self.assertIn("the file's version is 4, the listing takes 5 or higher", said)
+            said, in_order = run(listing(followed_for(data, version=4)), folders=[folder])
+            self.assertTrue(in_order, said)
+            self.assertIn("ok: tester (listed, follows main, its file held)", said)
+
+    def test_a_retired_followed_entry_is_not_downloaded(self):
+        def get(url):
+            raise AssertionError("asked for %s" % url)
+        said, in_order = run(listing(dict(followed_for(pack()), status="retired")), download=True, get=get)
+        self.assertTrue(in_order, said)
+
+
+def places_pack(lists=((("tape.svg",), False), (("signalflow.svg",), True)), level=6, name="tester", version=2):
+    """A pack file with a card of `level` whose asks are asks of places, each (its pictures' names, whether it gives
+    way), as the base reads them: by default a firm one and then one that gives way."""
+    link, at = pb.ROOM_START, 4
+    asks = at + pb.CARD_4_BYTES
+    size = pb.TABLE_BYTES_6[5]
+    tables = asks + pb.ASK.size * len(lists)
+    end = tables + size * len(lists)                            # where the next list of names goes
+    body = bytearray(end + sum(pb.PLACE_NAME * len(names) for names, _gives in lists))
+    pb.CARD_4.pack_into(body, at, pb.CARD_MARK, pb.CARD_4_BYTES, level, version, name.encode("ascii"), 0, 0, 0, 0, 0, 0,
+                        link + asks, len(lists))
+    places = [(at + pb.CARD_3_BYTES, pb.KIND_WORD, None, link + asks)]
+    for number, (names, gives) in enumerate(lists):
+        table = tables + size * number
+        pb.ASK.pack_into(body, asks + pb.ASK.size * number, 5, size, link + table)
+        pb.KIND_HEAD.pack_into(body, table, size, b"list%d" % number, pb.PLACES_GIVES_WAY if gives else 0, 0)
+        struct.pack_into("<2I", body, table + pb.KIND_HEAD.size, len(names), link + end)
+        for n, picture in enumerate(names):
+            body[end + pb.PLACE_NAME * n:end + pb.PLACE_NAME * n + len(picture)] = picture.encode("ascii")
+        places += [(asks + pb.ASK.size * number + 8, pb.KIND_WORD, None, link + table), (table + 32, pb.KIND_WORD, None, link + end)]
+        end += pb.PLACE_NAME * len(names)
+    return pb.make3(bytes(body), link, len(body), 0, name, OS_173, (link, link), version=version,
+                    imports=[("op1f_level_%d" % level, True)], places=places, card_place=at, no_table=True)
+
+
+def versioned_base(version, level=6, firmware="1.7.3"):
+    """A base of that version held to its form, whose file is not at hand: its entry says what its file would."""
+    return dict(base_entry(level), sha256="0" * 64, bytes=1000, version=version, firmware=firmware, places=0, needs=[], folders=[])
+
+
+class ABaseOfTheVersionACardNeeds(unittest.TestCase):
+    """What a card asks that a base serves only from one of its versions on (BASE_SINCE): places that give way, which
+    base 31 serves and bases 24 to 30 leave aside."""
+
+    SAID = ("REFUSED: tester: the file's card asks for places that give way, which the base serves from its version 31, "
+            "and the listing's base for 1.7.3 is version 30")
+
+    def held(self, data, entry, *bases):
+        with tempfile.TemporaryDirectory() as folder:
+            with open(os.path.join(folder, os.path.basename(entry["path"])), "wb") as f:
+                f.write(data)
+            return run(dict(listing(), packs=list(bases) + [entry]), folders=[folder])
+
+    def test_the_file_is_read_as_its_card_asks(self):
+        self.assertTrue(check.gives_way(places_pack()))
+        self.assertEqual(check.base_needed(places_pack()), (31, "places that give way"))
+        self.assertTrue(check.gives_way(places_pack(lists=((("signalflow.svg",), True),))))
+        for data in (places_pack(lists=((("tape.svg",), False),)), card_pack(), pack()):
+            self.assertFalse(check.gives_way(data))
+            self.assertIsNone(check.base_needed(data))
+
+    def test_a_pack_that_gives_way_is_listed_beside_base_31_or_later(self):
+        data = places_pack()
+        entry = entry_for(data, level=6)
+        said, in_order = self.held(data, entry, versioned_base(30))
+        self.assertFalse(in_order, said)
+        self.assertIn(self.SAID, said)
+        for version in (31, 32):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertTrue(in_order, said)
+                self.assertIn("ok: tester (listed, its file held)", said)
+
+    def test_a_pack_with_firm_places_only_is_listed_beside_any_base(self):
+        data = places_pack(lists=((("tape.svg",), False),))
+        said, in_order = self.held(data, entry_for(data, level=6), versioned_base(24))
+        self.assertTrue(in_order, said)
+
+    def test_a_listing_whose_base_has_no_file_has_no_version(self):
+        data = places_pack()
+        said, in_order = self.held(data, entry_for(data, level=6), base_entry(6))
+        self.assertFalse(in_order, said)
+        self.assertIn("and the listing's base for 1.7.3 is none with a file", said)
+
+    def test_the_base_of_the_pack_s_own_firmware_counts_and_no_retired_one(self):
+        bases = [versioned_base(31, firmware="1.7.0"), versioned_base(30), dict(versioned_base(32), status="retired")]
+        self.assertEqual(check.base_version(bases, (), "1.7.3"), 30)
+        self.assertEqual(check.base_version(bases, (), "1.7.0"), 31)
+        self.assertEqual(check.base_version(bases, (1,), "1.7.3"), 0)          # an entry out of form is no base
+
+    def test_a_followed_file_that_gives_way_is_held_so_too(self):
+        data = places_pack()
+        entry = followed_for(data)
+        for version, in_order_then in ((30, False), (31, True)):
+            with self.subTest(version=version):
+                said, in_order = run(dict(listing(), packs=[versioned_base(version), entry]), download=True, get=lambda url: data)
+                self.assertEqual(in_order, in_order_then, said)
+                if not in_order_then:
+                    self.assertIn(self.SAID, said)
+
+
+def options_pack(level=6, name="tester", version=2, with_places=False):
+    """A pack file with a card of `level` whose ask is an ask of options (the pack's settings, base 32) with one switch
+    shown in KEYBOARD, as the base reads it; with `with_places`, a firm ask of places and one that gives way before it."""
+    link, at = pb.ROOM_START, 4
+    lists = ((("tape.svg",), False), (("signalflow.svg",), True)) if with_places else ()
+    count = len(lists) + 1
+    asks = at + pb.CARD_4_BYTES
+    places_size, size = pb.TABLE_BYTES_6[5], pb.TABLE_BYTES_6[pb.OPTIONS]
+    tables = asks + pb.ASK.size * count
+    table = tables + places_size * len(lists)                   # the options' table, behind those of places
+    end = table + size                                          # where the lists of names go
+    body = bytearray(end + sum(pb.PLACE_NAME * len(names) for names, _gives in lists))
+    pb.CARD_4.pack_into(body, at, pb.CARD_MARK, pb.CARD_4_BYTES, level, version, name.encode("ascii"), 0, 0, 0, 0, 0, 0,
+                        link + asks, count)
+    places = [(at + pb.CARD_3_BYTES, pb.KIND_WORD, None, link + asks)]
+    for number, (names, gives) in enumerate(lists):
+        place = tables + places_size * number
+        pb.ASK.pack_into(body, asks + pb.ASK.size * number, 5, places_size, link + place)
+        pb.KIND_HEAD.pack_into(body, place, places_size, b"list%d" % number, pb.PLACES_GIVES_WAY if gives else 0, 0)
+        struct.pack_into("<2I", body, place + pb.KIND_HEAD.size, len(names), link + end)
+        for n, picture in enumerate(names):
+            body[end + pb.PLACE_NAME * n:end + pb.PLACE_NAME * n + len(picture)] = picture.encode("ascii")
+        places += [(asks + pb.ASK.size * number + 8, pb.KIND_WORD, None, link + place), (place + 32, pb.KIND_WORD, None, link + end)]
+        end += pb.PLACE_NAME * len(names)
+    ask = asks + pb.ASK.size * len(lists)
+    pb.ASK.pack_into(body, ask, pb.OPTIONS, size, link + table)
+    pb.KIND_HEAD.pack_into(body, table, size, b"mine", 0, 0)
+    struct.pack_into("<2I", body, table + pb.KIND_HEAD.size, 0, 1)             # no `changed`, one option
+    option = table + pb.KIND_HEAD.size + 8
+    body[option:option + 3] = b"dot"
+    body[option + 16:option + 20] = bytes((pb.OPTION_SWITCH, 2, 0, pb.OPTION_CATEGORY["keyboard"] << 4))   # a switch, off at first, in KEYBOARD
+    places.append((ask + 8, pb.KIND_WORD, None, link + table))
+    return pb.make3(bytes(body), link, len(body), 0, name, OS_173, (link, link), version=version,
+                    imports=[("op1f_level_%d" % level, True)], places=places, card_place=at, no_table=True)
+
+
+class ABaseOfVersion32ForOptions(unittest.TestCase):
+    """The second row of BASE_SINCE: a card that asks for options, the pack's settings in the unit's settings, which
+    base 32 serves and bases before it leave aside (with their line for a kind they do not know)."""
+
+    SAID = ("REFUSED: tester: the file's card asks for options, which the base serves from its version 32, "
+            "and the listing's base for 1.7.3 is version %d")
+
+    held = ABaseOfTheVersionACardNeeds.held
+
+    def test_the_file_is_read_as_its_card_asks(self):
+        data = options_pack()
+        tables = pb.ask_tables(data)
+        self.assertEqual([(kind, wrong) for kind, _size, _what, _ask, wrong in tables], [(pb.OPTIONS, None)])   # an ask in order
+        self.assertTrue(check.asks_options(data))
+        self.assertEqual(check.base_needed(data), (32, "options"))
+        self.assertEqual(check.base_needed(options_pack(with_places=True)), (32, "options"))      # the later of the two bases asked for
+        for data in (places_pack(), places_pack(lists=((("tape.svg",), False),)), card_pack(), pack()):
+            self.assertFalse(check.asks_options(data))
+
+    def test_a_pack_that_asks_for_options_is_listed_beside_base_32_or_later(self):
+        data = options_pack()
+        entry = entry_for(data, level=6)
+        for version in (30, 31):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertFalse(in_order, said)
+                self.assertIn(self.SAID % version, said)
+        for version in (32, 33):
+            with self.subTest(version=version):
+                said, in_order = self.held(data, entry, versioned_base(version))
+                self.assertTrue(in_order, said)
+                self.assertIn("ok: tester (listed, its file held)", said)
+
+    def test_a_followed_file_that_asks_for_options_is_held_so_too(self):
+        data = options_pack()
+        entry = followed_for(data)
+        for version, in_order_then in ((31, False), (32, True)):
+            with self.subTest(version=version):
+                said, in_order = run(dict(listing(), packs=[versioned_base(version), entry]), download=True, get=lambda url: data)
+                self.assertEqual(in_order, in_order_then, said)
+                if not in_order_then:
+                    self.assertIn(self.SAID % version, said)
 
 
 class TheFormOfAnEntry(unittest.TestCase):
@@ -440,6 +895,23 @@ class AChangeHeldToTheListingBefore(unittest.TestCase):
         self.assertIn("its file changed and its version did not grow past 2", said)
         said, in_order = held(dict(moved, version=3), within)
         self.assertTrue(in_order, said)
+
+    def test_a_version_never_goes_down_a_followed_entry_s_lowest_included(self):
+        followed = followed_for(pack(), version=5)
+        pinned = entry_for(pack(version=5))
+        for new, old, words in ((dict(followed, version=4), followed, "its version went down, from 5 to 4"),
+                                (followed_for(pack(), version=4), pinned, "its version went down, from 5 to 4"),      # pinned, then followed
+                                (entry_for(pack(version=4)), followed, "its version went down, from 5 to 4"),        # followed, then pinned
+                                (dict(pinned, version=4), pinned, "its version went down, from 5 to 4")):
+            with self.subTest(new=new, old=old):
+                said, in_order = run(listing(new), before=listing(old))
+                self.assertFalse(in_order)
+                self.assertIn(words, said)
+        for new, old in ((followed, followed), (dict(followed, version=6), followed), (followed, pinned),
+                         (entry_for(pack(version=5)), followed), (entry_for(pack(version=7)), followed)):
+            with self.subTest(new=new, old=old):
+                said, in_order = run(listing(new), before=listing(old))
+                self.assertTrue(in_order, said)
 
     def test_a_move_to_a_firmware_with_no_profile_here_keeps_no_version(self):
         old = entry_for(pack(version=2))

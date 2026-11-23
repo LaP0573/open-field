@@ -7,12 +7,12 @@ The base is a pack like any other ([packs](packs.md)), built from `packs/base.js
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 30 |
-| Release | `0.12`: the start screen reads `1.7.3 - open-field 0.12` |
+| Version | 32 |
+| Release | `0.14`: the start screen reads `1.7.3 - open-field 0.14` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
-| Its changes of the firmware | Fifty-one: [the change list](changes.md), "The base, `base.pack`" |
+| Its changes of the firmware | Fifty-eight: [the change list](changes.md), "The base, `base.pack`" |
 
 Since the base is a file, a new base is a new file copied into `user/pk`, with no install. The **loader**, our small piece inside the firmware file, only reads, places and joins the pack files. It hands the base what it needs and knows nothing of what the base offers.
 
@@ -34,7 +34,7 @@ You never write a card by hand. The recipe says what goes into it, and `tools/pa
 | `pick` | The pack's function that says which of its pictures a name stands for now, or null |
 | `input` | Level 2: the pack's function that is offered every key and knob event, or null |
 | `folders` | Level 3: the pack's folders, none to eight ([below](#level-3-folders-files-and-text)) |
-| `asks` | Level 4: what the pack asks of the base besides, up to sixteen asks: a sequencer, the notes heard ([level 5](level-5.md)), a sound stage, working memory, pictures that take a place ([level 6](level-6.md)), values kept in the unit's files ([level 7](level-7.md)), an effect ([level 8](level-8.md)), a synth engine ([level 9](level-9.md)) |
+| `asks` | Level 4: what the pack asks of the base besides, up to sixteen asks: a sequencer, the notes heard ([level 5](level-5.md)), a sound stage, working memory, pictures that take a place, settings ([level 6](level-6.md)), values kept in the unit's files ([level 7](level-7.md)), an effect ([level 8](level-8.md)), a synth engine ([level 9](level-9.md)) |
 
 The card's source is one of the recipe's sources (`examples/wink/wink_card.s`). It is written again from the recipe by this command, into a new file:
 
@@ -53,7 +53,7 @@ python -I tools/pack_build.py card --recipe examples/wink/recipe.json --out <the
 | 3 | Folders and files on the unit's disk, and text on a page | 56 bytes | `op1f_level_3` |
 | 4 | [What a page needs](level-4.md): pages that stack, a blank page to paint, painting, text placed and measured, a file deleted, a key watched, the thread an event came on; and the card's list of asks | 64 bytes | `op1f_level_4` |
 | 5 | [A sequencer of the pack's own](level-5.md) in the unit's list, and the notes heard | 64 bytes | `op1f_level_5` |
-| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name; from base 31, [options](level-6.md#options-base-31) on one page reached from the unit's settings | 64 bytes | `op1f_level_6` |
+| 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name; from base 31, pictures that [give way](level-6.md#giving-way-base-31) to another pack's; from base 32, the pack's own [settings](level-6.md#settings-base-32) in the unit's settings | 64 bytes | `op1f_level_6` |
 | 7 | [Values kept in tapes and sounds](level-7.md), in the unit's own files | 64 bytes | `op1f_level_7` |
 | 8 | [An effect of the pack's own](level-8.md) in the unit's lists of effects, for the sounds and the master, and the list of every pack's effects, to run inside another pack | 64 bytes | `op1f_level_8` |
 | 9 | [A synth engine of the pack's own](level-9.md) in the unit's list of engines, with sounds of its own in the sound list | 64 bytes | `op1f_level_9` |
@@ -123,7 +123,7 @@ What a frame function must keep to:
 
 A screen of the firmware loads its picture by a file name. The base stands at the entry of that loader. For a name a pack carries a picture for, the picture comes from the pack; every other name goes on in the firmware's own loader. That is how a pack changes a screen of the device, and how a page of its own gets its picture.
 
-**Who serves a name.** The base asks the cards in the order of the packs' file names, each pack's `pick` first. The first pack that has the name serves it. Where a second pack carries the same name, one line in the log says so. A card of level 6 or later serves a screen of the firmware only the names it lists ([level 6](level-6.md), "Pictures that take a place"): a picture of its own named like one of the unit's stays its own.
+**Who serves a name.** The base asks the cards in the order of the packs' file names, each pack's `pick` first. A card of level 6 or later serves a screen of the firmware only the names it lists ([level 6](level-6.md), "Pictures that take a place"): a picture of its own named like one of the unit's stays its own. The first pack that has the name serves it, unless it gives way: from base 31 a pack can list names it serves only when no other pack does ([level 6](level-6.md), "Giving way"). So a recolour of the signal flow screen can sit next to a pack whose working page lives on that screen, and neither names the other. Where two packs both hold on to one name, the first by file name serves it, and one line in the log says so.
 
 **A pack's own picture**, for a page of its own, has a name the firmware never asks for. `op1f_picture(card, name)` looks for it in that pack's directory alone, and makes it into a **document**: the picture as the firmware holds it once it is read, with parts that can be found by their names.
 
@@ -392,7 +392,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 
 | Tag | Line begins | What it says |
 | --- | --- | --- |
-| `op1f_cards` | `cards:` | The cards the loader handed over, each card's level and what it asks for; then, every 256 frames through a gate, each frame function's time |
+| `op1f_cards` | `cards:` | The cards the loader handed over, each card's level and what it asks for; a picture two packs carry, and which serves it; then, every 256 frames through a gate, each frame function's time |
 | `op1f_cards` | `page:` | A page opened, with the mode, and closed, with why |
 | `op1f_cards` | `input:` | The keys and turns that came, and how many packs took; at each change of screen, the last key down and up |
 | `op1f_folders` | `folders:` | Each folder's place and whether it is shown; what the disk mode shows; each file the computer brings or deletes |
@@ -403,8 +403,8 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_notes` | `notes:` | Level 5: the packs that hear the notes |
 | `op1f_stages` | `stage:` | Level 6: each sound stage, its cost, and why one was left aside or switched off |
 | `op1f_memory` | `memory:` | Level 6: the working memory given, or refused |
+| `op1f_options` | `options:` | Level 6, from base 32: the packs with settings, how many values were read from the file, where each pack's settings show, a pack whose category was full, each write of the file, a pack's own settings page opened |
 | `op1f_keeps` | `keeps:` | Level 7: the values kept in the unit's files, written and read |
-| `op1f_options` | `options:` | Base 31: the packs' options read and written, the page up and closed, whether the settings row is in the list ([level 6](level-6.md#options-base-31)) |
 | `op1f_effects` | `effect:` | Level 8: the packs' effects in the unit's lists, which place plays which, their memory and their period |
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |
 | `op1f_tape_art` | `artwork` | A picture put together on the unit, and from what |
@@ -437,7 +437,7 @@ A pack that makes the audio thread slower shows in `aud`, a page that draws slow
 - **More than four values on an effect's knobs, or eight on an engine's.** Anything more is a value of level 7, set from the pack's own page.
 - **Folders inside a pack's folder, in the disk mode.** A pack may make them on the disk itself; the disk mode does not show them, and `op1f_list` leaves them out.
 - **A write from an input function.** It is refused: the frame function writes.
-- **A value of the whole unit** in the unit's own settings file. A pack keeps such a value in its own folder (level 3).
+- **A value of the whole unit** in the unit's own settings file. From base 32 a pack's settings show in the unit's settings and the base keeps them in a file of its own ([level 6](level-6.md#settings-base-32)); anything else a pack keeps in its own folder (level 3).
 - **A place in the firmware.** A pack that has to stand in the firmware's own code changes it through its own table of changes, as the example `trampolines` does ([a first pack](first-pack.md), "A pack that changes the firmware"). Two packs cannot change the same place: the one whose file sorts later is left out, and when that is `base.pack`, every pack that needs the base goes with it ([level 6](level-6.md), "Two packs at one place of the firmware").
 
 A pack that needs something new of the base comes with a change to the base ([below](#a-change-to-the-base)). Open an issue before you start on one ([CONTRIBUTING.md](../CONTRIBUTING.md)).
