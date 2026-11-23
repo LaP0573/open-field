@@ -3,7 +3,7 @@
 
   python -I tools/catalog_check.py                                  # the listing's form: every entry, every name held once
   python -I tools/catalog_check.py --files out/packs --files out/examples   # and every entry with a file held to it, in those folders
-  python -I tools/catalog_check.py --fetch                          # and every listed entry held to its file, downloaded at its commit
+  python -I tools/catalog_check.py --fetch                          # and every listed entry held to its file, downloaded at its commit or from its branch
   python -I tools/catalog_check.py --before before.json --fetch     # a pull request: against the listing before it, fetching what changed
 
 An entry names a pack file that lies in its author's own repository, at one commit, with the file's SHA-256; nothing
@@ -11,6 +11,11 @@ of a pack is copied into this repository, but base.pack. An entry is `reserved` 
 to offer yet), `bundled` (its file lies in this repository beside the install page, under builder/, and the page puts
 it on every unit it installs: base.pack alone), `listed` (offered on the install page) or `retired` (no longer
 offered; its id and its folders stay held for good). It only moves that way.
+
+A listed or retired entry may follow a branch instead (`follow`, the branch's name): its file is the one at the head
+of that branch, as it stands when the install page opens, so its author puts out a new version with a commit and no
+pull request. A followed entry names no commit, SHA-256, size, places or level: the page reads them from the file.
+Its `version` is the lowest the page takes, its `needs` and its `folders` the most the file may ask for.
 
 What is held, with nothing but this repository:
 
@@ -26,17 +31,27 @@ its size and its SHA-256, and that what the file says of itself is what the entr
 firmware it is for, how many places of the firmware it changes, the packs it needs, the level of the base it needs
 or offers, the folders its card asks for. The file is read by tools/pack_build.py, as `check` reads it.
 
+A followed entry's file (`--files`, or `--fetch`, which downloads it from the head of its branch) is held as the
+install page holds it in the owner's browser before it offers it: at most 2 MB; a pack of format 3 whose header's
+sizes and checksum are the file's, its lists readable, its card where the header says; its name the entry's id; built
+for the entry's firmware; its version at least the entry's; no pack needed that the entry's `needs` do not name; no
+level of the base above the one the listed base offers; no folder that the entry's `folders` do not name. Its card
+and its release are held as a pinned file's are.
+
 The listing's `ours` names the repositories of open-field's own packs: an entry whose author is `open-field` and
 that names a repository names one of them, and an entry in one of them has `open-field` as its author. The install
 page shows the warning on a pack that is not ours on every other entry.
 
 With `--before`, the listing before the change: no entry is taken out, no status moves back, an id is never changed,
-a new file comes with a higher version, and `ours` stays as it was. One new file may keep its version: the same pack
-built for another firmware, when the entry's `firmware` changed too and this repository has a profile for the new one
-(the version never goes down). With `--fetch`, only the entries that changed are downloaded then.
+a new file comes with a higher version, no version goes down (a followed entry's lowest included), and `ours` stays
+as it was. One new file may keep its version: the same pack built for another firmware, when the entry's `firmware`
+changed too and this repository has a profile for the new one. A pinned entry may come to follow a branch, and back:
+that is a change like any other. With `--fetch`, only the entries that are new or name another file or another
+branch are downloaded then, and a followed entry whose version, firmware, needs or folders changed.
 
 What it does not hold, and the review does: that the source at the commit is what the author says, and that the
-pack does what its description says on a unit. It answers 0 when every entry is in order, 1 otherwise.
+pack does what its description says on a unit. Nobody holds a followed entry's later versions so: each new commit on
+its branch reaches owners unread. It answers 0 when every entry is in order, 1 otherwise.
 """
 
 import argparse
@@ -45,6 +60,7 @@ import importlib.util
 import json
 import os
 import re
+import struct
 import sys
 import urllib.parse
 import urllib.request
@@ -69,7 +85,11 @@ LOCATION = ("repository", "commit", "path")                     # where a listed
 BUNDLED_IN = "builder/"                                         # where a bundled entry's file lies in this repository: beside the install page
 FILE_FACTS = ("sha256", "bytes", "version", "firmware", "places", "needs", "folders")   # what the file says, held to it
 OPTIONAL = ("level", "offers_level")                            # a pack with a card needs a level; the base offers them
-KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL)
+FOLLOW = "follow"                                               # the branch a followed entry's file is read from, instead of a commit
+FOLLOWED = ("repository", "path", FOLLOW, "version", "firmware", "needs", "folders")   # what a followed entry says, with ALWAYS
+PINNED = ("commit", "sha256", "bytes", "places") + OPTIONAL     # what a followed entry never says: the page reads it from the file
+FOLLOWING = ("listed", "retired")                               # the statuses that may follow a branch
+KEYS = set(ALWAYS + LOCATION + FILE_FACTS + OPTIONAL + (FOLLOW,))
 TOP_KEYS = {"about", "categories", "packs"}
 TOP_OPTIONAL = {"ours"}                                         # the repositories of open-field's own packs
 OURS = "open-field"                                             # the author of open-field's own packs
@@ -80,6 +100,7 @@ NOT_IN_A_NAME = set('/\\:*?"<>|')                              # what no file na
 AUTHOR_FORM = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")             # a GitHub user or organisation
 REPOSITORY_FORM = re.compile(r"https://github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/([A-Za-z0-9._-]{1,100})")
 COMMIT_FORM = re.compile(r"[0-9a-f]{40}")
+BRANCH_FORM = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}")  # a branch's name as the listing takes one: no slash
 SHA256_FORM = re.compile(r"[0-9a-f]{64}")
 CATEGORY_FORM = re.compile(r"[a-z]{1,16}")
 PATH_PART = re.compile(r"[A-Za-z0-9 _.()+-]+")
@@ -90,6 +111,9 @@ DESCRIPTION_MOST = 140
 FOLDERS_MOST = pack_build.FOLDERS_MOST
 LARGEST = 2 * 1024 * 1024                                       # a pack file larger than this is not downloaded
 RAW = "https://raw.githubusercontent.com/%s/%s/%s/%s"           # a file of a repository at a commit: a web page can read it too
+BRANCH_HEAD = "refs/heads/"                                     # before a branch's name in that link: the head of the branch
+UNREADABLE = (ValueError, IndexError, KeyError, TypeError, OverflowError, struct.error)   # what reading a file nobody built here may raise
+NAME_MOST = 255                                                 # the longest name a followed file's lists may hold, as the install page takes it
 
 
 def is_int(value):
@@ -104,6 +128,13 @@ def id_in_form(text):
     """A pack's id: its name as its header holds it, one to fifteen plain characters, which the install page also
     names its file after on the unit (`<id>.pack`): none of / \\ : * ? " < > |, no space or dot at either end."""
     return plain(text, 15) and not NOT_IN_A_NAME & set(text) and text[0] not in " ." and text[-1] not in " ."
+
+
+def branch_in_form(text):
+    """A followed entry's branch: one to a hundred of A-Z a-z 0-9 _ . -, not beginning with a dot or a dash, no two
+    dots together, not ending in a dot or in .lock. No slash, so that its link names the branch and nothing else."""
+    return (isinstance(text, str) and BRANCH_FORM.fullmatch(text) is not None and ".." not in text
+            and not text.endswith(".") and not text.endswith(".lock"))
 
 
 def firmwares(folder=PROFILES):
@@ -152,7 +183,10 @@ def entry_faults(entry, categories, known_firmwares):
     if unknown:
         faults.append("it has keys the listing does not know: %s" % ", ".join(unknown))
     missing = [key for key in ALWAYS if key not in entry]
-    if status == "listed":
+    followed = FOLLOW in entry
+    if followed and status in FOLLOWING:                        # its file is read from its branch: the entry says what may come
+        missing += [key for key in FOLLOWED if key not in entry]
+    elif status == "listed":
         missing += [key for key in LOCATION + FILE_FACTS if key not in entry]
     elif status == "bundled":
         missing += [key for key in ("path",) + FILE_FACTS if key not in entry]
@@ -160,6 +194,14 @@ def entry_faults(entry, categories, known_firmwares):
         missing += [key for key in FILE_FACTS if key not in entry]
     if missing:
         faults.append("it lacks %s" % ", ".join(missing))
+    if followed and status not in FOLLOWING:
+        faults.append("only a listed or a retired entry follows a branch")
+    named = [key for key in PINNED if key in entry]
+    if followed and named:
+        faults.append("a followed entry names no %s: the install page reads them from its file" % ", ".join(named))
+    if followed and not branch_in_form(entry[FOLLOW]):
+        faults.append("its follow is not a branch's name: one to a hundred of A-Z a-z 0-9 _ . -, not beginning with . or -, "
+                      "no .., not ending in . or .lock, no slash")
     if status == "reserved" and any(key in entry for key in ("repository", "commit")):
         faults.append("a reserved entry names no repository or commit: it has no file to offer yet")
     if status == "bundled" and any(key in entry for key in ("repository", "commit")):
@@ -202,6 +244,16 @@ def entry_faults(entry, categories, known_firmwares):
     if "folders" in entry:
         faults += folder_faults(entry["folders"])
     return faults
+
+
+def base_offers(packs, out_of_form=(), firmware=None):
+    """The highest level of the base the listing offers: the highest `offers_level` of an entry in order that is not
+    retired, 0 for none. A pack's entry needs no higher level, and a followed pack's file needs none either: for it,
+    only a base for its own firmware counts (`firmware`; an entry that names none counts for every one), as the
+    install page takes the bundled base of the unit's firmware."""
+    return max((entry["offers_level"] for number, entry in enumerate(packs) if number not in out_of_form and isinstance(entry, dict)
+                and entry.get("status") != "retired" and is_int(entry.get("offers_level"))
+                and (firmware is None or entry.get("firmware", firmware) == firmware)), default=0)
 
 
 def listing_faults(listing, known_firmwares):
@@ -253,7 +305,7 @@ def listing_faults(listing, known_firmwares):
                     each.setdefault(number, []).append("its folder's %s %r is held by %r" % (part, folder[part], held_folders[(part, word)]))
                 held_folders.setdefault((part, word), entry["id"])
     present = {entry["id"]: entry for number, entry in enumerate(packs) if number not in each}
-    offered = max((entry["offers_level"] for entry in present.values() if entry["status"] != "retired" and "offers_level" in entry), default=0)
+    offered = base_offers(packs, each)
     for number, entry in enumerate(packs):
         if number in each:
             continue
@@ -309,6 +361,85 @@ def file_faults(entry, data, known_firmwares):
     return faults
 
 
+def long_name(data):
+    """A fault of a followed file's lists that would cost their reading dear, as a text, or None: a name longer than
+    NAME_MOST characters. Read before tools/pack_build.py reads the file, which takes every name again for each mention
+    of it, so that one long name mentioned many times cannot fill the memory. Anything else out of order is left to
+    pack_build to say."""
+    if len(data) < pack_build.HEADER3_BYTES or data[:8] != pack_build.MAGIC:
+        return None
+    header = pack_build.HEADER3.unpack_from(data)
+    body_bytes, lists_bytes = header[5], header[12]
+    lists = data[pack_build.HEADER3_BYTES + body_bytes:pack_build.HEADER3_BYTES + body_bytes + lists_bytes]
+    if len(lists) < 24 or len(lists) != lists_bytes:
+        return None
+    works, exports, imports, places, marks, strings_n = struct.unpack_from("<6I", lists)
+    if 24 + 12 * works + 8 * exports + 8 * imports + 12 * places + 8 * marks + strings_n != len(lists):
+        return None
+    strings = lists[len(lists) - strings_n:]
+    mentions = [24 + 12 * n for n in range(works)] + [24 + 12 * works + 8 * n for n in range(exports + imports)]
+    for offset in {struct.unpack_from("<I", lists, at)[0] for at in mentions}:
+        if offset < len(strings) and strings.find(b"\0", offset, offset + NAME_MOST + 1) < 0 and len(strings) - offset > NAME_MOST:
+            return "a name in its lists is longer than %d characters" % NAME_MOST
+    return None
+
+
+def followed_faults(entry, data, known_firmwares, offered):
+    """What is not in order with the file at the head of a followed entry's branch, as texts: what the install page
+    holds in the owner's browser before it offers the file (docs/catalog.md, "Following a branch"), and its card and
+    its release as `file_faults` holds a pinned file's. `offered` is the level the listed base offers (`base_offers`).
+    Nobody here built the file: what cannot be read in it is a fault, never a stop."""
+    if len(data) > LARGEST:                                     # 1: the size
+        return ["the file has %d bytes, and a pack has at most %d" % (len(data), LARGEST)]
+    long = long_name(data)                                      # 2, first: no name that would cost its reading dear
+    if long:
+        return ["the file is no pack the loader takes: %s" % long]
+    try:                                                        # 2: a pack of format 3, its sizes, its checksum, its lists, its card's place
+        fields, _body = pack_build.parse(data)
+    except UNREADABLE as problem:
+        return ["the file is no pack the loader takes: %s" % (str(problem) or type(problem).__name__)]
+    if fields["format"] != pack_build.FORMAT_LINKED:
+        return ["the file is a pack of format %d, which the loader no longer takes" % fields["format"]]
+    faults = []
+    lists = fields["lists"]
+    if fields["name"] != entry["id"]:                           # 3: its name
+        faults.append("the file's name is %s, the entry's id is %s" % (json.dumps(fields["name"]), json.dumps(entry["id"])))
+    firmware = known_firmwares.get(fields["os_id"], "one this repository has no profile for (0x%08x)" % fields["os_id"])
+    if firmware != entry["firmware"]:                           # 4: its firmware
+        faults.append("the file's firmware is %s, the entry says %s" % (firmware, entry["firmware"]))
+    if fields["version"] < entry["version"]:                    # 5: its version, the entry's at the least
+        faults.append("the file's version is %d, the listing takes %d or higher" % (fields["version"], entry["version"]))
+    for needed in sorted({name for name, _interface, flag in lists["works"] if flag} - set(entry["needs"])):   # 6: what it needs
+        faults.append("the file needs %s, which the entry's needs do not name" % json.dumps(needed))
+    level = level_of([(name, flag) for name, flag in lists["imports"]], True)
+    if level is not None and level > offered:                   # 7: the level of the base it needs
+        faults.append("the file needs level %d of the base, and the listing's base offers %d" % (level, offered))
+    allowed = {(folder["name"], folder["place"]) for folder in entry["folders"]}
+    try:                                                        # 8: the folders its card asks for, their list inside the body
+        card = pack_build.card_in(data)
+        at = card["folders"] - fields["load_address"] if card and card.get("folder_count") else 0
+        if card and card.get("folder_count") and (at < 0 or at + pack_build.FOLDER.size * card["folder_count"] > fields["body_bytes"]):
+            raise ValueError("its list does not lie in its body")
+        asked = [(name, place) for name, place, _shown in pack_build.folders_in(data)]
+    except UNREADABLE as problem:
+        asked = []
+        faults.append("the file's card lists folders that cannot be read: %s" % (str(problem) or type(problem).__name__))
+    for name, place in asked:
+        if (name, place) not in allowed:
+            faults.append("the file's card asks for the folder %s, which the entry's folders do not name"
+                          % json.dumps({"name": name, "place": place}))
+    try:
+        if pack_build.card_in(data) is not None:
+            faults += ["its card: %s" % fault for fault in pack_build.card_faults(data)]
+    except UNREADABLE as problem:
+        faults.append("its card cannot be read: %s" % (str(problem) or type(problem).__name__))
+    try:
+        pack_build.release_in(data)
+    except ValueError as problem:
+        faults.append("its release: %s" % problem)
+    return faults
+
+
 def moved_firmware(new, old, known_firmwares):
     """Whether an entry's new file is the same pack built for another firmware: its firmware changed to one this
     repository has a profile for, and its version did not go down."""
@@ -320,7 +451,8 @@ def moved_firmware(new, old, known_firmwares):
 def before_faults(listing, before, known_firmwares=None):
     """What a change to the listing may not do, held against the listing before it: {id: faults}. A file may change
     at the same version only with its firmware (`moved_firmware`); `known_firmwares` are those this repository has a
-    profile for, and without them no such move is let through."""
+    profile for, and without them no such move is let through. No version goes down, a followed entry's lowest
+    included; a pinned entry may come to follow a branch, and back, on that rule alone."""
     out = {}
     now = {entry.get("id", "").casefold(): entry for entry in listing["packs"] if isinstance(entry, dict) and isinstance(entry.get("id"), str)}
     for old in before.get("packs", []):
@@ -340,22 +472,30 @@ def before_faults(listing, before, known_firmwares=None):
                 and not moved_firmware(new, old, known_firmwares)):
             faults.append("its file changed and its version did not grow past %s (the same version is kept only by the "
                           "same pack built for another firmware this repository has a profile for)" % old.get("version"))
+        elif is_int(new.get("version")) and is_int(old.get("version")) and new["version"] < old["version"]:
+            faults.append("its version went down, from %d to %d: a version never goes down, and a followed entry's is the "
+                          "lowest the install page takes from its branch" % (old["version"], new["version"]))
         if faults:
             out[new["id"]] = faults
     return out
 
 
 def changed(entry, before):
-    """Whether an entry is new, or names another file than it did before."""
+    """Whether an entry is new, or names another file or another branch than it did before. A followed entry is also
+    held to its file again when what the file is held to changed: its version, its firmware, its needs or its folders."""
+    keys = LOCATION + (FOLLOW, "sha256") + (FOLLOWED[3:] if FOLLOW in entry else ())
     for old in before.get("packs", []):
         if isinstance(old, dict) and old.get("id") == entry["id"]:
-            return any(old.get(key) != entry.get(key) for key in LOCATION + ("sha256",))
+            return any(old.get(key) != entry.get(key) for key in keys)
     return True
 
 
 def raw_link(entry):
+    """Where the install page downloads an entry's file: its repository at its commit, or at the head of the branch
+    it follows."""
     owner, name = REPOSITORY_FORM.fullmatch(entry["repository"]).groups()
-    return RAW % (owner, name, entry["commit"], urllib.parse.quote(entry["path"]))
+    at = BRANCH_HEAD + entry[FOLLOW] if FOLLOW in entry else entry["commit"]
+    return RAW % (owner, name, at, urllib.parse.quote(entry["path"]))
 
 
 def fetch(url):
@@ -405,7 +545,8 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
         label = entry.get("id", "entry %d" % (number + 1)) if isinstance(entry, dict) else "entry %d" % (number + 1)
         faults = list(each.get(number, [])) + (earlier.get(label, []) if isinstance(label, str) else [])
         held = ""
-        if number not in each and entry.get("sha256") and entry["status"] != "retired":
+        followed = number not in each and entry.get("status") == "listed" and FOLLOW in entry
+        if number not in each and (entry.get("sha256") or followed) and entry["status"] != "retired":
             data, where = None, None
             if entry["status"] == "bundled":
                 data, where = repository_file(entry["path"]), "this repository"
@@ -421,9 +562,14 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
                 data, where = local_file(entry, folders), "the folders given"
                 if data is None:
                     faults.append("its file is not in %s" % ", ".join(folders))
-            if data is not None:
+            if data is not None and followed:
+                faults += followed_faults(entry, data, known_firmwares, base_offers(packs, each, entry["firmware"]))
+                held = ", its file held"
+            elif data is not None:
                 faults += file_faults(entry, data, known_firmwares)
                 held = ", its file held"
+        if followed:
+            held = ", follows %s%s" % (entry[FOLLOW], held)
         if faults:
             refused = True
             lines += ["REFUSED: %s: %s" % (label, fault) for fault in faults]
@@ -443,7 +589,7 @@ def main(argv=None):
     parser.add_argument("--catalog", default=CATALOG, help="the listing (default: catalog/packs.json)")
     parser.add_argument("--before", help="the listing before the change, to hold the change against")
     parser.add_argument("--files", action="append", default=[], help="a folder with pack files to hold the entries to (more than one may be given)")
-    parser.add_argument("--fetch", action="store_true", help="download each listed entry's file at its commit and hold the entry to it")
+    parser.add_argument("--fetch", action="store_true", help="download each listed entry's file, at its commit or from the branch it follows, and hold the entry to it")
     args = parser.parse_args(argv)
     try:
         listing = read_json(args.catalog)
