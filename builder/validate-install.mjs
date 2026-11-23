@@ -25,7 +25,7 @@ import {
   prepare, readHelper, readPacks, checkFolder, sha256,
 } from "./install.mjs";
 import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
-import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed } from "./catalog.mjs";
+import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
@@ -461,6 +461,21 @@ async function selfChecks() {
     (e) => check("kept bytes that changed are refused", /SHA-256 differs/.test(e.message) && calls.length === before, e.message));
   await download(followed(), host).then(() => check("a followed entry not checked at load is not downloaded by the tick", false),
     (e) => check("a followed entry not checked at load is not downloaded by the tick", /was not checked when the page opened/.test(e.message) && calls.length === before, e.message));
+
+  // a pack's picture: the same repository at the same commit, held to its size, its SHA-256 and the PNG signature
+  const png = new Uint8Array(64); png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const pictured = entry("one", { picture: { path: "thumbs/one.png", sha256: await sha256(png), bytes: 64 } });
+  check("a picture's link is the repository's file at the entry's commit", pictureLink(pictured) === RAW + "someone/packs/" + COMMIT + "/thumbs/one.png");
+  check("a picture out of form is none", pictureOf(entry("one", { picture: { path: "../x.png", sha256: pictured.picture.sha256, bytes: 64 } })) === null &&
+    pictureOf(entry("one", { picture: { path: "x.jpg", sha256: pictured.picture.sha256, bytes: 64 } })) === null && pictureOf(entry("one")) === null);
+  check("a followed entry's picture is none: it has no commit to take it at", pictureOf(followed({ picture: pictured.picture })) === null);
+  check("a picture that is the entry's is taken", (await downloadPicture(pictured, answer(png))).length === 64 && answer.asked?.options?.redirect === "error");
+  const notPng = new Uint8Array(64).fill(1), wrongKind = entry("one", { picture: { path: "a.png", sha256: await sha256(notPng), bytes: 64 } });
+  for (const [what, e, get, words] of [
+    ["a picture of other bytes is refused", pictured, answer(new Uint8Array(64).fill(2)), /SHA-256 differs/],
+    ["a picture of another size is refused", pictured, answer(new Uint8Array(63)), /63 bytes/],
+    ["a picture that is no PNG is refused", wrongKind, answer(notPng), /not a PNG/],
+  ]) await downloadPicture(e, get).then(() => check(what, false), (err) => check(what, words.test(err.message), err.message));
 
   // the bootloader: every verdict names one the model knows, and none is assumed
   check("a version with +0 is the model's", bootloaderVersion("1000.2.0+0") === "1000.2.0" && bootloaderVersion("1000.1.1+0") === "1000.1.1" &&

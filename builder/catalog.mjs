@@ -150,6 +150,9 @@ export function knownVersions(data, firmware) {
   return out;
 }
 
+// The one load from another site: a file of a repository at a commit (rawLink, pictureLink).
+const fetchRaw = (url, options) => fetch(url, options);
+
 // The bytes the host answers for `url`, or an error that says what went wrong (the caller names the pack). With
 // `most`, a file the host says is larger is refused before it is read.
 async function fileAt(url, get, most) {
@@ -167,7 +170,7 @@ async function fileAt(url, get, most) {
 // when the page opened gives back the bytes kept then, held to their SHA-256 again, and downloads nothing. A followed
 // entry not taken yet is downloaded from its branch and held to the entry by checkFollowed, with the level of the base
 // the listing offers (`baseLevel`; resolveFollowed gives it): the answer then has the file's `facts` too.
-export async function download(entry, get = (url, options) => fetch(url, options), baseLevel) {
+export async function download(entry, get = fetchRaw, baseLevel) {
   const url = rawLink(entry);
   if (entry.follow !== undefined && !taken(entry)) {
     if (!Number.isInteger(baseLevel)) throw new Error(followedSaid(entry) + " was not checked when the page opened: refused");
@@ -360,4 +363,34 @@ export async function resolveFollowed(data, firmware, get, wait = FOLLOWED_WAIT)
     finally { clearTimeout(timer); }
   }));
   return { data: { ...data, packs }, problems: problems.filter((p) => p) };
+}
+
+// A listed entry's picture, if it names one in form: {path, sha256, bytes}, a PNG in the pack's repository (or null).
+export const PICTURE_LARGEST = 100 * 1024;
+export function pictureOf(entry) {
+  const p = entry && entry.follow === undefined && entry.picture;   // a followed entry has no commit to take a picture at
+  if (!p || typeof p !== "object" || typeof p.path !== "string" || !/\.png$/i.test(p.path) || !SHA256.test(p.sha256 ?? "") ||
+      !Number.isInteger(p.bytes) || p.bytes <= 0 || p.bytes > PICTURE_LARGEST) return null;
+  if (!p.path.split("/").every((part) => part && part !== "." && part !== ".." && PATH_PART.test(part))) return null;
+  return p;
+}
+
+// The link of an entry's picture: the same repository, at the same commit, as its pack.
+export function pictureLink(entry) {
+  const found = REPOSITORY.exec(entry.repository);
+  if (!found || !COMMIT.test(entry.commit ?? "") || !pictureOf(entry)) throw new Error(entry.id + ": no picture in form");
+  return RAW + found[1] + "/" + found[2] + "/" + entry.commit + "/" + entry.picture.path.split("/").map(encodeURIComponent).join("/");
+}
+
+// An entry's picture, downloaded at its commit and held to its size, its SHA-256 and the PNG signature: the bytes,
+// or an error. The page shows it only then, and the category's pictogram otherwise.
+export async function downloadPicture(entry, get = fetchRaw) {
+  const url = pictureLink(entry), picture = entry.picture;
+  const answer = await get(url, { credentials: "omit", redirect: "error" });
+  if (!answer.ok) throw new Error(entry.id + ": the picture's download answered " + answer.status);
+  const bytes = new Uint8Array(await answer.arrayBuffer());
+  if (bytes.length !== picture.bytes) throw new Error(entry.id + ": the picture has " + bytes.length + " bytes, the listing says " + picture.bytes);
+  if (await sha256(bytes) !== picture.sha256) throw new Error(entry.id + ": the picture is not the one the listing names (its SHA-256 differs)");
+  if (![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => bytes[i] === b)) throw new Error(entry.id + ": the picture is not a PNG");
+  return bytes;
 }

@@ -71,6 +71,24 @@
       "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}]
     },
     {
+      "id": "master mod",
+      "author": "Reverdy-Carrasco",
+      "status": "listed",
+      "categories": ["mixer", "looks"],
+      "description": "Encoder remap on the Master page, L/R post-makeup on the master compressor, matching SVGs.",
+      "repository": "https://github.com/Reverdy-Carrasco/master-mod",
+      "commit": "781ea4ffbe61a8e52750fb88e2c48310174f0999",
+      "path": "out/master mod.pack",
+      "sha256": "421aea3a276ba3ffb7a05c4a9201b746cb4cf49d7937fb4c5a0b7fb791e8f0eb",
+      "bytes": 3656,
+      "version": 1,
+      "firmware": "1.7.3",
+      "places": 14,
+      "needs": [],
+      "level": 1,
+      "folders": []
+    },
+    {
       "id": "sidechain",
       "author": "Faust",
       "status": "listed",
@@ -82,6 +100,24 @@
       "version": 10,
       "firmware": "1.7.3",
       "needs": [],
+      "folders": []
+    },
+    {
+      "id": "save mod",
+      "author": "Reverdy-Carrasco",
+      "status": "listed",
+      "categories": ["tape", "mixer"],
+      "description": "Keeps per tape the master EQ, effect (with its switch and a pack's effect on it), compressor, tape speed and M1/M2.",
+      "repository": "https://github.com/Reverdy-Carrasco/save-mod",
+      "commit": "554fd8d9ce8421bb520d65316ffa8a1883546ca2",
+      "path": "out/save mod.pack",
+      "sha256": "08085ba94186f94e8c4e582da22fc719db01db6b6be497c4de0b6137534eab4d",
+      "bytes": 9812,
+      "version": 4,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 7,
       "folders": []
     },
     {
@@ -251,7 +287,7 @@
       "categories": ["effects"],
       "description": "A Bode frequency shifter in a delay's feedback loop, with an animated page, in the unit's lists of effects and on fx train's wagons.",
       "repository": "https://github.com/galfaroth/open-field-veff",
-      "commit": "24bf2969d2b7891b0ef3b7f08d77c20f195b200f",
+      "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
       "path": "veffbode.pack",
       "sha256": "8f303080059ca6e54aa1f45b1f773309eeacf26ba1889820af20e5b21918c250",
       "bytes": 28902,
@@ -260,7 +296,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffbode.png", "sha256": "125265388fc71f281d68a4e8d630e943b2485cac134edb05bef6bcbe26f8060e", "bytes": 22248}
     },
     {
       "id": "veffrosion",
@@ -269,7 +306,7 @@
       "categories": ["effects"],
       "description": "A degrader after Erosion: a tiny delay wobbled by a sine or band-passed noise, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
-      "commit": "24bf2969d2b7891b0ef3b7f08d77c20f195b200f",
+      "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
       "path": "veffrosion.pack",
       "sha256": "054017034fb2379084aed7f1866312883c9f1d99586790639f59e54a84baf824",
       "bytes": 49186,
@@ -278,7 +315,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffrosion.png", "sha256": "80800ac50fab5d4152d3789b314225d89f61422931f6571c944f1fcce79339b2", "bytes": 12046}
     },
     {
       "id": "veffsaturator",
@@ -295,7 +333,7 @@
       "categories": ["effects"],
       "description": "A saturator with six curves, colour, soft clip and 2x oversampling, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
-      "commit": "24bf2969d2b7891b0ef3b7f08d77c20f195b200f",
+      "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
       "path": "veffurator.pack",
       "sha256": "ae7de55843b1fa3e26400407bfbde083b46b9055528ab614054b0e78fdc8625f",
       "bytes": 45814,
@@ -304,7 +342,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffurator.png", "sha256": "8098cecb840edb3255037f63b300caedb32a3caf6a739434aa02becfcbca3420", "bytes": 17234}
     },
     {
       "id": "veffshaper",
@@ -313,7 +352,7 @@
       "categories": ["effects"],
       "description": "A parametric waveshaper with an animated transfer curve, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
-      "commit": "24bf2969d2b7891b0ef3b7f08d77c20f195b200f",
+      "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
       "path": "veffshaper.pack",
       "sha256": "d6734560fcaf396de653901ca54a560d69714ffb9eff0f3d117ec46dc5ed7c1f",
       "bytes": 23618,
@@ -322,7 +361,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffshaper.png", "sha256": "89c4dbba0f0ae5664fd6604a53a5cd49fce7b1ca1a7b021d39dd8d63aba6e4c0", "bytes": 19644}
     },
     {
       "id": "veffgrrr",
@@ -339,7 +379,7 @@
       "categories": ["effects"],
       "description": "A two-stage distortion with filters and a feedback loop, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
-      "commit": "24bf2969d2b7891b0ef3b7f08d77c20f195b200f",
+      "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
       "path": "veffrrrr.pack",
       "sha256": "e8c14658041e76270e58c94cab733b4a8dae8381889fd7452e945217e20f1517",
       "bytes": 48382,
@@ -348,7 +388,8 @@
       "places": 0,
       "needs": [],
       "level": 10,
-      "folders": []
+      "folders": [],
+      "picture": {"path": "thumbs/veffrrrr.png", "sha256": "fa027d8bd0c1d6a9992fb1ff533e4fa0828564fb316c896a7e4ed438f002f6c3", "bytes": 15015}
     }
   ]
 }
