@@ -45,7 +45,7 @@ If you have not built a pack yet, start with [a first pack](first-pack.md).
 | `needs` | The packs it cannot run without, by their ids: `base` for a pack that wants the base's names and has no card, none for a pack with a card. In a followed entry: the packs the file may need |
 | `level` | For a pack with a card: the level of the base it needs, 1 to 10 ([the base](base.md)) |
 | `folders` | The folders its card asks for under `user/pf/`: each its name in the disk mode and its place. None to eight. In a followed entry: the folders its card may ask for |
-| `picture` | Optional, on a `listed` or `bundled` entry: `{"path": ..., "sha256": ..., "bytes": ...}`, a thumbnail the install page shows in place of the category's pictogram ([a picture](#a-picture)) |
+| `picture` | Optional, on a `listed` entry: `{"path": ..., "sha256": ..., "bytes": ...}`, a thumbnail the install page shows in place of the category's pictogram ([a picture](#a-picture)) |
 
 The base's own entry says `offers_level` instead of `level`: the highest level it offers. A pack that needs a higher level than the listed base offers is refused.
 
@@ -76,7 +76,7 @@ A followed entry names no `commit`, `sha256`, `bytes`, `places` or `level`: the 
 
 ## A picture
 
-A `listed` entry may name a picture, and a `bundled` one may too; no other may, a followed entry neither (a picture lies at the commit an entry names), and none needs one. The install page shows it on the pack's tile in the slot of the category's line pictogram (150×120 on a wide screen, 130×104 on a phone), so draw it to sit there: ink lines on a transparent ground rather than a screenshot.
+A `listed` entry may name a picture; no other may (the base row shows none), a followed entry neither (a picture lies at the commit an entry names), and none needs one. The install page shows it on the pack's tile in the slot of the category's line pictogram (150×120 on a wide screen, 130×104 on a phone), so draw it to sit there: ink lines on a transparent ground rather than a screenshot.
 
 ```json
 "picture": {"path": "thumbs/notes.png", "sha256": "the picture's SHA-256", "bytes": 3012}

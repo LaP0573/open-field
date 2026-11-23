@@ -162,14 +162,16 @@ const fetchRaw = (url, options) => fetch(url, options);
 
 // The bytes the host answers for `url`, or an error that says what went wrong (the caller names the pack). With
 // `most`, a file the host says is larger is refused before it is read.
-async function fileAt(url, get, most) {
+async function fileAt(url, get, most, said) {
   let answer;
   try { answer = await get(url, { credentials: "omit", redirect: "error" }); }
   catch (e) { throw new Error("could not be downloaded (" + (e.message || e) + ")"); }
   if (!answer.ok) throw new Error("the download answered " + answer.status + ", not the file");
   const told = most && answer.headers && typeof answer.headers.get === "function" ? Number(answer.headers.get("content-length")) : 0;
-  if (told > most) throw new Error("it has " + told.toLocaleString("en-US") + " bytes, more than the " + most.toLocaleString("en-US") + " the page takes from a branch");
-  return new Uint8Array(await answer.arrayBuffer());
+  if (told > most) throw new Error("it has " + told.toLocaleString("en-US") + " bytes, more than the " + most.toLocaleString("en-US") + " the page takes" + (said || ""));
+  const bytes = new Uint8Array(await answer.arrayBuffer());
+  if (most && bytes.length > most) throw new Error("it has " + bytes.length.toLocaleString("en-US") + " bytes, more than the " + most.toLocaleString("en-US") + " the page takes" + (said || ""));
+  return bytes;
 }
 
 // A listed entry's file, downloaded at its commit and held to the entry: {id, name, bytes, sha256, from}, or an error
@@ -182,7 +184,7 @@ export async function download(entry, get = fetchRaw, baseLevel) {
   if (entry.follow !== undefined && !taken(entry)) {
     if (!Number.isInteger(baseLevel)) throw new Error(followedSaid(entry) + " was not checked when the page opened: refused");
     let fresh;
-    try { fresh = await fileAt(url, get, FOLLOWED_MOST); } catch (e) { throw new Error(followedSaid(entry) + " is refused: " + e.message); }
+    try { fresh = await fileAt(url, get, FOLLOWED_MOST, " from a branch"); } catch (e) { throw new Error(followedSaid(entry) + " is refused: " + e.message); }
     const facts = checkFollowed(entry, fresh, baseLevel);
     return { id: entry.id, name: fileName(entry), bytes: fresh, sha256: await sha256(fresh), from: url, facts };
   }
@@ -393,9 +395,8 @@ export function pictureLink(entry) {
 // or an error. The page shows it only then, and the category's pictogram otherwise.
 export async function downloadPicture(entry, get = fetchRaw) {
   const url = pictureLink(entry), picture = entry.picture;
-  const answer = await get(url, { credentials: "omit", redirect: "error" });
-  if (!answer.ok) throw new Error(entry.id + ": the picture's download answered " + answer.status);
-  const bytes = new Uint8Array(await answer.arrayBuffer());
+  let bytes;
+  try { bytes = await fileAt(url, get, PICTURE_LARGEST, " for a picture"); } catch (e) { throw new Error(entry.id + ": the picture " + e.message); }
   if (bytes.length !== picture.bytes) throw new Error(entry.id + ": the picture has " + bytes.length + " bytes, the listing says " + picture.bytes);
   if (await sha256(bytes) !== picture.sha256) throw new Error(entry.id + ": the picture is not the one the listing names (its SHA-256 differs)");
   if (![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => bytes[i] === b)) throw new Error(entry.id + ": the picture is not a PNG");
