@@ -100,7 +100,8 @@
       "needs": [],
       "level": 1,
       "folders": []
-    },    {
+    },
+    {
       "id": "sidechain",
       "author": "open-field",
       "status": "listed",
