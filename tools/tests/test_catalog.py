@@ -316,6 +316,10 @@ class Downloads(unittest.TestCase):
                     "picture": {"path": "a.png", "sha256": "0" * 64, "bytes": 5}}
         said, in_order = run(listing(reserved))
         self.assertIn("only a listed or a bundled entry has a picture", said)
+        followed = followed_for(data, picture={"path": "a.png", "sha256": "0" * 64, "bytes": 5})
+        said, in_order = run(listing(followed))
+        self.assertFalse(in_order)
+        self.assertIn("a followed entry has no picture", said)
 
     def test_a_link_that_does_not_answer_is_the_entry_s_fault(self):
         def get(url):

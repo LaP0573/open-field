@@ -368,6 +368,8 @@ def entry_faults(entry, categories, known_firmwares):
     if PICTURE in entry:
         if status not in ("listed", "bundled"):
             faults.append("only a listed or a bundled entry has a picture")
+        elif followed:                                          # the page shows a picture only from the entry's commit
+            faults.append("a followed entry has no picture: a picture lies at the commit an entry names")
         faults += picture_faults(entry[PICTURE])
     return faults
 

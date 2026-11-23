@@ -469,6 +469,7 @@ async function selfChecks() {
   check("a picture's link is the repository's file at the entry's commit", pictureLink(pictured) === RAW + "someone/packs/" + COMMIT + "/thumbs/one.png");
   check("a picture out of form is none", pictureOf(entry("one", { picture: { path: "../x.png", sha256: pictured.picture.sha256, bytes: 64 } })) === null &&
     pictureOf(entry("one", { picture: { path: "x.jpg", sha256: pictured.picture.sha256, bytes: 64 } })) === null && pictureOf(entry("one")) === null);
+  check("a followed entry's picture is none: it has no commit to take it at", pictureOf(followed({ picture: pictured.picture })) === null);
   check("a picture that is the entry's is taken", (await downloadPicture(pictured, answer(png))).length === 64 && answer.asked?.options?.redirect === "error");
   const notPng = new Uint8Array(64).fill(1), wrongKind = entry("one", { picture: { path: "a.png", sha256: await sha256(notPng), bytes: 64 } });
   for (const [what, e, get, words] of [

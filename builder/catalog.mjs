@@ -375,7 +375,7 @@ export async function resolveFollowed(data, firmware, get, wait = FOLLOWED_WAIT)
 // A listed entry's picture, if it names one in form: {path, sha256, bytes}, a PNG in the pack's repository (or null).
 export const PICTURE_LARGEST = 100 * 1024;
 export function pictureOf(entry) {
-  const p = entry && entry.picture;
+  const p = entry && entry.follow === undefined && entry.picture;   // a followed entry has no commit to take a picture at
   if (!p || typeof p !== "object" || typeof p.path !== "string" || !/\.png$/i.test(p.path) || !SHA256.test(p.sha256 ?? "") ||
       !Number.isInteger(p.bytes) || p.bytes <= 0 || p.bytes > PICTURE_LARGEST) return null;
   if (!p.path.split("/").every((part) => part && part !== "." && part !== ".." && PATH_PART.test(part))) return null;

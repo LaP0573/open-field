@@ -76,7 +76,7 @@ A followed entry names no `commit`, `sha256`, `bytes`, `places` or `level`: the 
 
 ## A picture
 
-A `listed` entry may name a picture, and a `bundled` one may too; no other may, and none needs one. The install page shows it on the pack's tile in the slot of the category's line pictogram (150×120 on a wide screen, 130×104 on a phone), so draw it to sit there: ink lines on a transparent ground rather than a screenshot.
+A `listed` entry may name a picture, and a `bundled` one may too; no other may, a followed entry neither (a picture lies at the commit an entry names), and none needs one. The install page shows it on the pack's tile in the slot of the category's line pictogram (150×120 on a wide screen, 130×104 on a phone), so draw it to sit there: ink lines on a transparent ground rather than a screenshot.
 
 ```json
 "picture": {"path": "thumbs/notes.png", "sha256": "the picture's SHA-256", "bytes": 3012}
