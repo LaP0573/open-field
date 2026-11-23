@@ -2,7 +2,7 @@
 """Check the listing of packs, catalog/packs.json: what the install page offers an owner (docs/catalog.md).
 
   python -I tools/catalog_check.py                                  # the listing's form: every entry, every name held once
-  python -I tools/catalog_check.py --files out/packs --files out/examples   # and every entry with a file held to it, in those folders
+  python -I tools/catalog_check.py --files out/packs --files out/examples   # and the entries of each author with a file there held to their files
   python -I tools/catalog_check.py --fetch                          # and every listed entry held to its file, downloaded at its commit or from its branch
   python -I tools/catalog_check.py --before before.json --fetch     # a pull request: against the listing before it, fetching what changed
 
@@ -29,14 +29,23 @@ A bundled entry is always held to its file in this repository. With a pack file 
 which downloads it from its repository at the entry's commit):
 its size and its SHA-256, and that what the file says of itself is what the entry says: its name, its version, the
 firmware it is for, how many places of the firmware it changes, the packs it needs, the level of the base it needs
-or offers, the folders its card asks for. The file is read by tools/pack_build.py, as `check` reads it.
+or offers, the folders its card asks for. The file is read by tools/pack_build.py, as `check` reads it. And that its
+card asks for nothing the listing's base for its firmware is too old to serve (BASE_SINCE: an ask of places that gives
+way needs base 31 or later), which is no level: an older base of the same level leaves that ask aside and runs the
+rest of the pack.
+
+With `--files`, an author whose file lies in one of the folders is held whole: every entry of theirs that names a file
+is held to it, and one whose file is not there is refused. So open-field's own packs are all held when the folders of
+a build are given, and an author's own are when their file is. An entry of an author with no file there is held to its
+form only, and its line says so. Folders that hold no entry's file at all are refused.
 
 A followed entry's file (`--files`, or `--fetch`, which downloads it from the head of its branch) is held as the
 install page holds it in the owner's browser before it offers it: at most 2 MB; a pack of format 3 whose header's
 sizes and checksum are the file's, its lists readable, its card where the header says; its name the entry's id; built
 for the entry's firmware; its version at least the entry's; no pack needed that the entry's `needs` do not name; no
-level of the base above the one the listed base offers; no folder that the entry's `folders` do not name. Its card
-and its release are held as a pinned file's are.
+level of the base above the one the listed base offers; no folder that the entry's `folders` do not name. Its card,
+its release and the base's version it needs are held as a pinned file's are (the page does not hold the version: it
+puts the listed base on the unit with every pack).
 
 The listing's `ours` names the repositories of open-field's own packs: an entry whose author is `open-field` and
 that names a repository names one of them, and an entry in one of them has `open-field` as its author. The install
@@ -114,6 +123,43 @@ RAW = "https://raw.githubusercontent.com/%s/%s/%s/%s"           # a file of a re
 BRANCH_HEAD = "refs/heads/"                                     # before a branch's name in that link: the head of the branch
 UNREADABLE = (ValueError, IndexError, KeyError, TypeError, OverflowError, struct.error)   # what reading a file nobody built here may raise
 NAME_MOST = 255                                                 # the longest name a followed file's lists may hold, as the install page takes it
+PLACES_KIND = 6                                                 # the level from which a card may ask for places
+GIVES_WAY = getattr(pack_build, "PLACES_GIVES_WAY", 1)          # the places ask's flag that it gives way
+
+
+def gives_way(data):
+    """Whether the file's card asks for places that give way (its ask head's flag OP1F_PLACES_GIVES_WAY)."""
+    card = pack_build.card_in(data)
+    if card is None or card["level"] < PLACES_KIND:
+        return False
+    places = pack_build.ASK_KINDS_OF_LEVEL[PLACES_KIND]["places"]
+    return any(kind == places and ask is not None and ask[2] & GIVES_WAY for kind, _size, _what, ask, _wrong in pack_build.ask_tables(data))
+
+
+# What a card may ask that a base serves only from one of its versions on, with no new level: (what, that version, how
+# it is read in a file). A base of the same level before that version leaves the ask aside, says so in its log and
+# runs the rest of the pack. A pack that asks it is listed only beside a base of that version or later for its
+# firmware: the base the install page puts on the unit with every pack.
+BASE_SINCE = (
+    ("places that give way", 31, gives_way),
+)
+
+
+def base_needed(data):
+    """(the base's lowest version that serves what the file's card asks, what it asks) for the highest of BASE_SINCE
+    the file asks, or None."""
+    asked = [(version, what) for what, version, asks in BASE_SINCE if asks(data)]
+    return max(asked) if asked else None
+
+
+def base_faults(entry, data, base):
+    """What the file's card asks that the listing's base, of version `base` for the entry's firmware, is too old to
+    serve, as texts."""
+    needed = base_needed(data)
+    if needed is None or needed[0] <= base:
+        return []
+    return ["the file's card asks for %s, which the base serves from its version %d, and the listing's base for %s is %s"
+            % (needed[1], needed[0], entry["firmware"], "version %d" % base if base else "none with a file")]
 
 
 def is_int(value):
@@ -256,6 +302,15 @@ def base_offers(packs, out_of_form=(), firmware=None):
                 and (firmware is None or entry.get("firmware", firmware) == firmware)), default=0)
 
 
+def base_version(packs, out_of_form=(), firmware=None):
+    """The version of the base the listing offers for a firmware, as base_offers picks the base: the highest `version`
+    of an entry in order that offers a level and is not retired, 0 for none with a file. What a pack's card asks needs
+    no later version (BASE_SINCE)."""
+    return max((entry["version"] for number, entry in enumerate(packs) if number not in out_of_form and isinstance(entry, dict)
+                and entry.get("status") != "retired" and is_int(entry.get("offers_level")) and is_int(entry.get("version"))
+                and (firmware is None or entry.get("firmware", firmware) == firmware)), default=0)
+
+
 def listing_faults(listing, known_firmwares):
     """What is not in order with the listing: (faults of the whole, {index of an entry: its faults})."""
     whole, each = [], {}
@@ -323,8 +378,10 @@ def level_of(names, needed_only):
     return max(levels) if levels else None
 
 
-def file_faults(entry, data, known_firmwares):
-    """What the pack file says of itself that the entry does not, as texts: none for a file that is the entry's."""
+def file_faults(entry, data, known_firmwares, base=None):
+    """What the pack file says of itself that the entry does not, as texts: none for a file that is the entry's. With
+    `base`, the version of the listing's base for the entry's firmware (base_version), also what its card asks that
+    this base is too old to serve."""
     faults = []
     if len(data) != entry["bytes"]:
         faults.append("the file has %d bytes, the entry says %d" % (len(data), entry["bytes"]))
@@ -354,6 +411,8 @@ def file_faults(entry, data, known_firmwares):
             faults.append("the file's %s is %s, the entry says %s" % (key.replace("_", " "), json.dumps(value), json.dumps(stated)))
     if pack_build.card_in(data) is not None:
         faults += ["its card: %s" % fault for fault in pack_build.card_faults(data)]
+        if base is not None:
+            faults += base_faults(entry, data, base)
     try:
         pack_build.release_in(data)
     except ValueError as problem:
@@ -384,11 +443,12 @@ def long_name(data):
     return None
 
 
-def followed_faults(entry, data, known_firmwares, offered):
+def followed_faults(entry, data, known_firmwares, offered, base=None):
     """What is not in order with the file at the head of a followed entry's branch, as texts: what the install page
-    holds in the owner's browser before it offers the file (docs/catalog.md, "Following a branch"), and its card and
-    its release as `file_faults` holds a pinned file's. `offered` is the level the listed base offers (`base_offers`).
-    Nobody here built the file: what cannot be read in it is a fault, never a stop."""
+    holds in the owner's browser before it offers the file (docs/catalog.md, "Following a branch"), and its card, its
+    release and with `base` the base's version as `file_faults` holds a pinned file's. `offered` is the level the
+    listed base offers (`base_offers`), `base` its version (`base_version`). Nobody here built the file: what cannot be
+    read in it is a fault, never a stop."""
     if len(data) > LARGEST:                                     # 1: the size
         return ["the file has %d bytes, and a pack has at most %d" % (len(data), LARGEST)]
     long = long_name(data)                                      # 2, first: no name that would cost its reading dear
@@ -431,6 +491,8 @@ def followed_faults(entry, data, known_firmwares, offered):
     try:
         if pack_build.card_in(data) is not None:
             faults += ["its card: %s" % fault for fault in pack_build.card_faults(data)]
+            if base is not None:
+                faults += base_faults(entry, data, base)
     except UNREADABLE as problem:
         faults.append("its card cannot be read: %s" % (str(problem) or type(problem).__name__))
     try:
@@ -541,12 +603,18 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
     if moved:                                                   # the maintainer changes it on main, never a pull request
         lines.append("REFUSED: the listing: its ours changed: the repositories of open-field's own packs are the maintainer's change")
     refused = bool(whole) or bool(earlier) or moved
+    with_a_file = [number for number, entry in enumerate(packs)
+                   if number not in each and (entry.get("sha256") or (entry.get("status") == "listed" and FOLLOW in entry))
+                   and entry["status"] != "retired"]
+    found = {number: local_file(packs[number], folders) for number in with_a_file} if folders else {}
+    at_hand = {packs[number]["author"] for number, data in found.items() if data is not None}   # whose files the folders hold
+    looked = False
     for number, entry in enumerate(packs):
         label = entry.get("id", "entry %d" % (number + 1)) if isinstance(entry, dict) else "entry %d" % (number + 1)
         faults = list(each.get(number, [])) + (earlier.get(label, []) if isinstance(label, str) else [])
         held = ""
         followed = number not in each and entry.get("status") == "listed" and FOLLOW in entry
-        if number not in each and (entry.get("sha256") or followed) and entry["status"] != "retired":
+        if number in with_a_file:
             data, where = None, None
             if entry["status"] == "bundled":
                 data, where = repository_file(entry["path"]), "this repository"
@@ -559,14 +627,17 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
                 except Exception as problem:                    # a link that does not answer is the entry's fault
                     faults.append("its file could not be downloaded from %s: %s" % (where, problem))
             elif folders:
-                data, where = local_file(entry, folders), "the folders given"
-                if data is None:
+                data, where, looked = found[number], "the folders given", True
+                if data is None and entry["author"] in at_hand:      # another of its author's files is there: this one is missing
                     faults.append("its file is not in %s" % ", ".join(folders))
+                elif data is None:                              # an author with no file at hand: held to its form only
+                    held = ", its file not held: no file of %s's in the folders given" % entry["author"]
+            base = base_version(packs, each, entry["firmware"])
             if data is not None and followed:
-                faults += followed_faults(entry, data, known_firmwares, base_offers(packs, each, entry["firmware"]))
+                faults += followed_faults(entry, data, known_firmwares, base_offers(packs, each, entry["firmware"]), base)
                 held = ", its file held"
             elif data is not None:
-                faults += file_faults(entry, data, known_firmwares)
+                faults += file_faults(entry, data, known_firmwares, base)
                 held = ", its file held"
         if followed:
             held = ", follows %s%s" % (entry[FOLLOW], held)
@@ -575,6 +646,10 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
             lines += ["REFUSED: %s: %s" % (label, fault) for fault in faults]
         else:
             lines.append("ok: %s (%s%s)" % (label, entry["status"], held))
+    if looked and not at_hand:                                  # a file named otherwise than its entry would pass unread
+        refused = True
+        lines.append("REFUSED: the folders given (%s) hold no entry's file: a file is looked for by the last part of its entry's"
+                     " path, or as <id>.pack" % ", ".join(folders))
     lines.append("%d entries, %s" % (len(packs), "REFUSED" if refused else "all in order"))
     return lines, not refused
 
