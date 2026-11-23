@@ -45,6 +45,7 @@ If you have not built a pack yet, start with [a first pack](first-pack.md).
 | `needs` | The packs it cannot run without, by their ids: `base` for a pack that wants the base's names and has no card, none for a pack with a card. In a followed entry: the packs the file may need |
 | `level` | For a pack with a card: the level of the base it needs, 1 to 10 ([the base](base.md)) |
 | `folders` | The folders its card asks for under `user/pf/`: each its name in the disk mode and its place. None to eight. In a followed entry: the folders its card may ask for |
+| `picture` | Optional, on a `listed` or `bundled` entry: `{"path": ..., "sha256": ..., "bytes": ...}`, a thumbnail the install page shows in place of the category's pictogram ([a picture](#a-picture)) |
 
 The base's own entry says `offers_level` instead of `level`: the highest level it offers. A pack that needs a higher level than the listed base offers is refused.
 
@@ -72,6 +73,20 @@ The same pack, following the branch `main` instead of one commit:
 ```
 
 A followed entry names no `commit`, `sha256`, `bytes`, `places` or `level`: the page reads them from the file each time.
+
+## A picture
+
+A `listed` entry may name a picture, and a `bundled` one may too; no other may, a followed entry neither (a picture lies at the commit an entry names), and none needs one. The install page shows it on the pack's tile in the slot of the category's line pictogram (150×120 on a wide screen, 130×104 on a phone), so draw it to sit there: ink lines on a transparent ground rather than a screenshot.
+
+```json
+"picture": {"path": "thumbs/notes.png", "sha256": "the picture's SHA-256", "bytes": 3012}
+```
+
+- It lies in the same `repository` at the same `commit` as the pack (a bundled entry's, in this repository); `path` is a plain path in it, ending in `.png`.
+- A PNG with transparency: an alpha channel, or a `tRNS` chunk.
+- Its width to its height exactly 5:4, at most 600×480 (300×240 is plenty), at most 100 KB (102400 bytes).
+
+The listing's check downloads it from raw.githubusercontent.com at the entry's commit, as it does the pack, and holds it to its size, its SHA-256, the PNG signature, and the width, height and transparency its IHDR and chunks say. The install page downloads it when the tile comes into view, holds it to its size, SHA-256 and signature, and only then shows it; a picture that is refused or does not load leaves the pictogram.
 
 ## Categories
 
