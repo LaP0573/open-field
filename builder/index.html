@@ -690,7 +690,7 @@
   import { Session } from "./ferret.mjs";
   import { buildImage, ours } from "./patch.mjs";
   import { NAMES, prepare, readHelper, checkFolder, sha256 } from "./install.mjs";
-  import { LISTING_FILE, readListing } from "./catalog.mjs";
+  import { LISTING_FILE, readListing, resolveFollowed } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
   const SUPPORTED_BL = ["1000.1.1", "1000.1.1+0",    // te-boot answers "1000.1.1" (2026-11-15); its screen says "+0"
@@ -905,8 +905,11 @@
     try {
       const data = await fetch("./" + LISTING_FILE).then((r) => (r.ok ? r.json() : null));
       if (!data) throw new Error(LISTING_FILE + " is not beside this page");
-      const listing = readListing(data, manifest.os);
-      listingData = data;
+      // a pack that follows its author's branch: its file downloaded once now, held to its entry and kept
+      const followed = await resolveFollowed(data, manifest.os);
+      for (const problem of followed.problems) log("the listing: " + problem, "warn");
+      const listing = readListing(followed.data, manifest.os);
+      listingData = followed.data;
       for (const problem of listing.problems) log("the listing: " + problem, "warn");
     } catch (e) {
       log("no listing of packs: " + e.message);
@@ -1702,7 +1705,15 @@
           if (r.state === P.STATE.different) t.append(el("div", "why", r.unit && r.unit.hashError ? "Your OP-1 couldn't read it back." : "Not the listing's v" + entry.version + ". A test build or a friend's, maybe."));
           if (v && v.locked && v.why) t.append(el("div", "why", v.why));
         }
-        t.append(meta, ft);
+        t.append(meta);
+        if (entry.followed) {   // a file taken from its author's branch when the page opened: reviewed only when it is open-field's own
+          const own = isOurs(listing, entry);
+          const mark = el("div", "why", "latest from " + entry.author + "'s " + entry.follow + (own ? "" : " · not reviewed"));
+          mark.title = "This file comes straight from " + entry.author + "'s branch " + entry.follow + " as it stands today" +
+            (own ? ": one of open-field's own packs." : ": nobody at open-field has looked at this version.");
+          t.append(mark);
+        }
+        t.append(ft);
         g.append(t);
       }
     }
@@ -1805,9 +1816,10 @@
         let bytes;
         if (s.kind === "base") bytes = files.basePack.bytes;
         else {
-          $("asksSay").textContent = "Downloading " + s.id + " from its author's repository…";
+          $("asksSay").textContent = (s.entry.followed ? "Taking " : "Downloading ") + s.id + " from its author's repository…";
           const got = await download(s.entry);
-          say("downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
+          say(s.entry.followed ? "took " + got.name + " as the page checked it when it opened, from " + got.from + (listing && isOurs(listing, s.entry) ? "" : ": not reviewed by open-field")
+            : "downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
           bytes = got.bytes;
         }
         sent.push({ name: s.name, data: bytes, sha256: D.hexBytes(s.sha256), id: s.id, version: s.version });
