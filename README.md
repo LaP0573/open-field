@@ -24,7 +24,7 @@ Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
 
 With open-field on the unit, the start screen reads `1.7.3 - open-field 0.14`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.14`.
 
-The install puts two things on the unit: the new firmware file and `base.pack`, from `builder/base.pack` beside the page. Packs come after. They are not kept in this repository: their authors publish them, and once open-field is on your unit, the install page's packs section adds and removes the packs of [the listing](docs/catalog.md). You can also copy a pack file onto the unit yourself, in its disk mode ([the guide](docs/guide.md#adding-a-feature)). **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
+The install puts two things on the unit: the new firmware file and `base.pack`, from `builder/base.pack` beside the page. Packs come after. They are not kept in this repository: their authors publish them, and once open-field is on your unit, the install page's packs section adds and removes the packs of [the listing](docs/catalog.md), and with its **+** any pack file you have on your computer. You can also copy a pack file onto the unit yourself, in its disk mode ([the guide](docs/guide.md#adding-a-feature)). **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
 ## What is not here, and never will be
 

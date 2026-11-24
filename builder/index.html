@@ -191,8 +191,10 @@
   .act.q { background: var(--ink); color: var(--on-ink); }
   .act.rm { border-color: var(--red); color: var(--red); }
   .act:disabled { cursor: default; opacity: .55; }
-  .tile.yours { align-items: center; justify-content: center; text-align: center; color: var(--mid); gap: 10px; }
-  .tile.yours .plus { width: 54px; height: 54px; border: 1.3px dashed var(--mid); border-radius: 50%; font: 300 30px/50px var(--sans); }
+  .tile.yours { align-items: center; justify-content: center; text-align: center; color: var(--mid); gap: 10px; cursor: pointer; }
+  .tile.yours .plus { width: 54px; height: 54px; border: 1.3px dashed var(--mid); border-radius: 50%; font: 300 30px/50px var(--sans);
+    padding: 0; background: transparent; color: inherit; cursor: pointer; }
+  .tile.yours:hover .plus, .tile.yours .plus:focus-visible { border-color: var(--ink); color: var(--ink); }
   .tile.yours b { color: var(--ink); font-weight: 500; font-size: 15px; }
   .also { margin-top: 28px; }
   .also h4 { margin: 0 0 8px; font: 500 12px var(--mono); color: var(--mid); }
@@ -657,6 +659,8 @@
           <div class="side"><span class="st" id="baseState"><span class="dot" style="--c:var(--grey)"></span>comes with the install</span><span id="baseAct"></span></div>
         </div>
         <div class="grid" id="grid"></div>
+        <input type="file" id="pickPacks" class="hidden" accept=".pack" multiple>
+        <p class="say warn" id="pickSay"></p>
         <p class="note" id="listingNote"></p>
         <p class="note packnote">A pack is a program that can read and write the files on your unit: take packs only from people you trust. If one acts up, hold the help key (the speech bubble) while you switch on. Your OP-1 then starts with no packs, like the original firmware, for that one start.</p>
         <p class="note" data-m="connect">Connect your OP-1 above to add or take off packs.</p>
@@ -1349,7 +1353,7 @@
   // and holds every file to the record it kept in the browser's storage (one record a firmware).
   import * as D from "./door.mjs";
   import * as P from "./packs-live.mjs";
-  import { readListing, knownVersions, fileName, download, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
+  import { readListing, knownVersions, fileName, download, pictureOf, pictureLink, downloadPicture, checkPickedFile } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
   const FW = window.openFieldFirmware;               // the firmware this page is for, from the install's own script
@@ -1358,6 +1362,9 @@
   let files = null, listing = null, known = new Map(), base = null;
   let unit = null, rowsNow = null, choices = null, resolved = null, filter = "all", onlyMine = false;
   let lastCounts = null;
+  // the pack files picked on this computer with the + tile, each checkPickedFile's answer with its bytes as `data`: they
+  // belong to the computer, not to the unit, so they stay through a connect, a disconnect and a change that didn't go
+  let picked = [];
 
   function store() { try { return window.localStorage; } catch (e) { return null; } }
   // The install steps, once open, stay until the owner closes them: nothing the unit does takes them away (it goes away
@@ -1644,7 +1651,7 @@
     return slot;
   }
 
-  function choose(fn) { fn(); $("changeSay").textContent = ""; resolved = rowsNow ? P.resolve(rowsNow, choices, listing, base) : null; render(); }
+  function choose(fn) { fn(); $("changeSay").textContent = ""; resolved = rowsNow ? P.resolve(rowsNow, choices, listing, base, picked) : null; render(); }
 
   function act(text, cls, onClick, disabled, title) {
     const b = el("button", "act" + (cls ? " " + cls : ""), text);
@@ -1661,7 +1668,7 @@
     const offered = listing ? listing.offered.size : 0;
     $("offerCount").textContent = offered ? offered + " to pick from" : "none listed yet";
     const live = !!(unit && rowsNow && client.protocol >= 3);
-    if (live && !resolved) resolved = P.resolve(rowsNow, choices, listing, base);
+    if (live && !resolved) resolved = P.resolve(rowsNow, choices, listing, base, picked);
     if (!live) resolved = null;
     // the filters: all, each category, and what is on your OP-1
     const fl = $("filters");
@@ -1721,7 +1728,8 @@
         const acts = el("span", "acts");
         if (live && r && v) {
           const lockWhy = v.locked ? v.why : "";
-          if (r.unit) {
+          if (v.picked) acts.append(pickedAct(v));
+          else if (r.unit) {
             if (v.action === P.ACTION.remove) acts.append(act("coming off −", "rm", () => choose(() => choices.ticked.add(key)), v.locked, lockWhy));
             else acts.append(act("on your OP-1 ✓", "on", () => choose(() => { choices.ticked.delete(key); choices.updates.delete(key); }), v.locked, lockWhy || "untick to take it off"));
             if (P.updateOffered(r) && v.action !== P.ACTION.remove) {
@@ -1757,10 +1765,63 @@
         g.append(t);
       }
     }
+    for (const p of picked) g.append(pickedTile(p, live));
+    // the + tile: the computer's own file picker, for pack files the list doesn't have
     const yours = el("article", "tile yours");
-    yours.append(el("div", "plus", "+"), el("b", "", "your pack here"), el("span", "", "There's room on the shelf. The repository says how to write one and how to get it listed."));
+    const plus = el("button", "plus", "+");
+    plus.type = "button";
+    plus.setAttribute("aria-label", "pick pack files on your computer");
+    yours.append(plus, el("b", "", "add your own"), el("span", "", "A .pack that isn't in the list, your own build or a friend's. Pick one or more on your computer and they go on with your next send."));
+    yours.addEventListener("click", () => $("pickPacks").click());
     g.append(yours);
   }
+
+  // The one button of a row whose place a picked file takes: nothing to press there, the picked file's own tile has it.
+  function pickedAct(v) { return act(v.action === P.ACTION.picked ? "your file goes in ↑" : "same as your file ✓", v.action === P.ACTION.picked ? "q" : "on", null, true, v.why); }
+
+  // A file picked on the computer, as a tile: what its header says, where it goes on the unit, and its button to leave it out again.
+  function pickedTile(p, live) {
+    const t = el("article", "tile");
+    const hd = el("div", "hd");
+    hd.append(el("span", "", "yours"), el("span", "", "from your computer"));
+    const place = live && resolved ? resolved.placed.get(p) : null;
+    const target = place && place.replaces ? place.replaces : p.file;     // the unit's file it takes the place of keeps its name
+    const goesAs = (place && place.same) || p.from.toLowerCase() === target.toLowerCase() ? "" : " It goes on your OP-1 as " + target + ".";
+    t.append(hd, parcel(), el("h3", "", p.name), el("p", "", "Picked on your computer, the file " + p.from + "." + goesAs));
+    if (place) {
+      const st = el("span", "st");
+      const words = place.same ? "already on your OP-1, the very same file" : place.replaces ? "takes the place of " + place.replaces + " on your OP-1" : "goes on with your next send";
+      st.append(Object.assign(el("span", "dot"), { style: "--c:var(--" + (place.same ? "blue" : "ochre") + ")" }), document.createTextNode(words));
+      t.append(st);
+    }
+    const meta = el("div", "meta");
+    meta.append(el("span", "", "v" + p.version + " · " + kb(p.size)), el("span", "", "not in the list"));
+    const ft = el("div", "ft"), acts = el("span", "acts");
+    acts.append(act("added ✓", "q", () => choose(() => { picked = picked.filter((x) => x !== p); $("pickSay").textContent = ""; }), false, "click to leave it out"));
+    ft.append(el("span", "who", "picked by you"), acts);
+    t.append(meta, ft);
+    return t;
+  }
+
+  $("pickPacks").addEventListener("change", async (e) => {
+    const chosen = [...e.target.files];
+    e.target.value = "";                                    // the same file may be picked again later
+    const refused = [];
+    const level = listing && listing.base && Number.isInteger(listing.base.offers_level) ? listing.base.offers_level : null;
+    for (const f of chosen) {
+      try {
+        const bytes = new Uint8Array(await f.arrayBuffer());   // read once: the bytes checked and hashed are the bytes sent
+        const checked = await checkPickedFile(bytes, FW, level);
+        picked = picked.filter((x) => x.file.toLowerCase() !== checked.file.toLowerCase());     // a later pick of the same pack takes the earlier one's place
+        picked.push({ ...checked, from: f.name, data: bytes });
+        say("picked " + f.name + " on this computer: the pack " + checked.name + " v" + checked.version + ", " + checked.size.toLocaleString("en-US") + " bytes, SHA-256 " + checked.sha256, "ok");
+      } catch (err) {
+        refused.push(f.name + " can't go on: " + (err && err.message ? err.message : err) + ".");
+      }
+    }
+    for (const words of refused) say(words, "warn");
+    choose(() => { $("pickSay").textContent = refused.join(" "); });
+  });
 
   function renderAlso(live) {
     const box = $("alsoBox"), rowsEl = $("alsoRows");
@@ -1775,6 +1836,7 @@
       const what = el("span", "", r.state === P.STATE.leftOut ? "left out at the start" : r.knownId ? r.knownId + ", an example for pack authors" : "not in the listing");
       const from = el("span", "", r.state === P.STATE.leftOut ? "take it off in disk mode" : "source unknown to this page");
       const a = r.state === P.STATE.leftOut ? act("left out", "", null, true, v.why) :
+        v.picked ? pickedAct(v) :
         v.action === P.ACTION.remove ? act("coming off −", "rm", () => choose(() => choices.ticked.add(r.key))) : act("remove −", "", () => choose(() => choices.ticked.delete(r.key)));
       line.append(name, size, what, from, a);
       rowsEl.append(line);
@@ -1805,7 +1867,7 @@
   }
 
   $("updateBase").addEventListener("click", () => { if (rowsNow && P.updateOffered(rowsNow.base)) choose(() => choices.updates.add(P.BASE)); });
-  $("undoAll").addEventListener("click", () => { if (rowsNow) choose(() => { choices = P.initialChoices(rowsNow); }); });
+  $("undoAll").addEventListener("click", () => { if (rowsNow) choose(() => { choices = P.initialChoices(rowsNow); picked = []; $("pickSay").textContent = ""; }); });
 
   // ---------- the change: downloads held to the listing, the door's change, the card, the restart ----------
 
@@ -1855,14 +1917,18 @@
       for (const s of plan.send) {
         let bytes;
         if (s.kind === "base") bytes = files.basePack.bytes;
-        else {
+        else if (s.kind === P.ACTION.picked) {
+          bytes = s.data;                                     // as picked: its size and SHA-256 are the ones read then
+          say("took " + s.name + " from your computer, as you picked it", "ok");
+        } else {
           $("asksSay").textContent = (s.entry.followed ? "Taking " : "Downloading ") + s.id + " from its author's repository…";
           const got = await download(s.entry);
           say(s.entry.followed ? "took " + got.name + " as the page checked it when it opened, from " + got.from
             : "downloaded " + got.name + " from " + got.from + ": its size and SHA-256 are the listing's", "ok");
           bytes = got.bytes;
         }
-        sent.push({ name: s.name, data: bytes, sha256: D.hexBytes(s.sha256), id: s.id, version: s.version });
+        // a picked file's record names no id: the page knows no listing entry for it, so it never names it as one later
+        sent.push({ name: s.name, data: bytes, sha256: D.hexBytes(s.sha256), id: s.kind === P.ACTION.picked ? null : s.id, version: s.version });
       }
     } catch (e) { $("asksSay").textContent = ""; setMoment(momentFor()); $("barProblem").textContent = (e.message || e) + ". Nothing was sent."; return; }
     const out = await client.changePacks({ files: sent, remove: plan.remove }, {

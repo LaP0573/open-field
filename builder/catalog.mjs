@@ -24,7 +24,7 @@
 // Runs in the browser and in Node (no Node APIs in this file), so that validate-install.mjs runs the same code.
 
 import { sha256 } from "./install.mjs";
-import { firmwareOf } from "./door.mjs";
+import { firmwareOf, checkName } from "./door.mjs";
 
 export const LISTING_FILE = "packs.json";                     // beside the page, put there by the host's pages
 export const RAW = "https://raw.githubusercontent.com/";       // the only site the page downloads from
@@ -326,6 +326,26 @@ export function checkFollowed(entry, bytes, baseLevel) {
   const outside = facts.folders.find((f) => !room.includes(f.name + "\0" + f.place));
   if (outside) throw refused("its card asks for the folder " + quoted(outside.name) + " in " + quoted(outside.place) + ", which the listing's folders do not name");
   return facts;
+}
+
+// A pack file the owner picked on their own computer (one the listing need not know), held to what the loader and this
+// page take: its facts (packFacts) with `file`, the name it goes on the unit under, `size` and `sha256`. The name on the
+// unit is the pack's own name and .pack, whatever the file on the computer is called, so that a later build of the same
+// pack takes its place and never lies beside it. `firmware` is the page's ("1.7.3"); `baseLevel` the level the
+// listing's base offers, or null when the page has no listing. An error says what is wrong in a plain sentence.
+export async function checkPickedFile(bytes, firmware, baseLevel = null) {
+  if (!(bytes instanceof Uint8Array) || !bytes.length) throw new Error("the file is empty");
+  const facts = packFacts(bytes);
+  if (!facts.name) throw new Error("its header names no pack");
+  if (facts.name.toLowerCase() === "base") throw new Error("it is a base, and the base only comes with this page");
+  if (facts.firmware !== firmware) {
+    throw new Error(facts.firmware ? "it is built for OS " + facts.firmware + ", not " + firmware :
+      "it is built for a firmware this page does not know (0x" + facts.osId.toString(16).toUpperCase().padStart(8, "0") + "), not " + firmware);
+  }
+  const file = facts.name + ".pack", why = checkName(file);
+  if (why) throw new Error("its name " + quoted(facts.name) + " won't do as a file on your OP-1 (" + why + ")");
+  if (baseLevel !== null && (facts.level ?? 0) > baseLevel) throw new Error("it needs level " + facts.level + " of the base, and this page's base offers " + baseLevel);
+  return { ...facts, file, size: bytes.length, sha256: await sha256(bytes) };
 }
 
 // What a followed entry must hold before its file is downloaded: a reason it is out of form, or null.

@@ -25,7 +25,7 @@ import {
   prepare, readHelper, packNames, checkFolder, sha256,
 } from "./install.mjs";
 import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
-import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
+import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture, checkPickedFile } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
@@ -382,6 +382,24 @@ async function selfChecks() {
     ["7: a followed file that needs a later base than the listing's is refused", fileOf, /needs level 3 of the base, and the listing's base offers 2/, {}, 2],
     ["8: a followed file whose card asks for a folder the entry does not name is refused", packFile({ folder: ["notes", "elsewhere"] }), /asks for the folder "notes" in "elsewhere", which the listing's folders do not name/],
   ]) throws(what, () => checkFollowed(followed(entryMore), bytes, level), new RegExp("^veff: its file on someone's branch main is refused: .*" + words.source));
+  // a pack file picked on the owner's computer (the + tile): its facts, the name it goes on the unit under, its size and SHA-256
+  const pickedOk = await checkPickedFile(fileOf, "1.7.3", 5);
+  check("a picked file that passes: its pack's own name with .pack, its size and SHA-256", pickedOk.name === "veff" && pickedOk.file === "veff.pack" && pickedOk.version === 2 &&
+    pickedOk.size === fileOf.length && pickedOk.sha256 === (await sha256(fileOf)) && pickedOk.needs.join() === "helper", JSON.stringify({ ...pickedOk, folders: undefined }));
+  check("a picked file with no listing beside the page: its level is not held to a base", (await checkPickedFile(fileOf, "1.7.3", null)).file === "veff.pack");
+  for (const [what, bytes, words, level = 5] of [
+    ["an empty picked file is refused", new Uint8Array(0), /^the file is empty$/],
+    ["a picked file that is no pack is refused", Uint8Array.from([...fileOf.subarray(0, 96)].map((b, n) => (n < 8 ? 0x41 : b))), /^it is not a pack file$/],
+    ["a picked file whose CRC-32 is not its header's is refused", packFile({ spoil: (b) => { b[96 + 4] ^= 1; } }), /CRC-32 of its body and lists is not its header's/],
+    ["a picked base is refused: the base only comes with the page", packFile({ name: "Base" }), /^it is a base, and the base only comes with this page$/],
+    ["a picked file for another firmware is refused", packFile({ osId: 0xd67577f9 }), /^it is built for OS 1\.7\.0, not 1\.7\.3$/],
+    ["a picked file for a firmware the page does not know is refused", packFile({ osId: 0x12345678 }), /does not know \(0x12345678\), not 1\.7\.3$/],
+    ["a picked file whose name the loader would not take is refused", packFile({ name: "a/b" }), /^its name "a\/b" won't do as a file on your OP-1 \(the character \/ at 1\)$/],
+    ["a picked file that needs a later base than the page's is refused", fileOf, /^it needs level 3 of the base, and this page's base offers 2$/, 2],
+  ]) {
+    try { await checkPickedFile(bytes, "1.7.3", level); check(what, false, "no error"); }
+    catch (e) { check(what, words.test(e.message), e.message); }
+  }
   // the resolver: the listing's data with its followed entries taken, and the refused ones named
   const served = new Map([[RAW + "someone/veff/refs/heads/main/veff.pack", fileOf], [RAW + "someone/old/refs/heads/main/old.pack", packFile({ name: "old", version: 1 })]]);
   const calls = [];

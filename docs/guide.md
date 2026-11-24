@@ -108,7 +108,7 @@ The pad file may stay on the unit; it served only this write. The next install t
 
 **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs ([the safe start](#the-safe-start)).
 
-The easiest way is the install page's packs section: switch the unit on as usual, plug it in, press **connect**, press **add** on the packs you want and send the change. The unit asks on its own screen: T1 confirms, T2 cancels. On a Mac use that section: no drive of the unit shows in Finder to copy to. By hand, on a computer that shows the unit's drive:
+The easiest way is the install page's packs section: switch the unit on as usual, plug it in, press **connect**, press **add** on the packs you want and send the change. The unit asks on its own screen: T1 confirms, T2 cancels. A pack that isn't in the list goes on the same way: press the **+** at the end of the list, pick its file on your computer, and send. The page checks that the file is a pack made for your OS version, and puts it on under the pack's own name, in place of an older file of the same pack. On a Mac use that section: no drive of the unit shows in Finder to copy to. By hand, on a computer that shows the unit's drive:
 
 1. Get the pack file. Packs are not kept in this repository: the packs of the listing are offered by the install page's packs section, and each one's author publishes it. A pack that is not listed comes from wherever its author shares it.
 2. Put the unit into its disk mode, as you do to copy samples. It shows a folder `packs`.
