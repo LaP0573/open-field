@@ -1,4 +1,5 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Step R10 (base.pack 34): no pack's folder is shown under `logs` either, the base's own (module/build_r10_logs.cpp).
 // Step R2, the base pack (base.pack 21): the packs' folders and files of a base that holds nothing made for one pack.
 // A sibling of base 20's folders unit, which stays as it was for base.pack 20. The names fx and lfo are no
 // longer the base's: a pack's folder may be shown under them, as under any name no earlier folder has. The names a
@@ -146,9 +147,11 @@ static const char BASE_TEMPORARY[] = "tmp/op1f_base.part";   // R3: the base's o
 static const char BASE_NAME[] = "base";                // R3: the name the base's own writes are said by
 
 // The names a pack's folder is never shown under: the firmware's at the top of the disk mode (its root child maker
-// 0x8fcacea0 takes these four) and the loader's.
+// 0x8fcacea0 takes these four), the loader's, and the base's own (R10: the firmware's log files,
+// module/build_r10_logs.cpp).
 static const char* const FIRMWARE_NAMES[] = { "synth", "drum", "tapes", "mixdown" };
 static const char LOADER_NAME[] = "packs";
+static const char LOGS_NAME[] = "logs";
 
 extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
 extern "C" u32 op1f_cards_used() OP1F_NAMED("op1f_cards_used");
@@ -270,6 +273,7 @@ static const char* refused(const Folder* f, u32 upto, const char** other, u32* k
     for (u32 i = 0; i < sizeof FIRMWARE_NAMES / sizeof FIRMWARE_NAMES[0]; ++i)
         if (same_folded(f->name, FIRMWARE_NAMES[i])) return "NOT shown: the name is the firmware's";
     if (same_folded(f->name, LOADER_NAME)) return "NOT shown: the name is the loader's";
+    if (same_folded(f->name, LOGS_NAME)) return "NOT shown: the name is the base's";
     for (u32 j = 0; j < upto; ++j) {
         if (folders[j].shown && same_folded(f->name, folders[j].name)) {
             *other = op1f_cards.slots[folders[j].slot].card->name;

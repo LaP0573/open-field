@@ -220,6 +220,8 @@ The loader does all of it: it checks every place of a pack by its checksum first
 
 The unit writes a log into the folder `logs` on its disk: a new file at every start, named by the date and time, and a further one whenever a file is full. It keeps a limited number and removes the oldest. [A first pack](first-pack.md), step 4, says how to copy one off the unit.
 
+From base 34 (release 0.16) the disk mode shows them too, in a folder `logs`: the newest 64. The newest is the start that is running, as far as the unit has written it. You can delete an older log there from the computer; the running one is kept. The folder takes no file: a file copied into it is refused. Deleting and copying in have been tried in the tests on a computer, not yet on a unit.
+
 A line looks like this:
 
 ```

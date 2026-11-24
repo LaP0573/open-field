@@ -84,7 +84,7 @@ It finds the dot once, by its name, in the tempo screen's document, and keeps it
 
 Or, with no disk mode (on a Mac, the only way): on the install page's packs section press **connect**, then the **+** at the end of the list, pick `out/examples/wink.pack` and send. The unit restarts by itself once you press T1.
 
-The start screen reads `1.7.3 - open-field 0.14`, as before: it names no pack. Press the metronome key: on the tempo screen, a small red dot at the top blinks, half a second on and half a second off.
+The start screen reads `1.7.3 - open-field 0.19`, as before: it names no pack. Press the metronome key: on the tempo screen, a small red dot at the top blinks, half a second on and half a second off.
 
 Without `base.pack` on the unit the example does not run: the start screen counts it as left out, and the log says `nobody offers the name it needs, op1f_level_1`.
 
@@ -95,6 +95,12 @@ Without `base.pack` on the unit the example does not run: the start screen count
 ## 4. Read its lines in the log
 
 The unit writes a log whenever it runs. To get it:
+
+1. On the unit, hold shift and press COM, then press T4: the disk mode starts.
+2. The computer shows a folder `logs`. Copy the newest file from it: that is the start the unit is running now.
+3. Leave the disk mode on the unit.
+
+A base before 34 (a release before 0.16 on the start screen) shows no `logs`. Then take the log from the bootloader's drive:
 
 1. Switch the unit off. Hold **COM** and switch it on: the bootloader's menu shows.
 2. Press `3` for the developer menu and then `2`. **Press no other key there**: key `1` is a factory reset that asks nothing.
