@@ -1313,7 +1313,7 @@
       } };
       const done = await prepare(checked, { build: (s) => buildImage(s, manifest, loader), stock: keptStock, wayBack: wayBack(), base: basePack, bootloader: asked.bl });
       planned = done.plan;
-      for (const c of done.chosen) log(c.name + " put into the folder's packs" + (c.kept ? "; the one there before is kept as " + c.kept : ""));
+      if (done.left?.length) log("left in the folder, not copied: " + done.left.join(", ") + (planned.wayBack ? "." : ". Add packs from the packs section once open-field is on your OP-1."));
       if (done.base?.kept) log("the base.pack that was in the folder's packs is kept as " + done.base.kept);
       log("plan written for the helper's run " + planned.run + (planned.wayBack ? " (the way back: your backup of the original firmware)" : "") +
         (planned.pad ? ", with the pad file " + planned.pad.name : ", no pad file") + (done.base ? ", with this page's base.pack" : ""), "ok");

@@ -171,7 +171,7 @@ class TheRecipes(unittest.TestCase):
         self.assertEqual((base["works_with"], base["serves"], base["marks"]), ([], [], []))
 
     def test_the_pages_for_pack_authors_point_at_the_packs_repository(self):
-        for page in ("README.md", "AGENTS.md", "docs/first-pack.md", "docs/base.md"):
+        for page in ("AGENTS.md", "docs/first-pack.md", "docs/base.md"):      # not the README since 2026-11-23: no link to them there
             self.assertIn("(https://github.com/", text(*page.split("/")), page)
             self.assertIn("/open-field-packs", text(*page.split("/")), page)
 

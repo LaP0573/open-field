@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   NAMES, PACK_FOLDER, makePlan, checkAfter, compareListings, normalRows, padBytes, padName, packOrder, packNameProblem,
-  prepare, readHelper, readPacks, checkFolder, sha256,
+  prepare, readHelper, packNames, checkFolder, sha256,
 } from "./install.mjs";
 import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plainBuffer, bootloaderVersion, SEEN_RESTS } from "./placement.mjs";
 import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
@@ -236,7 +236,7 @@ async function selfChecks() {
   });
   const fakeImage = new Uint8Array(IMAGE_BYTES).fill(7);
   let given = null;
-  const { plan: made } = await prepare(folder, { ...BL, build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
+  const { plan: made, left: made0 } = await prepare(folder, { ...BL, build: async (s) => { given = s; return { image: fakeImage, report: { loader: { version: "test" } } }; } });
   check("the build is given the owner's file from the folder", given && given.length === 4);
   check("the plan is for the helper's run", made.run === "2026-11-18_20-00-00");
   check("the plan names the listing it was made from by its SHA-256", made.before.sha256 === await sha256(new TextEncoder().encode(listingText)));
@@ -244,7 +244,9 @@ async function selfChecks() {
   check("the plan is the last file written", folder.writes[folder.writes.length - 1] === NAMES.plan, folder.writes.join(", "));
   check("a pad file is written exactly when the plan has one", (made.pad === null) === !folder.writes.some((w) => w.startsWith("open-field-pad")));
   if (made.pad) check("the pad file's SHA-256 is in the plan", made.pad.sha256 === await sha256(folder.store.get(made.pad.file)));
-  check("only .pack files of the packs folder go in", made.packs.length === 1 && made.packs[0].name === "base.pack" && made.packs[0].file === "packs/base.pack");
+  check("a pack file in the folder's packs is not put into the plan, and only .pack files are named as left", made.packs.length === 0 && made.makeFolder === null &&
+    !made.expected.some((r) => r.path.startsWith(PACK_FOLDER + "/")) && made0.join("|") === "base.pack" &&
+    !folder.writes.some((w) => w.startsWith(NAMES.packs + "/")), made0.join("|"));
   // the way back: the owner's original file is what is written, from the folder, with no build and no pack file
   const back = memoryFolder({
     [NAMES.helper]: JSON.stringify({ helper: 1, run: "back-run", state: "listed", stock: { file: NAMES.stock } }),
@@ -260,18 +262,27 @@ async function selfChecks() {
   check("the way back writes no new firmware file and copies no pack", !back.writes.includes(NAMES.image) && wayBack.packs.length === 0);
   check("the way back's plan lands", analyzeListing(wayBack.expected, BL).current.pass);
   // base.pack, which comes with the page (2026-11-18, the owner's word: "base.pack is part of open-field"): put into
-  // the folder's packs, counted in the placement, copied last; one of other bytes kept in the folder's replaced first;
-  // the way back adds none
+  // the folder's packs, counted in the placement, the only pack copied (2026-11-23, the owner's word: other packs come
+  // from the listing once open-field is on the unit); one of other bytes kept in the folder's replaced first; any other
+  // pack file in the folder's packs left there, named in `left`; the way back adds none
   const pageBase = new Uint8Array(107492).fill(9);
   const base = { bytes: pageBase, sha256: await sha256(pageBase) };
   const listed = (run, more = {}) => memoryFolder({
     [NAMES.helper]: JSON.stringify({ helper: 1, run, state: "listed", stock: { file: NAMES.stock } }), [NAMES.before]: listingText, [NAMES.stock]: stock, ...more });
   const stand = async () => ({ image: fakeImage, report: { loader: { version: "test" } } });
-  const fresh = listed("base-1", { [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
+  const eight = new Uint8Array(99476).fill(8), eightSha = await sha256(eight);
+  const fresh = listed("base-1", { [NAMES.packs + "/8 tracks.pack"]: eight });
+  const freshReads = [], readFresh = fresh.readBytes;
+  fresh.readBytes = async (name) => { freshReads.push(name); return readFresh(name); };
   const r1 = await prepare(fresh, { ...BL, build: stand, base });
   check("the page's base.pack goes into the folder's packs", r1.base.state === "added" && (await sha256(fresh.store.get(NAMES.packs + "/base.pack"))) === base.sha256);
-  check("the page's base.pack is in the plan, last, with its size and SHA-256", r1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|base.pack" &&
-    r1.plan.packs[1].bytes === 107492 && r1.plan.packs[1].sha256 === base.sha256 && r1.plan.packs[1].file === NAMES.packs + "/base.pack");
+  check("the page's base.pack is the plan's one pack, with its size and SHA-256", r1.plan.packs.map((p) => p.name).join("|") === "base.pack" &&
+    r1.plan.packs[0].bytes === 107492 && r1.plan.packs[0].sha256 === base.sha256 && r1.plan.packs[0].file === NAMES.packs + "/base.pack", r1.plan.packs.map((p) => p.name).join("|"));
+  check("a pack left in the folder is named in left, and is neither in the plan's packs nor in its listing", r1.left.join("|") === "8 tracks.pack" &&
+    !r1.plan.packs.some((p) => p.name === "8 tracks.pack") && !r1.plan.expected.some((r) => r.path === "user/pk/8 tracks.pack"), r1.left.join("|"));
+  check("a pack left in the folder is neither read nor written again", !fresh.writes.some((w) => w === NAMES.packs + "/8 tracks.pack" || w.startsWith(NAMES.replaced + "/")) &&
+    !freshReads.includes(NAMES.packs + "/8 tracks.pack") && (await sha256(fresh.store.get(NAMES.packs + "/8 tracks.pack"))) === eightSha,
+    fresh.writes.join(", ") + "; read: " + freshReads.join(", "));
   check("the page's base.pack is counted in the placement", r1.plan.expected.some((r) => r.path === "user/pk/base.pack" && r.size === 107492) &&
     analyzeListing(r1.plan.expected, BL).current.pass);
   check("base.pack is written before the plan, and the plan last", fresh.writes.includes(NAMES.packs + "/base.pack") &&
@@ -287,8 +298,9 @@ async function selfChecks() {
   const r3 = await prepare(other, { ...BL, build: stand, base });
   check("a base.pack of other bytes is kept in the folder's replaced first", r3.base.state === "replaced" && r3.base.kept === NAMES.replaced + "/base-" + olderSha.slice(0, 12) + ".pack" &&
     (await sha256(other.store.get(r3.base.kept))) === olderSha && other.writes.indexOf(r3.base.kept) < other.writes.indexOf(NAMES.packs + "/base.pack"), JSON.stringify(r3.base));
-  check("and the page's takes its place, once and last", (await sha256(other.store.get(NAMES.packs + "/base.pack"))) === base.sha256 &&
-    r3.plan.packs.map((p) => p.name).join("|") === "lfo.pack|base.pack" && r3.plan.packs[1].sha256 === base.sha256 && r3.plan.base.kept === r3.base.kept);
+  check("and the page's takes its place, once, the folder's other pack left", (await sha256(other.store.get(NAMES.packs + "/base.pack"))) === base.sha256 &&
+    r3.plan.packs.map((p) => p.name).join("|") === "base.pack" && r3.plan.packs[0].sha256 === base.sha256 && r3.plan.base.kept === r3.base.kept &&
+    r3.left.join("|") === "lfo.pack", r3.plan.packs.map((p) => p.name).join("|") + "; left: " + r3.left.join("|"));
   const back2 = listed("base-4", { [NAMES.packs + "/base.pack"]: older });
   const r4 = await prepare(back2, { ...BL, build: stand, wayBack: true, base });
   check("the way back adds no pack, not even the page's base.pack", r4.plan.packs.length === 0 && r4.base === null && !r4.plan.base &&
@@ -299,37 +311,6 @@ async function selfChecks() {
   const own = pageOwnBase();
   check("the base.pack beside this file is the one base-pack.json names", own.problem === null, own.problem);
   if (own.problem === null) check("base-pack.json names a version and a release", Number.isInteger(own.version) && own.version >= 1 && /^[0-9A-Za-z.]{1,15}$/.test(own.release));
-
-  // packs ticked in the listing (PLAN.md piece 3, steps 2 and 3): put into the folder's packs by the page, counted in
-  // the placement, copied before base.pack; one of the same bytes left as it is, one of other bytes kept in replaced
-  const lfoBytes = new Uint8Array(375422).fill(11), winkBytes = new Uint8Array(2130).fill(12);
-  const lfo = { name: "lfo.pack", bytes: lfoBytes, sha256: await sha256(lfoBytes), from: RAW + "x/y/" + "0".repeat(40) + "/lfo.pack" };
-  const wink = { name: "wink.pack", bytes: winkBytes, sha256: await sha256(winkBytes), from: null };
-  const oldLfo = new Uint8Array(375418).fill(13), oldLfoSha = await sha256(oldLfo);
-  const withTicks = listed("tick-1", { [NAMES.packs + "/lfo.pack"]: oldLfo, [NAMES.packs + "/wink.pack"]: winkBytes, [NAMES.packs + "/8 tracks.pack"]: new Uint8Array(99476).fill(8) });
-  const t1 = await prepare(withTicks, { ...BL, build: stand, base, chosen: [lfo, wink] });
-  check("ticked packs are in the plan with the folder's own, base.pack last", t1.plan.packs.map((p) => p.name).join("|") === "8 tracks.pack|lfo.pack|wink.pack|base.pack",
-    t1.plan.packs.map((p) => p.name).join("|"));
-  check("a ticked pack is counted in the placement with its own size", t1.plan.expected.some((r) => r.path === "user/pk/lfo.pack" && r.size === 375422) &&
-    analyzeListing(t1.plan.expected, BL).current.pass);
-  check("a ticked pack of other bytes than the folder's is put in its place, the old one kept in replaced first",
-    (await sha256(withTicks.store.get(NAMES.packs + "/lfo.pack"))) === lfo.sha256 &&
-    (await sha256(withTicks.store.get(NAMES.replaced + "/lfo-" + oldLfoSha.slice(0, 12) + ".pack"))) === oldLfoSha &&
-    withTicks.writes.indexOf(NAMES.replaced + "/lfo-" + oldLfoSha.slice(0, 12) + ".pack") < withTicks.writes.indexOf(NAMES.packs + "/lfo.pack"), withTicks.writes.join(", "));
-  check("a ticked pack of the same bytes as the folder's is left as it is", !withTicks.writes.includes(NAMES.packs + "/wink.pack") &&
-    t1.chosen.find((c) => c.name === "wink.pack")?.state === "same");
-  check("the ticked packs are written before base.pack, and the plan last", withTicks.writes.indexOf(NAMES.packs + "/lfo.pack") < withTicks.writes.indexOf(NAMES.packs + "/base.pack") &&
-    withTicks.writes[withTicks.writes.length - 1] === NAMES.plan, withTicks.writes.join(", "));
-  check("the plan says where each ticked pack came from", t1.plan.chosen?.length === 2 && t1.plan.chosen[0].from === lfo.from && t1.plan.chosen[0].in_folder === "replaced");
-  const tickBack = listed("tick-2");
-  const t2 = await prepare(tickBack, { ...BL, build: stand, base, chosen: [lfo], wayBack: true });
-  check("the way back puts no ticked pack on", t2.plan.packs.length === 0 && !t2.plan.chosen && !tickBack.writes.some((w) => w.startsWith(NAMES.packs + "/")));
-  for (const [what, chosen, words] of [
-    ["a ticked pack that is not its file is refused", [{ ...lfo, sha256: "0".repeat(64) }], /not the file the listing names/],
-    ["base.pack is never ticked", [{ ...lfo, name: "base.pack" }], /never ticked/],
-    ["two ticked packs of one name are refused", [lfo, { ...lfo }], /two ticked packs/],
-    ["a ticked pack with a name the unit cannot hold is refused", [{ ...lfo, name: "a/b.pack" }], /cannot be copied/],
-  ]) await prepare(listed("tick-x"), { ...BL, build: stand, base, chosen }).then(() => check(what, false), (e) => check(what, words.test(e.message), e.message));
 
   // the listing as the page reads it (catalog.mjs), and the download of a ticked pack held to its entry
   const COMMIT = "0123456789abcdef0123456789abcdef01234567";
@@ -542,12 +523,14 @@ async function selfChecks() {
   check("on 1000.2.0 every buffer stands 0x60c8 above 1000.1.1's", cases === 58 * 20 * 2 * 2 && off === 0, off + " of " + cases + " cases differ");
 
   // what a Mac's Finder leaves in the packs folder is no pack
+  const oldLfo = new Uint8Array(375418).fill(13);
   const mac = listed("mac-1", { [NAMES.packs + "/._lfo.pack"]: new Uint8Array(4096), [NAMES.packs + "/._base.pack"]: new Uint8Array(4096),
     [NAMES.packs + "/.hidden.PACK"]: new Uint8Array(10), [NAMES.packs + "/.DS_Store"]: new Uint8Array(6148), [NAMES.packs + "/lfo.pack"]: oldLfo });
-  check("a file whose name begins with ._ is no pack, and any other dot's is, as on Windows", (await readPacks(mac)).map((p) => p.name).join("|") === ".hidden.PACK|lfo.pack");
-  const m1 = await prepare(mac, { ...BL, build: stand, base, chosen: [lfo] });
-  check("no ._ file gets into the plan or takes a pack's place", m1.plan.packs.map((p) => p.name).join("|") === ".hidden.PACK|lfo.pack|base.pack" && m1.base.state === "added" &&
-    m1.chosen[0].found === "lfo.pack" && !m1.plan.expected.some((r) => r.path.startsWith("user/pk/._")) && !mac.writes.some((w) => /(^|\/)\._/.test(w)), mac.writes.join(", "));
+  check("a file whose name begins with ._ is no pack, and any other dot's is, as on Windows", (await packNames(mac)).join("|") === ".hidden.PACK|lfo.pack");
+  const m1 = await prepare(mac, { ...BL, build: stand, base });
+  check("no ._ file gets into the plan or takes a pack's place", m1.plan.packs.map((p) => p.name).join("|") === "base.pack" && m1.base.state === "added" &&
+    m1.left.join("|") === ".hidden.PACK|lfo.pack" && !m1.plan.expected.some((r) => r.path.startsWith("user/pk/._")) && !mac.writes.some((w) => /(^|\/)\._/.test(w)),
+    mac.writes.join(", ") + "; left: " + m1.left.join("|"));
 
   const helperGone = memoryFolder({});
   await prepare(helperGone, { ...BL, build: async () => ({ image: fakeImage }) }).then(() => check("no helper, no plan", false), (e) => check("no helper, no plan", /written nothing/.test(e.message), e.message));

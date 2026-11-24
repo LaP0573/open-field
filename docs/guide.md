@@ -2,7 +2,7 @@
 
 How to put open-field on your own OP-1 Field, how to add and take away a feature, how to start the unit as the original firmware, and how to go back for good.
 
-open-field has three parts. **The loader** is a small piece of our code that goes, once, into the firmware file of your unit: at every start it reads the pack files on the unit. **The base**, the file `base.pack`, is the shared pack every feature needs. **The features** are one file each, `8 tracks.pack` say. The install puts the loader in and `base.pack` on the unit; the features are files you copy.
+open-field has three parts. **The loader** is a small piece of our code that goes, once, into the firmware file of your unit: at every start it reads the pack files on the unit. **The base**, the file `base.pack`, is the shared pack every feature needs. **The packs** are the features, one file each. The install puts the loader in and `base.pack` on the unit, and nothing else; packs come after, from the install page's packs section or copied by hand.
 
 Read the whole page before you begin. The install changes the firmware of your unit. A write that goes wrong can leave a unit unable to start, for good. Installing this will void the warranty of your device. open-field is unofficial: it is not made or supported by Teenage Engineering, and it is not affiliated with them. Whether to install it is your decision, and you do it at your own risk ([NOTICE.md](../NOTICE.md)).
 
@@ -30,7 +30,7 @@ open-field is for OS 1.7.3 only. Update a unit still on OS 1.7.0 first, with Tee
 
 **Pack files left from OS 1.7.0.** A pack file is made for one firmware. The loader for 1.7.3 leaves out every pack file made for 1.7.0 and starts everything else; the start screen counts what it left out at the end of its line, `(4 left out)` for four such files. Nothing breaks, but those features do not run. Two ways to set it right:
 
-- After the install, connect on the install page and take the packs again from its packs section: it puts their 1.7.3 files on in place of the old files of the same name. `base.pack` is always the page's own. If you work in the folder of your 1.7.0 install, look at its folder `packs` before step 5, too: a pack file from your 1.7.0 install that is still there would be copied onto the unit again, and left out again. Delete them.
+- After the install, connect on the install page and take the packs again from its packs section: it puts their 1.7.3 files on in place of the old files of the same name. `base.pack` is always the page's own.
 - Or delete the old files from the folder `packs` on the unit in the disk mode ([below](#taking-a-feature-away)).
 
 ### A unit that shows 1.7.3+1
@@ -63,21 +63,19 @@ One page leads you through it, `builder/index.html`, with a small helper that do
 3. **Pick a working folder.** The page and the helper share one folder on the computer. Make an empty folder anywhere you like, then press **choose the folder** on the page, choose it, and let the browser view and edit its files. The page writes a small mark into it (`page.json`) and keeps the folder for the rest of the install. On a later visit it offers it again.
 4. **Run the helper.** The page shows one line, for the computer it is open on. On Windows, paste it into PowerShell (press the Windows key, type `PowerShell`, press Enter). On a Mac, paste it into Terminal (press Cmd + Space, type `Terminal`, press Return). If macOS asks, allow Terminal to reach the folder; to reach the unit, the helper may end macOS's camera service, `ptpcamerad`. On Linux, paste it into a terminal. The line carries the page's mark and the folder's name: a browser never tells a page where a folder is, so the helper looks for a folder of that name with the mark in it, in its own current folder, your user or home folder, the Desktop, Documents and Downloads, and one level below each. If it finds none, or more than one, it asks you for the folder: on Windows you pick it in a window, on a Mac or Linux you give its path in the terminal. It checks the mark in the folder before anything else, so that the page and the helper never work in two different folders; if the mark is not there, it stops at once and does nothing. Then it finds the unit, copies your own firmware file off (it lies in `upgrade/firmware/blackfin/bin` on the unit), takes the unit's log files off into the same folder (the unit writes logs whenever it runs, and they would change the count of the next step), takes off the pad files an earlier install left and the files waiting in `user/pkin`, lists the unit's disk, and waits. Leave its window open.
 5. **Pick what to install.** Once the helper waits, the page checks that your file is the exact OS 1.7.3 file, builds the new one, and checks its own result against a known SHA-256. Then it works out where the write lands: the bootloader can only write the file when its working memory happens to stand at the right place, and where it stands follows from what is on the unit's disk (how many files and folders, and how large the files are). When the disk as it stands would not do, the page adds one extra file, the pad file, of the size that makes it do. The page's log, at the bottom of the page, has the numbers. Choose **the latest version of the open-field custom firmware**, or **my backup of the original firmware** for the way back ([below](#the-way-back-to-the-original-firmware)). Put a copy of `os-1.7.3-yours.ldr` from your folder somewhere safe (rule 1), and press **put the files on your OP-1**.
-6. **The helper finishes by itself.** It puts the new file on the unit as `os.ldr`, the pad file if there is one, and the pack files with `base.pack` last, lists the disk again and holds the listing against the page's plan row for row, and reads every file it copied back to check its SHA-256. It says `READY TO WRITE`, and the page says **Ready to write**.
+6. **The helper finishes by itself.** It puts the new file on the unit as `os.ldr`, the pad file if there is one, and `base.pack`, lists the disk again and holds the listing against the page's plan row for row, and reads every file it copied back to check its SHA-256. It says `READY TO WRITE`, and the page says **Ready to write**.
 
-The page and the helper write nothing to the unit but `os.ldr`, the pad file, `base.pack` and the pack files of the folder `packs`, and take nothing off it but your firmware file (a copy), the log files, the pad files of earlier installs and the files waiting in `user/pkin`. Nothing is sent anywhere: the page works inside your browser, on your files.
+The page and the helper write nothing to the unit but `os.ldr`, the pad file and `base.pack`, and take nothing off it but your firmware file (a copy), the log files, the pad files of earlier installs and the files waiting in `user/pkin`. Nothing is sent anywhere: the page works inside your browser, on your files.
 
 If your unit's `upgrade` folder holds another file than the original OS 1.7.3 one (it can, on a unit that once took a custom package), the page says so and asks for the original file you kept from before.
 
 If you prefer a command line for the build alone, `node builder/build-image.mjs <your os.ldr> <the new file>` does what the page does, with the same code.
 
-### Pack files in the same visit
+### `base.pack`, and no other pack
 
-**`base.pack` comes with the install.** Every unit needs it: without it no feature runs. The page has its own copy beside it, checks it against a known SHA-256, and puts it into the folder `packs` inside your working folder; the helper copies it onto the unit with the new firmware file. If `packs` already holds a `base.pack` (an earlier install leaves one there), the page's takes its place; one with other bytes is first kept in the folder `replaced`, so nothing of yours is lost.
+**`base.pack` comes with the install.** Every unit needs it: without it no pack runs. The page has its own copy beside it, checks it against a known SHA-256, and puts it into the folder `packs` inside your working folder; the helper copies it onto the unit with the new firmware file. If `packs` already holds a `base.pack` (an earlier install leaves one there), the page's takes its place; one with other bytes is first kept in the folder `replaced`, so nothing of yours is lost.
 
-**Packs from the listing** go on after the install, from the page's packs section ([adding a feature](#adding-a-feature)): the install itself offers none.
-
-Other pack files you have can go onto the unit in the same visit: put them into the folder `packs` before you press **put the files on your OP-1**. The page counts them in the placement, and the helper copies them into `user/pk` on the unit, `base.pack` last. You can also copy them later, in the disk mode ([adding a feature](#adding-a-feature)).
+**Every other pack goes on after the install**, from the page's packs section or by hand ([adding a feature](#adding-a-feature)). The install puts no other pack on: a pack file you left in the folder `packs` stays there, and the page's log names it.
 
 The way back to the original firmware (step 5's second choice) puts no pack on.
 
@@ -112,12 +110,12 @@ The pad file may stay on the unit; it served only this write. The next install t
 
 The easiest way is the install page's packs section: switch the unit on as usual, plug it in, press **connect**, press **add** on the packs you want and send the change. The unit asks on its own screen: T1 confirms, T2 cancels. On a Mac use that section: no drive of the unit shows in Finder to copy to. By hand, on a computer that shows the unit's drive:
 
-1. Get the feature file, `8 tracks.pack` say. The feature files are not kept in this repository: the packs of the listing are offered by the install page's packs section, and Faust's four packs lie in the repository [open-field-packs](https://github.com/LaP0573/open-field-packs), beside this one, with a manual each and their sources. A pack that is not listed comes from wherever its author shares it. You can also build those four from their sources, with one command in open-field-packs ([its BUILDING.md](https://github.com/LaP0573/open-field-packs/blob/main/BUILDING.md#building-them) has it).
+1. Get the pack file. Packs are not kept in this repository: the packs of the listing are offered by the install page's packs section, and each one's author publishes it. A pack that is not listed comes from wherever its author shares it.
 2. Put the unit into its disk mode, as you do to copy samples. It shows a folder `packs`.
 3. Copy the file into `packs`.
 4. Leave the disk mode and switch the unit off and on.
 
-The start screen reads `1.7.3 - open-field 0.14` (`1.7.3+1 - open-field 0.14` on a unit on `1.7.3+1`). It does not name the features: each shows itself where it is used ([what each feature adds](#what-each-feature-adds-in-short)).
+The start screen reads `1.7.3 - open-field 0.14` (`1.7.3+1 - open-field 0.14` on a unit on `1.7.3+1`). It does not name the packs: each shows itself where it is used, as its author's manual says.
 
 You can also copy the files in the bootloader's drive mode (hold COM, switch on, `3`, `2`); the folder is then `user/pk`.
 
@@ -129,16 +127,9 @@ A file may have any name that ends in `.pack`. If a file cannot run, the start s
 
 Delete its file from `packs` in the disk mode, and switch the unit off and on. On a Mac, take it off in the install page's packs section. Keep `base.pack` while any feature file is there. With no pack file left, the unit starts as the original firmware and the start screen reads `1.7.3 stock (no pack)`, or `1.7.3+1 stock (no pack)`.
 
-## What each feature adds, in short
+## A pack's folders
 
-- **8 tracks.** Hold the tape key and press track key 1 to 4 to select tracks 5 to 8. Hold the mixer key for the mixer's page of tracks 5 to 8. Everything else works on eight tracks as it did on four, undo included. In the disk mode each tape's folder shows eight track files.
-- **sidechain.** Shift + the mixer key opens its page. A track can be turned down each time another track, or the beat, hits. The four knobs set the source, the amount, the hold and the release.
-- **fx train.** On a synth or drum sound, T3 opens the train: four wagons, each can carry an effect. Turn a knob to choose a wagon's effect, press it briefly to open that effect's page, hold it to switch the wagon off or on, shift + turn to move it. Shift + T3: tap for the list of saved trains, hold to save one.
-- **lfo.** On a synth sound, T4 opens four LFOs. The knobs work as on the train. Shift + T4: tap for the list of saved sets, hold to save one.
-
-Saved trains and LFO sets are files. The disk mode shows them in the folders `fx` and `lfo`, so you can keep copies on the computer or pass your own on.
-
-A pack may have folders of its own, which the disk mode shows beside `packs`, `fx` and `lfo`: the example pack `list` has one, `list`. On the unit's disk they lie in `user/pf`. A pack's folder stays there when the pack is deleted; delete it in the bootloader's drive mode if you no longer want it.
+A pack may have folders of its own, which the disk mode shows beside `packs`: the example pack `list` has one, `list`. On the unit's disk they lie in `user/pf`. A pack's folder stays there when the pack is deleted; delete it in the bootloader's drive mode if you no longer want it.
 
 ## A pack's settings
 
@@ -148,12 +139,6 @@ From open-field 0.14 a pack can add settings of its own to the unit's settings (
 - **PACKS** is a row of its own, after the unit's six. On the right it lists the packs that have settings there or a page of their own. Pick one with the ochre knob and press the ochre knob: you get that pack's settings in the same place (ochre picks, red changes), or the pack's own page. **T1** takes you back to the list of packs. On the list, T1 leaves the settings as always.
 
 The base keeps these settings in a file of its own on the unit, `user/pf/.options`, never in the unit's own settings, and they come back at the next start. **A change made in the last second or two before you switch off is lost**, so give it a moment. A pack you delete keeps its line in that file, and its settings are still there when you put it back.
-
-## Your tapes
-
-A tape recorded with `8 tracks.pack` is still a tape the original firmware reads. Tracks 1 to 4 are stored exactly as the original firmware stores them. Tracks 5 to 8 are stored beside them in files of our own, which the original firmware leaves alone.
-
-One thing to know: if you record on such a tape while the unit runs **without** `8 tracks.pack`, the original firmware may use tape that tracks 5 to 8 were using. When the pack is back, those stretches of tracks 5 to 8 play silence. Tracks 1 to 4 are never affected.
 
 ## The safe start
 
