@@ -2,8 +2,8 @@
  "about": "What a build of this tree gives: the size and the SHA-256 of base.pack (the shared pack every other relies on), of the loader (our piece inside the firmware file, as linked and as the file the installer's builder uses) and of the example packs. tools/build_all.py holds its results to these, and its option --update writes them anew after a change that is meant to change them.",
  "files": {
   "base.pack": {
-   "bytes": 303909,
-   "sha256": "b307bdbc5bedbd61b58bbd590a2b9a016810dc0cd850b017ad2048da7113d788"
+   "bytes": 303825,
+   "sha256": "4c1059a3ec8a53d0f84b1fb77148425aebf1ac37eb363861bf22e84dd6d5195b"
   },
   "loader.bin": {
    "bytes": 25876,
