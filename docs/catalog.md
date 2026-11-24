@@ -136,7 +136,7 @@ A followed entry's file is downloaded once, when the page has read the listing: 
 
 These downloads are the only things the page loads from another site, and the tree's own test holds that (`tools/tests/test_tree.py`, `ThePagesOnAHost`).
 
-A ticked file goes into the folder `packs` that the page and the helper share, under the name `<id>.pack`, and the plan of the install counts it; the helper copies it onto the unit with the rest, `base.pack` last, and reads every copy back. A file of the same name with other bytes already in `packs` is kept in the folder `replaced` first. One with the same bytes is shown ticked and goes on as it is. The way back to the original firmware puts no pack on.
+A pack goes on from the page's packs section, once open-field is on the unit: the page sends the file over USB, the unit asks on its own screen, and T1 confirms ([the guide](guide.md#adding-a-feature)). The install itself puts no pack on but `base.pack`.
 
 ## Getting your pack listed
 

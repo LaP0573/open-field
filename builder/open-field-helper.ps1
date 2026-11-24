@@ -14,8 +14,8 @@
 # What it changes on the unit, and nothing else: it takes the files in "logs" off, and the pad files of earlier
 # installs that bear its own name (open-field-pad.bin, open-field-pad-2.bin, ...), and the files in user/pkin, the
 # waiting folder where the install page leaves pack files over USB MIDI (its note .apply among them), and it writes
-# os.ldr at the top level, the pad file the plan names, and the pack files of the folder's "packs" sub folder into
-# user/pk (the folder made if it is not there). It never deletes a folder, and it writes nothing before it has listed
+# os.ldr at the top level, the pad file the plan names, and the pack files the plan names (base.pack, from the folder's
+# "packs" sub folder) into user/pk (the folder made if it is not there). It never deletes a folder, and it writes nothing before it has listed
 # the disk again and found it as the plan was made from.
 #
 # Run it from a PowerShell window (the install page shows the command), or as a file:

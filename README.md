@@ -20,20 +20,11 @@ Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
 
 - **A loader.** A small piece of our own code that is added, once, to the firmware file from your own unit. A page that runs in your browser does that: you give it your file, it gives you a new one, and nothing is uploaded anywhere. At every start the loader reads the pack files on the unit.
 - **The base** (`base.pack`). The shared pack every feature relies on: one file that every unit with open-field has. It is also what any pack can build on: a call every frame, pictures, a page with keys and knobs, folders and files.
-- **Feature files** ("packs"). Each feature is one file that you copy onto the unit like a sample. With the file there, the feature is there at the next start. Delete the file and the feature is gone.
+- **Packs.** Each feature is one file that you copy onto the unit like a sample. With the file there, the feature is there at the next start. Delete the file and the feature is gone.
 
-Faust's four packs live in a repository of their own, [open-field-packs](https://github.com/LaP0573/open-field-packs), with a manual each, their sources and finished files:
+With open-field on the unit, the start screen reads `1.7.3 - open-field 0.14`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.14`.
 
-| Feature file | What it adds |
-| --- | --- |
-| `8 tracks.pack` | Tape tracks 5 to 8, with everything tracks 1 to 4 do. The original firmware can still read your tapes. |
-| `fx train.pack` | Up to four effects on an instrument, their presets, and instruments that keep their effects. |
-| `lfo.pack` | Four LFOs on a synth sound, with presets. |
-| `sidechain.pack` | One tape track turned down by another, or by the beat. |
-
-Each works by itself or together with the others, beside `base.pack`. With them on the unit, the start screen reads `1.7.3 - open-field 0.14`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.14`.
-
-`base.pack` comes with the install: the install page puts it on the unit with the new firmware file, from `builder/base.pack` beside the page. The feature files are not kept in this repository, and neither are their sources. Their authors share them, and you copy them onto the unit in its disk mode ([the guide](docs/guide.md#adding-a-feature)). The four above can also be built from their sources, with one command in open-field-packs. **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
+The install puts two things on the unit: the new firmware file and `base.pack`, from `builder/base.pack` beside the page. Packs come after. They are not kept in this repository: their authors publish them, and once open-field is on your unit, the install page's packs section adds and removes the packs of [the listing](docs/catalog.md). You can also copy a pack file onto the unit yourself, in its disk mode ([the guide](docs/guide.md#adding-a-feature)). **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
 ## What is not here, and never will be
 
@@ -48,7 +39,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 **To use it**
 
 - Install it: [the install page](https://lap0573.github.io/open-field/). Use it: [docs/guide.md](docs/guide.md).
-- See exactly what the loader and the base change in the firmware: [docs/changes.md](docs/changes.md). What a pack changes is in that pack's own profile: for the four, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs).
+- See exactly what the loader and the base change in the firmware: [docs/changes.md](docs/changes.md). What a pack changes in the firmware is in that pack's own profile, beside its sources.
 - Build the loader, the base and the examples yourself from the sources: [docs/build.md](docs/build.md).
 
 **To write a feature of your own**
@@ -59,8 +50,6 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 4. [Methods](docs/methods.md): how to find, check and use a place in your own firmware, for a feature that has to stand in it.
 5. [The firmware's functions our code uses](docs/firmware-interfaces.md): what each takes and gives back.
 6. [The listing](docs/catalog.md): how a pack of yours is offered to every owner on the install page.
-
-When the examples get too small to learn from, read [open-field-packs](https://github.com/LaP0573/open-field-packs): four real packs on cards, with their sources, built with this repository's tools and headers. To change one of those four, send the change there.
 
 **To send a change in**: [CONTRIBUTING.md](CONTRIBUTING.md). **If you are a coding assistant**: [AGENTS.md](AGENTS.md).
 
@@ -81,7 +70,7 @@ When the examples get too small to learn from, read [open-field-packs](https://g
 - One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.14 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
 - For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
-- The features have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 32, has run on the maintainer's unit beside the four features and the examples, with two test packs that add settings: their settings showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart. `fx train` 17, the version the listing offers, has been proven on a computer and not yet watched on a unit: if it gives you trouble, `fx train` 16 is linked from [its manual](https://github.com/LaP0573/open-field-packs/blob/main/fx%20train/README.md) in open-field-packs.
+- The loader and the base have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 32, has run on the maintainer's unit beside the examples and other packs, with two test packs that add settings: their settings showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart.
 
 ## What is in this repository
 

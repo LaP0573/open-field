@@ -227,34 +227,32 @@ async function readJson(folder, name) {
 // What the helper says of itself, or null when it has written nothing yet.
 export async function readHelper(folder) { return readJson(folder, NAMES.helper); }
 
-// The pack files the owner put into the folder's packs sub folder, in the helper's order. A name that begins with "._"
-// is none of theirs: a Mac's Finder leaves files such as ._lfo.pack beside the real ones.
-export async function readPacks(folder) {
+// The names of the pack files in the folder's packs sub folder, in the helper's order. Only their names are read. A
+// name that begins with "._" is none of the owner's: a Mac's Finder leaves files such as ._lfo.pack beside the real ones.
+export async function packNames(folder) {
   const entries = (await folder.list(NAMES.packs)).filter((e) => e.kind === "file" && !e.name.startsWith("._") && /\.pack$/i.test(e.name));
-  const packs = [];
-  for (const name of packOrder(entries.map((e) => e.name))) {
-    const bytes = await folder.readBytes(NAMES.packs + "/" + name);
-    packs.push({ name, bytes: bytes.length, sha256: await sha256(bytes) });
-  }
-  return packs;
+  return packOrder(entries.map((e) => e.name));
 }
 
 // From a helper that has listed the disk and waits: the owner's file, the build, the plan; the new file, the pad
 // file and the plan written into the folder, the plan last. `build(stock)` returns {image, report} or throws (the
 // page passes patch.mjs's buildImage with the manifest and the loader's file). `stock` may be given by the caller, for an
 // owner whose unit holds another file than the original one and who chose their own kept file.
+// An install puts the new firmware file and the page's base.pack on the unit, and no other pack (the owner's word,
+// 2026-11-23: other packs are added from the listing once open-field is on the unit). Any other pack file in the
+// folder's packs is left there: not read, not in the plan, not copied, not touched. Their names come back in `left`,
+// so that the page can say so.
 // `wayBack`: the owner's own original file is what is written (the way back to the original firmware), from the
 // folder under its own name; no build, and no pack file (the original firmware does not read them). The caller has
 // checked that `stock` (or the helper's file) is the original one.
 // `base`: the page's own base.pack, {bytes, sha256}, which comes with the page and goes onto every unit it installs.
-// It is written into the folder's packs as base.pack, so that the plan counts it and the helper copies it last. A
+// It is written into the folder's packs as base.pack, so that the plan counts it and the helper copies it. A
 // base.pack of the same bytes there already is left as it is. One of other bytes (an earlier release, or one the
 // owner put there) is kept in the folder's `replaced` sub folder under its SHA-256's first twelve digits, and the
 // page's takes its place. The way back adds no pack, so `base` is passed over there.
-// `chosen`: the packs the owner ticked in the listing, each downloaded and held to its entry by catalog.mjs,
-// [{name, bytes, sha256, from}]. Each is written into the folder's packs under its name the same way: left as it is
-// when the same bytes are there, the other bytes kept in `replaced` first. The way back passes them over too.
 // `bootloader`: the unit's bootloader version. It is required: without one the model knows, nothing is written.
+// Returns {plan, image, report, base, left}: `base` says what the page's base.pack found in the folder (null when none
+// goes on), `left` names the pack files of the folder's packs that the plan does not copy.
 // What a pack file the page puts into the folder's packs finds there under its name, in small letters or capitals.
 export async function packStep(folder, name, digestWanted) {
   const there = (await folder.list(NAMES.packs)).filter((e) => e.kind === "file" && e.name.toLowerCase() === name.toLowerCase());
@@ -267,7 +265,7 @@ export async function packStep(folder, name, digestWanted) {
 
 export async function baseStep(folder, base) { return packStep(folder, BASE_PACK, base.sha256); }
 
-export async function prepare(folder, { build, stock = null, made, wayBack = false, base = null, chosen = [], bootloader } = {}) {
+export async function prepare(folder, { build, stock = null, made, wayBack = false, base = null, bootloader } = {}) {
   bootloader = bootloaderVersion(bootloader);
   const helper = await readHelper(folder);
   if (!helper) throw new Error("the helper has written nothing into this folder yet");
@@ -290,54 +288,33 @@ export async function prepare(folder, { build, stock = null, made, wayBack = fal
     report = { loader: { version: "the original file" } };
   } else ({ image, report } = await build(stockBytes));
   const imageSha = await sha256(image);
-  let packs = wayBack ? [] : await readPacks(folder);
-  const ticked = [];
-  if (!wayBack) {
-    const names = new Set();
-    for (const pack of chosen) {
-      if (isBase(pack.name)) throw new Error("base.pack comes with the page and is never ticked");
-      const problem = packNameProblem(pack.name);
-      if (problem) throw new Error("the pack file " + pack.name + " cannot be copied: " + problem);
-      if (names.has(pack.name.toLowerCase())) throw new Error("two ticked packs are named " + pack.name);
-      names.add(pack.name.toLowerCase());
-      if ((await sha256(pack.bytes)) !== pack.sha256) throw new Error("the pack " + pack.name + " is not the file the listing names");
-      ticked.push({ pack, step: await packStep(folder, pack.name, pack.sha256) });
-    }
-    packs = packs.filter((p) => !names.has(p.name.toLowerCase())).concat(chosen.map((p) => ({ name: p.name, bytes: p.bytes.length, sha256: p.sha256 })));
-  }
+  const packs = [];                                   // the page's base.pack alone, or none
   let step = null;
   if (!wayBack && base) {
     if ((await sha256(base.bytes)) !== base.sha256) throw new Error("the page's base.pack is not the file it names");
     step = await baseStep(folder, base);
-    packs = packs.filter((p) => !isBase(p.name)).concat([{ name: BASE_PACK, bytes: base.bytes.length, sha256: base.sha256 }]);
+    packs.push({ name: BASE_PACK, bytes: base.bytes.length, sha256: base.sha256 });
   }
+  const copied = new Set(packs.map((p) => p.name.toLowerCase()));
+  const left = (await packNames(folder)).filter((name) => !copied.has(name.toLowerCase()));
   const plan = makePlan({ run: helper.run, listing, image: { bytes: image.length, sha256: imageSha }, packs, made, bootloader });
   plan.image.file = imageFile;
   plan.wayBack = wayBack;
   plan.before = { file: NAMES.before, sha256: await sha256(new TextEncoder().encode(listingText)) };
   plan.build = { loader: report?.loader?.version ?? null, output_sha256: report?.output_sha256 ?? imageSha };
   if (step) plan.base = { from: "the page", sha256: base.sha256, in_folder: step.state, kept: step.kept };
-  if (ticked.length) plan.chosen = ticked.map(({ pack, step: s }) => ({ name: pack.name, sha256: pack.sha256, from: pack.from ?? null, in_folder: s.state, kept: s.kept }));
   if (!wayBack) await folder.writeBytes(NAMES.image, image);
   if (plan.pad) {
     const bytes = padBytes(plan.pad.bytes);
     plan.pad.sha256 = await sha256(bytes);
     await folder.writeBytes(plan.pad.file, bytes);
   }
-  for (const { pack, step: s } of ticked) {           // the ticked packs, then base.pack, then the plan
-    if (s.state === "same") continue;
-    if (s.kept) await folder.writeBytes(s.kept, s.bytes);
-    await folder.writeBytes(NAMES.packs + "/" + pack.name, pack.bytes);
-  }
-  if (step && step.state !== "same") {
+  if (step && step.state !== "same") {                // base.pack, then the plan
     if (step.kept) await folder.writeBytes(step.kept, step.bytes);
     await folder.writeBytes(NAMES.packs + "/" + BASE_PACK, base.bytes);
   }
   await folder.writeText(NAMES.plan, JSON.stringify(plan, null, 1));
-  return {
-    plan, image, report, base: step && { state: step.state, found: step.found, kept: step.kept },
-    chosen: ticked.map(({ pack, step: s }) => ({ name: pack.name, state: s.state, found: s.found, kept: s.kept })),
-  };
+  return { plan, image, report, base: step && { state: step.state, found: step.found, kept: step.kept }, left };
 }
 
 // Once the helper says it is ready: its listing of the disk held against the plan, by the page as well.
