@@ -394,6 +394,266 @@
       "level": 10,
       "folders": [],
       "picture": {"path": "thumbs/veffrrrr.png", "sha256": "fa027d8bd0c1d6a9992fb1ff533e4fa0828564fb316c896a7e4ed438f002f6c3", "bytes": 15015}
+    },
+    {
+      "id": "bark",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Electric piano with Rhodes, Wurli, Pianet and CP-70 models and adjustable strike.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/bark.pack",
+      "sha256": "773267239b7070c23a1b5f4158524afc6fef1d6717e0eed46aac2893bd5c1add",
+      "bytes": 82223,
+      "version": 10,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "cube",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo resonator with a geometric chamber and an animated resonant object.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/cube.pack",
+      "sha256": "d8400c058b5959a4c7e8e31f7c935198e6333e535c382a592a0e6eba847a1072",
+      "bytes": 17454,
+      "version": 5,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "fret",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Electric bass with four playing techniques, switchable pickups, damping and amplifier circuits.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/fret.pack",
+      "sha256": "38791f4422d7ac590223caa2ab9dd59a37a5dce19401811213f95e39926fffc1",
+      "bytes": 64588,
+      "version": 7,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "organ",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Drawbar organ with four generator models, percussion, drive and a rotating stereo cabinet.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/organ.pack",
+      "sha256": "339834573b8e6e52d20706dd74320b19a4cc8b1db8f6f00ebaabe1eff472e173",
+      "bytes": 266206,
+      "version": 5,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "plonk",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Percussion synthesizer with wavefolding, tuned oscillator ratios and short or long spring decay.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/plonk.pack",
+      "sha256": "f2854cf0debae6ea50c42f78953c7e2907533854615fe6058a042b95025ae78e",
+      "bytes": 58638,
+      "version": 7,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "pong",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo delay with court timing, repeat count, stereo spin and input level.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/pong.pack",
+      "sha256": "f7bc5df47ea9e26994f1200c6ec144ba76fa003b4065221613231e3720a268e6",
+      "bytes": 1349157,
+      "version": 6,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "sag",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo drive effect with adjustable power-supply sag, tone and wet/dry mix.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/sag.pack",
+      "sha256": "41af9c4b38145fabc1e43a905e26b97d2617262240cce7a1a9e5ca377f6f32b2",
+      "bytes": 86669,
+      "version": 4,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "sid",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Chip synthesizer with pulse width, oscillator sync, ring modulation, filtering and drive.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/sid.pack",
+      "sha256": "efddad065b91c49ad3dd37413ab6660c6c1ddf81cc307f0b5504ebc9d41093e5",
+      "bytes": 44395,
+      "version": 8,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "skatter",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo granular effect with a rolling sample buffer, adjustable grain length and scatter.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/skatter.pack",
+      "sha256": "d5c998d9c14aa0f8920a9147b9170878237aa50eb221c83a3dc13d82e6416b39",
+      "bytes": 149335,
+      "version": 6,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "split",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo crossover drive with independent low-band and high-band gain.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/split.pack",
+      "sha256": "6adc6f5e6ddd438080e1d1850c54a6bf8b825240f1c762429edc247df996d5f8",
+      "bytes": 55777,
+      "version": 4,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "squash",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Stereo compressor with adjustable threshold, compression, timing and wet/dry mix.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/squash.pack",
+      "sha256": "a515f95a283114f61f6d24303b4a6331de025efe4840ebb0e9f863bec088064c",
+      "bytes": 58271,
+      "version": 3,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "syrup",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "effects"
+      ],
+      "description": "Driven filter with frequency, resonance, drive and wet/dry mix.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/syrup.pack",
+      "sha256": "5afdcffaeddb074c91cebecdd8fe5efe3ba2692eeed009cfdec9af0262143244",
+      "bytes": 270997,
+      "version": 8,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
+    },
+    {
+      "id": "wave",
+      "author": "midnightops94",
+      "status": "listed",
+      "categories": [
+        "library"
+      ],
+      "description": "Wavetable synthesizer with eight banks, wavetable sweep, pulse shaping and twin oscillators.",
+      "repository": "https://github.com/midnightops94/open-field-midnight94",
+      "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+      "path": "packs/wave.pack",
+      "sha256": "15085d474ed88bafb06e948098a25e127b66379abc09a1237cde72aa9664cebf",
+      "bytes": 161028,
+      "version": 8,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 10,
+      "folders": []
     }
   ]
 }
