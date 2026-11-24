@@ -40,6 +40,26 @@
   "keys": {
    "title": "Keys and the screen that is shown",
    "about": ""
+  },
+  "sounds": {
+   "title": "Sounds, effects and engines",
+   "about": "The synth and the drum each keep eight slots. A slot has a record of 52 bytes whose document, the sound as its file holds it, is the JSON value at the record's +8; the synth's eight records start at `0x080235dc`, the drum's at `0x0802377c`. An effect has a type, 0 to 10 for the firmware's own (delay, grid, punch, phone, spring, mother, nitro, cwo, vocoder, terminal, fazer). The firmware keeps two effect objects at a time: index 0 for the instrument that plays, index 1 for the master."
+  },
+  "notes": {
+   "title": "Notes and sequencers",
+   "about": "These play on the instrument the unit is on: the synth or the drum, by the firmware's play mode. A note is a MIDI note number, 0 to 127."
+  },
+  "tape": {
+   "title": "The tape's document and its save",
+   "about": "The firmware keeps the tape's settings as one JSON document, read from the tape's file at a load and written into it at a save. The save runs on the firmware's background worker, the lowest of its threads, which also loads the sounds picked in the unit's list."
+  },
+  "disk": {
+   "title": "The disk mode",
+   "about": "When the unit is a disk on a computer, the firmware builds a tree of folders and files to show. A folder has a behaviour: an object whose first word is a table of functions. The word at +0x10 makes the behaviour of a folder inside it by its name, and the word at +0x14 gives a file object for a file of it by its name; each answers 0 for a name it does not take."
+  },
+  "unit": {
+   "title": "The keyboard controller, MIDI out and the restart",
+   "about": "Calls that reach beyond the firmware's own memory: the keyboard controller, the USB MIDI output, and the restart of the unit."
   }
  },
  "functions": {
@@ -58,7 +78,7 @@
   "0x8fc8a9d8": {
    "name": "file_open",
    "group": "files",
-   "what": "Opens a file. `mode` is a text as C's `fopen` takes it; our code hands over the firmware's own text for reading, `rb`, which stands at `0x848daa84`. Gives back a descriptor, a small number that may be 0. A negative number means the open failed, and the function has then written a line into the log itself.",
+   "what": "Opens a file. `mode` is a text as C's `fopen` takes it; our code hands over the firmware's own text for reading, `rb`, which stands at `0x848daec0`. Gives back a descriptor, a small number that may be 0. A negative number means the open failed, and the function has then written a line into the log itself.",
    "thread": "Not the audio thread. Ours: the main thread at the start and when a screen is made, and the display thread."
   },
   "0x8fc8a9a8": {
@@ -208,13 +228,13 @@
   "0x8fcc7560": {
    "name": "alloc",
    "group": "memory",
-   "what": "A block of the firmware's own heap, the one its screens and pictures come from. It never gives back 0: when the heap has no room, the firmware writes an error into the log and stops. So bound what you ask for (our picture maker asks for a megabyte at most) and give every block back with `free` at `0x8fcc4e10`.",
+   "what": "A block of the firmware's own heap, the one its screens and pictures come from. It never gives back 0: when the heap has no room, the firmware writes an error into the log and stops. So bound what you ask for (our picture maker asks for a megabyte at most) and give every block back with `free` at `0x8fcc6c30`.",
    "thread": "Not the audio thread. Ours: the main thread when a screen is made, and the display thread."
   },
   "0x8fcc6c30": {
    "name": "free",
    "group": "memory",
-   "what": "Gives back a block got with `alloc` at `0x8fcc5744`.",
+   "what": "Gives back a block got with `alloc` at `0x8fcc7560`.",
    "thread": "As `alloc`."
   },
   "0x8fcc51fc": {
@@ -342,6 +362,318 @@
    "group": "keys",
    "what": "The same for MIDI: only its own lines, 0 to 4.",
    "thread": "Ours: the key thread."
+  },
+  "0x8c053a50": {
+   "name": "assert",
+   "group": "log",
+   "what": "Writes `message` into the log, then stops the unit for good: it never comes back. Our code puts an endless loop after it all the same.",
+   "thread": "Ours: the main thread at the start."
+  },
+  "0x8c051f88": {
+   "name": "rename",
+   "group": "files",
+   "what": "Renames a file: `from` and `to` are paths as `file_size` takes them. Both must be counted from the top of the disk or both begin with a slash: one of each stops the unit. Not 0 when the rename was made. The file system behind it replaces a target that is there in one step.",
+   "thread": "Not the audio thread. Ours: the display thread, the main task when it handles a SysEx message."
+  },
+  "0x8c052054": {
+   "name": "is_folder",
+   "group": "files",
+   "what": "Not 0 when the path opens as a folder, written without a slash at its end. It opens the folder and closes it again.",
+   "thread": "As `rename`."
+  },
+  "0x8c0a4730": {
+   "name": "free_space",
+   "group": "files",
+   "what": "The free bytes of the file system the path names, as one number of 64 bits (R1:R0); -1 on a failure. Our code hands over `/yaffs2`, the text the firmware's own callers hand over.",
+   "thread": "Ours: the main task when it handles a SysEx message."
+  },
+  "0x8fcba988": {
+   "name": "open",
+   "group": "files",
+   "what": "The second family: the calls of the firmware's file class. Opens a file and gives back a handle, or -1 with a line in the log. `mode` is one of four texts, compared as texts: `rb`, `ab`, `r+b` and `w+b`, which makes the file anew. Any other mode is refused with a line. A path that begins with a slash is taken from the device's root; any other is counted from the top of the unit's disk.",
+   "thread": "Not the audio thread. Ours: the display thread, the disk mode's thread, the main task when it handles a SysEx message."
+  },
+  "0x8fcba954": {
+   "name": "read",
+   "group": "files",
+   "what": "Reads `count` items of `size` bytes from a file opened with `open`. Gives back the number of items read. The handle is the fourth argument, so it travels on the stack.",
+   "thread": "As `open`."
+  },
+  "0x8fcba8c0": {
+   "name": "write",
+   "group": "files",
+   "what": "Writes `count` items of `size` bytes into a file opened with `open`. Gives back the number of items written, or 0 with the line `write error` in the log. The handle is the fourth argument.",
+   "thread": "As `open`."
+  },
+  "0x8fcba8ac": {
+   "name": "close",
+   "group": "files",
+   "what": "Closes a file opened with `open`.",
+   "thread": "As `open`."
+  },
+  "0x8c084748": {
+   "name": "json_cstring",
+   "group": "json",
+   "what": "The characters of a text value (the kind 4): the value's own, not a copy, good while the value lives and is not changed. A value of any other kind stops the unit: ask the kind first.",
+   "thread": "Not the audio thread. Ours: the display thread, the key thread, the main task, the firmware's background worker."
+  },
+  "0x8c0828e0": {
+   "name": "json_read_raw",
+   "group": "json",
+   "what": "The parse under `json_read_file`: it reads a JSON text that is already in memory into a value. `a` is the firmware's JSON reader, an object on the caller's stack; `path` is not a path but a text object of the firmware that holds the whole text to parse; `value` is the value to fill; the firmware's own callers hand 1 for `flag`. Not 0 when the text was parsed. Our code calls it only in place of the firmware's own call, with the arguments that call came with.",
+   "thread": "Ours: in place of the firmware's own call in the synth's read of a preset, on the firmware's background worker."
+  },
+  "0x8d4e63bc": {
+   "name": "new",
+   "group": "memory",
+   "what": "A block of `bytes` from the firmware's heap: the C++ `new` of the firmware, which `alloc` calls. As `alloc`, it never gives back 0: with no room the firmware writes an error into the log and stops. Give the block back with `free` at `0x8d4e63cc`.",
+   "thread": "Not the audio thread. Ours: the main thread at the start, the disk mode's thread."
+  },
+  "0x8d4e63cc": {
+   "name": "free",
+   "group": "memory",
+   "what": "Gives back a block of the firmware's heap: one from `new`, or the text of a firmware text object that holds sixteen characters or more.",
+   "thread": "Ours: the disk mode's thread."
+  },
+  "0x8fc261fc": {
+   "name": "screens",
+   "group": "screens",
+   "what": "The table of the firmware's screens by their numbers: a word a number, the screen object or 0 for a number no screen has. A screen's document is the word at its +4, 0 until the firmware has loaded it. Our code reads only the numbers 1 to 85.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fc273f0": {
+   "name": "screen_of",
+   "group": "screens",
+   "what": "The number of the screen of an effect's type, 0 to 10. For any other type it writes a line into the log and gives back 86.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fc274ac": {
+   "name": "engine_screen",
+   "group": "screens",
+   "what": "The number of the screen of a synth engine's type. For a type that has no screen it writes a line into the log and gives back 86.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8c0dd2cc": {
+   "name": "draw_char",
+   "group": "screens",
+   "what": "Draws one character of the firmware's small bitmap font into a frame buffer, at the cursor: the two words at `0x840148b0` (x) and `0x840148b4` (y). Every pixel of the character's cell is written, the character's in white and the rest in black. The cursor's x moves on by the character's width and one. A byte 0x80 to 0xbf draws nothing; any other character outside 0x20 to 0x7e is drawn as `?`. A character that does not fit before x = 480 is not drawn, and the cursor stays. Our code sets the cursor before a text and puts it back after.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fca6940": {
+   "name": "tick",
+   "group": "screens",
+   "what": "The firmware's work of a frame before the draw, called by the display thread's frame loop. It takes one argument, the object the loop hands over, and gives nothing back. Our code calls it in place of the loop's own call, with the registers as they came.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fc27678": {
+   "name": "draw",
+   "group": "screens",
+   "what": "The whole draw of a frame: every screen that is shown, into the frame buffer the loop hands over, its one argument. It gives nothing back. Our code calls it in place of the loop's own call, with the registers as they came.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d4f6c3c": {
+   "name": "synth_put",
+   "group": "sounds",
+   "what": "Puts a sound on a synth slot: `record` is the slot's record, `slot` its number, 0 to 7, and `json` the sound's document, which is assigned to the record's. With `flag` 0 the firmware then keeps of the record's document only the members it knows. Last it sets the name the screen shows for the slot; a `slot` outside 0 to 7 sets no name. Nothing comes back.",
+   "thread": "Ours: the firmware's background worker, in place of its own call when a sound is loaded from the unit's list."
+  },
+  "0x8d4f6748": {
+   "name": "drum_put",
+   "group": "sounds",
+   "what": "The same for a drum slot. With `flag` 0, a document the firmware's check refuses is written as an error into the log.",
+   "thread": "As `synth_put`."
+  },
+  "0x8d4f3b9c": {
+   "name": "set_params",
+   "group": "sounds",
+   "what": "Writes an effect's eight knob words into a slot's document, as the member `fx_params`: each word is a value shifted left by sixteen, and the value is what goes in. Then the record is marked to be written. `record` is the slot's record.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d4f3c24": {
+   "name": "set_active",
+   "group": "sounds",
+   "what": "Writes whether a slot's effect is on into the slot's document, as the member `fx_active`, and marks the record to be written. `record` is the slot's record.",
+   "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8d4f689c": {
+   "name": "knob_set",
+   "group": "sounds",
+   "what": "Writes a synth slot's eight knob words into its document, as the member `knobs`, each a value shifted left by sixteen, and marks the record to be written. The words of the sampler's sounds are taken another way: some of them are written as other members.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d504320": {
+   "name": "on_synth",
+   "group": "sounds",
+   "what": "Sets the byte that says whether the effect of synth slot `slot` plays. Only that byte: nothing is written into the slot's document.",
+   "thread": "Ours: the display thread, and in place of the firmware's own call when a slot's sound is applied."
+  },
+  "0x8d5042f0": {
+   "name": "on_drum",
+   "group": "sounds",
+   "what": "The same for a drum slot.",
+   "thread": "As `on_synth`."
+  },
+  "0x8d5042c0": {
+   "name": "on_master",
+   "group": "sounds",
+   "what": "The same for the master's effect.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d50424c": {
+   "name": "master_on",
+   "group": "sounds",
+   "what": "Whether the master's effect plays: the byte `on_master` sets.",
+   "thread": "Ours: in place of the firmware's own call when the master is saved."
+  },
+  "0x8c0bb684": {
+   "name": "master_pick",
+   "group": "sounds",
+   "what": "The mixer's pick of the master's effect: the function in the word +0x28 of the mixer's controller's table (the word at `0x8400f2cc`). `controller` is the mixer's controller, `id` the id of the effect's row in the catalog's list `fx_types`. Our code calls it with the controller as it came.",
+   "thread": "Ours: the key thread, in place of the firmware's own call."
+  },
+  "0x8f011068": {
+   "name": "factory",
+   "group": "sounds",
+   "what": "Makes an effect object of a type, 0 to 10, for an index, 0 or 1, and gives it back; 0, with a line in the log, for any other type or index. Each index has one room: an object made for an index is made in the place of the one made before for it. The object's first word is its table of functions.",
+   "thread": "Ours: in place of the firmware's own call, on whatever thread that call runs."
+  },
+  "0x8d505390": {
+   "name": "build",
+   "group": "sounds",
+   "what": "Makes the effect object of `index` anew for a type: it clears the index's word, makes the object with `factory`, starts it and puts it in the word. A type the factory refuses stops the unit.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d4fee88": {
+   "name": "user_sounds",
+   "group": "sounds",
+   "what": "The number of user sounds the unit holds, synth and drum together. It stops the unit when the synth's or the drum's total is 0, as it is before the firmware's first count: our code reads the two totals first and calls it only when both are not 0.",
+   "thread": "Ours: the display thread, with interrupts masked."
+  },
+  "0x8fca2220": {
+   "name": "classic",
+   "group": "sounds",
+   "what": "Not 0 when the unit holds the file `content/op1.classic`. The first call looks on the disk; every call after gives back what it found.",
+   "thread": "Not the audio thread. Ours: the display thread."
+  },
+  "0x8f007d68": {
+   "name": "note_record",
+   "group": "notes",
+   "what": "The note a key plays: `key`, the key's number, and `velocity` become a record of four words, the MIDI note first and the velocity second. The note is 53 and the key, and on the synth twelve times its keyboard octave more. The record comes back as a structure, by value: bind the function as one that returns the structure, and the compiler hands over the address for it in P0.",
+   "thread": "Ours: the key thread, the audio thread or a MIDI handler's thread, when a key reaches a pack's sequencer."
+  },
+  "0x8f008388": {
+   "name": "note_on",
+   "group": "notes",
+   "what": "Begins `note` at `velocity` on the instrument the unit is on, as a key does, and sends it out over MIDI. A `velocity` of -1 is taken as 127. A note above 127 stops the unit. `octave` counts on the drum only. `target` is where the MIDI goes, 0 for the unit's own settings; with `no_midi` not 0 nothing is sent. Our code hands 0 for `third`, `fourth`, `octave` and `target`.",
+   "thread": "Ours: from a pack's sequencer calls: the sequencer thread, the key thread, the audio thread, a MIDI handler's thread."
+  },
+  "0x8f008518": {
+   "name": "note_off",
+   "group": "notes",
+   "what": "Ends `note` on the instrument the unit is on and sends the end out over MIDI, unless `no_midi` is not 0; `target` as for `note_on`. A note outside 0 to 127 is passed over. While the firmware holds its notes, as with a sustain pedal, the end waits until they are let go. Our code hands 64 for `velocity` and 0 for `third`, `fourth` and `target`.",
+   "thread": "As `note_on`."
+  },
+  "0x8f008ba8": {
+   "name": "bend",
+   "group": "notes",
+   "what": "Sets the pitch of the synth's voices that play `note`. `pitch` is a pitch word as the firmware's table of pitches holds them. It works on the synth's voices: our code calls it only while the unit is on the synth.",
+   "thread": "As `note_on`."
+  },
+  "0x8fc97844": {
+   "name": "player_word",
+   "group": "notes",
+   "what": "The address of the word that holds the sequencer player of the instrument the unit is on: the drum's while the unit is on the drum, else the synth's. A player is an object whose first word is its table of functions.",
+   "thread": "Ours: the key thread, or the main thread at the start."
+  },
+  "0x8fc978fc": {
+   "name": "current_player",
+   "group": "notes",
+   "what": "The player in that word: the object, or 0.",
+   "thread": "As `player_word`."
+  },
+  "0x8fc9e818": {
+   "name": "restart_allowed",
+   "group": "notes",
+   "what": "Not 0 when the unit's clock settings let the sequencers' count be set back now, as the firmware's own sequencers ask before they set it back at a first key.",
+   "thread": "As `note_on`."
+  },
+  "0x8fc9e868": {
+   "name": "restart",
+   "group": "notes",
+   "what": "Sets the sequencers' count back to its start. It takes nothing and gives nothing back. Ask `restart_allowed` first.",
+   "thread": "As `note_on`."
+  },
+  "0x8fc681a0": {
+   "name": "overlay_match",
+   "group": "notes",
+   "what": "The matcher of the notice \"sequencer off\": the function in the word at `0x848d8668`, its table's. `overlay` is the notice's object and `screen` a screen's number. Our code answers in its place for the packs' page and hands it every other call with the arguments as they came.",
+   "thread": "Ours: in place of the firmware's own call."
+  },
+  "0x8d4f2b80": {
+   "name": "tape_root",
+   "group": "tape",
+   "what": "The tape's document: a JSON value at a fixed place, the same every call. The unit stops when the document is null.",
+   "thread": "Not the audio thread. Ours: the firmware's background worker, the key thread, the main task."
+  },
+  "0x8d4f24dc": {
+   "name": "tape_set",
+   "group": "tape",
+   "what": "Sets a member of one of the firmware's documents to a copy of `value`, under the documents' lock, and marks that document changed. `db` picks the document: 2 is the tape's, the one `tape_root` gives. `key` is the member's name. It waits for the lock as long as it takes, so it waits while a tape's file is read or written. Gives back 1.",
+   "thread": "Not the audio thread. Ours: the firmware's background worker, in the tape's save."
+  },
+  "0x8c0c1dd0": {
+   "name": "tape_saver",
+   "group": "tape",
+   "what": "The tape's saver: an object of the firmware's, made at the first call and the same at every call after. Hand it to `notify` to have the tape saved.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fca1ed2": {
+   "name": "notify",
+   "group": "tape",
+   "what": "Marks a saver to save and wakes the background worker, which then saves. It does not wait.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8fcacea0": {
+   "name": "root_child",
+   "group": "disk",
+   "what": "The root folder's behaviour's maker of a folder inside it: the function in the word at `0x8490fc4c`, the root behaviour's +0x10. `behaviour` is the root behaviour, `name` the folder's name; it gives back the behaviour of that folder, or 0. Our code calls it for every name that is not its own, with the arguments as they came.",
+   "thread": "Ours: the disk mode's thread, in place of the firmware's own call."
+  },
+  "0x8fcaeb10": {
+   "name": "make_folder",
+   "group": "disk",
+   "what": "Makes a folder of the disk mode's tree inside `parent` and gives it back. The folder's behaviour comes from the parent's behaviour, its word at +0x10. It gives back 0 with a line in the log for a name the parent already has, or when the behaviour gives none.",
+   "thread": "Ours: the disk mode's thread."
+  },
+  "0x8fcaed68": {
+   "name": "add_file",
+   "group": "disk",
+   "what": "Adds a file to a folder of the disk mode's tree and gives back its node, or 0 when the folder's behaviour gives no file object for the name (its word at +0x14). An empty name stops the unit.",
+   "thread": "Ours: the disk mode's thread."
+  },
+  "0x8fcbabb8": {
+   "name": "fs_file_ctor",
+   "group": "disk",
+   "what": "Makes the firmware's file object for a file on the disk in memory the caller provides, 64 bytes from `new`: the object the disk mode reads and writes a file through. The path is copied into a text object of the firmware at the object's +4, and the file is not open yet. The object's first word is its table of twelve functions.",
+   "thread": "Ours: the disk mode's thread."
+  },
+  "0x8c0567f0": {
+   "name": "kb_request",
+   "group": "unit",
+   "what": "Sends a request to the keyboard controller and waits for its answer. `link` is the controller's link, at `0x8497d844`; `type` the request; `payload` and `bytes` what goes with it, 0 and 0 for none. The answer is copied whole into `answer`, the type at its byte 2, the length at byte 3 and the payload from byte 4; it may be copied there even after the wait is over, so keep the buffer out of the stack. `timeout_ms` bounds the wait. Not 0 when the answer came in time; 0 when it did not, or when four requests are already waiting.",
+   "thread": "Ours: the main thread at the start."
+  },
+  "0x8d4e5cb8": {
+   "name": "midi_out",
+   "group": "unit",
+   "what": "Hands USB MIDI packets, four bytes each, to the MIDI output: `index` is the port, `packets` the packets, `bytes` their length in bytes. In some states of the USB connection nothing is sent and nothing is said, and it gives nothing back: our code looks at the output's room and at the USB mode first, and sends only in the mode 1.",
+   "thread": "Ours: the main task when it handles a SysEx message."
+  },
+  "0x8c0df868": {
+   "name": "restart",
+   "group": "unit",
+   "what": "Asks for a restart: writes the line `got request to enter DFU mode` into the log, keeps `code` and the time of the call, and comes back. `delay_ms` later the firmware's main loop shuts the unit down and starts it again; the delay is kept in sixteen bits. `code` picks what starts next. Our code hands 20, and the unit comes back into the OS; 20 is also the code the firmware's own automatic power-off writes. The firmware's MIDI request to enter its update mode hands other codes.",
+   "thread": "Ours: the main task when it handles a SysEx message, the display thread."
   }
  }
 }
