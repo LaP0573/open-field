@@ -461,6 +461,41 @@
    "sum": "0x29fb618c",
    "group": "base",
    "name": "A word in the table of the settings row MIDI: its function for a turn of the red knob on a line."
+  },
+  {
+   "address": "0x8fc26744",
+   "length": 8,
+   "sum": "0x6b3a1314",
+   "group": "base",
+   "name": "In the render loop, in its part for the frame's first screen that draws: the call that fills the whole frame buffer black before the screens are drawn."
+  },
+  {
+   "address": "0x8c0ba6d6",
+   "length": 8,
+   "sum": "0x08a01142",
+   "group": "base",
+   "name": "In the function that opens the master's list of effects: the call that looks the master's effect up in the unit's catalog, whose answer is the row the list opens on."
+  },
+  {
+   "address": "0x8d4f3a54",
+   "length": 8,
+   "sum": "0xbaed63c3",
+   "group": "base",
+   "name": "The entry of the function that puts an LFO picked in the unit's list on a sound."
+  },
+  {
+   "address": "0x8d4f7a34",
+   "length": 8,
+   "sum": "0x4a08d6e5",
+   "group": "base",
+   "name": "The entry of the function that gives the row a sound's list of effects opens on. The lists of synth and drum sounds both call it, and nothing else does."
+  },
+  {
+   "address": "0x8d4f7ad0",
+   "length": 8,
+   "sum": "0x4a08d6e5",
+   "group": "base",
+   "name": "The entry of the function that gives the row a sound's list of LFOs opens on. The lists of synth and drum sounds both call it, and nothing else does."
   }
  ],
  "image": [
@@ -910,6 +945,42 @@
      "form": "word",
      "target": "op1f_settings_red_midi",
      "does": "Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours."
+    },
+    {
+     "address": "0x8fc26744",
+     "form": "call",
+     "target": "op1f_fill_place",
+     "does": "A call to ours, part of a page that keeps its picture (base 33): in a frame where the page at 77 asked to be kept, it leaves the black fill out; otherwise it makes the firmware's call."
+    },
+    {
+     "address": "0x8c0ba6d6",
+     "form": "call",
+     "target": "op1f_layer_c3_stub",
+     "does": "A call to our stub, which makes the firmware's call and, while the master rides a pack's effect, has the list open on the pack's row."
+    },
+    {
+     "address": "0x8d4f3a54",
+     "form": "jump",
+     "target": "op1f_layer_lg_stub",
+     "room": "op1f_layer_lg_room",
+     "copies": 8,
+     "does": "A jump to ours, which puts a pack's LFO on the sound or takes it off, and lets the firmware's function run (through a trampoline)."
+    },
+    {
+     "address": "0x8d4f7a34",
+     "form": "jump",
+     "target": "op1f_layer_eh_stub",
+     "room": "op1f_layer_eh_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise."
+    },
+    {
+     "address": "0x8d4f7ad0",
+     "form": "jump",
+     "target": "op1f_layer_lh_stub",
+     "room": "op1f_layer_lh_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise."
     }
    ]
   }

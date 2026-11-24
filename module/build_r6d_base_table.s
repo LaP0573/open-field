@@ -68,6 +68,11 @@ op1f_boot_table:
     .long 0x00000010, 0x840134bc, op1f_settings_red_system, 0x89f53f9a, 0    /* Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours. */
     .long 0x00000010, 0x840134fc, op1f_settings_chosen_midi, 0xdfaf55a7, 0    /* Ours calls the firmware's function first, then puts the packs' settings for MIDI on lines behind the unit's own and lets the ochre knob reach them. */
     .long 0x00000010, 0x84013504, op1f_settings_red_midi, 0x29fb618c, 0    /* Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours. */
+    .long 0x00000012, 0x8fc26744, op1f_fill_place, 0x6b3a1314, 0    /* A call to ours, part of a page that keeps its picture (base 33): in a frame where the page at 77 asked to be kept, it leaves the black fill out; otherwise it makes the firmware's call. */
+    .long 0x00000012, 0x8c0ba6d6, op1f_layer_c3_stub, 0x08a01142, 0    /* A call to our stub, which makes the firmware's call and, while the master rides a pack's effect, has the list open on the pack's row. */
+    .long 0x00080014, 0x8d4f3a54, op1f_layer_lg_stub, 0xbaed63c3, op1f_layer_lg_room    /* A jump to ours, which puts a pack's LFO on the sound or takes it off, and lets the firmware's function run (through a trampoline). */
+    .long 0x00080014, 0x8d4f7a34, op1f_layer_eh_stub, 0x4a08d6e5, op1f_layer_eh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. */
+    .long 0x00080014, 0x8d4f7ad0, op1f_layer_lh_stub, 0x4a08d6e5, op1f_layer_lh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

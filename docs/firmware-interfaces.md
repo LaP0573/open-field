@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 102 functions bound in the sources. 50 are described below, by subject. The other 52 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 112 functions bound in the sources. 60 are described below, by subject. The other 52 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -109,6 +109,23 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | `0x8c0d5018` | `void system_red(void* row, u32 line, u32 amount)` | The same for SYSTEM: only its own lines, 0 to 5. | Ours: the key thread. |
 | `0x8c0d49d0` | `void midi_red(void* row, u32 line, u32 amount)` | The same for MIDI: only its own lines, 0 to 4. | Ours: the key thread. |
 
+## Sounds and their LFOs
+
+The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Each slot has a record, an object of the firmware's at a fixed address, which holds the sound's document: what the unit saves with the sound. A sound's LFO has a kind (a row of the list under shift and T4), eight words of settings and a switch. Our code changes them through the calls below, the way the unit's own keys do, so that what the unit shows, plays and saves agrees.
+
+| Address | The call | What the caller hands over and gets back | Called from |
+| --- | --- | --- | --- |
+| `0x8d4f3c84` | `void lfo_words_doc(void* record, const u32* words)` | Writes eight words of LFO settings into the document of the sound whose record is `record`. Follow it with the record's LFO apply (`lfo_apply_synth` or `lfo_apply_drum`), so that the sound plays them. | Ours: the key thread. |
+| `0x8d4f3d0c` | `void lfo_active_doc(void* record, int on)` | Writes the LFO's switch, `on` 1 or 0, into the document of the sound whose record is `record`. Our code calls it right after `lfo_on_synth` or `lfo_on_drum`, so that the switch the sound plays with is the one it is saved with. | Ours: the display thread. |
+| `0x8d4f64c0` | `void lfo_apply_synth(void* record)` | Makes the synth sound whose record is `record` play the LFO its document holds now, as after a change on the unit's own LFO page. | Ours: the key thread. |
+| `0x8d4f4f90` | `void lfo_apply_drum(void* record)` | The same for a drum sound's record. | Ours: the key thread. |
+| `0x8d504308` | `void lfo_on_synth(u32 slot, int on)` | Switches the LFO of synth slot `slot` (0 to 7) on (`on` 1) or off (0), as the unit's own key does. It changes the switch the sound plays with; `lfo_active_doc` writes it into the document. | Ours: the key thread, the display thread. |
+| `0x8d5042d8` | `void lfo_on_drum(u32 slot, int on)` | The same for drum slot `slot` (0 to 7). | As `lfo_on_synth`. |
+| `0x8d504290` | `u32 lfo_on_synth_read(u32 slot)` | Whether the LFO of synth slot `slot` (0 to 7) is on: not 0 when it is. | Ours: the key thread, the display thread. |
+| `0x8d504260` | `u32 lfo_on_drum_read(u32 slot)` | The same for drum slot `slot` (0 to 7). | Ours: the key thread, the display thread. |
+| `0x8fc275e4` | `u32 lfo_screen_of(u32 kind)` | The number of the screen the unit shows for an LFO of kind `kind`, in the firmware's own numbering of its six kinds, 0 to 5. Our code asks it once for each kind, at its first frame, and knows the LFO pages by those numbers from then on. | Ours: the display thread. |
+| `0x8d4f221c` | `u32 lookup(u32 database, const char* key, const void* name, void* out)` | Finds a row of the unit's catalog of sounds and effects. `database`: which part of the catalog, as the firmware hands it; `key`: the group's key; `name`: the row's name, as the firmware hands it; the row is put into the JSON value `out`. Gives back 0 when there is no such row. Our code calls it from its own function in its place where the master effect's list opens, and then, while the master rides an effect of a pack, puts that effect's id into the row. | Ours: the key thread. |
+
 ## Bound in the sources, not described yet
 
 Each of these is called by the files named. The type is what our code hands over and takes back; the name is the sources' own. Read the file's comments at the binding before you use one, and add its words to `profiles/op1f-1.7.3-interfaces.json` when you have.
@@ -127,7 +144,7 @@ Each of these is called by the files named. The type is what our code hands over
 | `0x8c0dd2cc` | `void draw_char(u16* framebuffer, int character)` | `build_r2_measure.cpp` |
 | `0x8c0df868` | `void restart(int code, int delay_ms)` | `build_r4c_door.cpp` |
 | `0x8d4e5cb8` | `void midi_out(int index, const void* packets, u32 bytes)` | `build_r4c_door.cpp` |
-| `0x8d4e63bc` | `void* new(u32 bytes)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp`, `build_r8_options.cpp` |
+| `0x8d4e63bc` | `void* new(u32 bytes)` | `build_m1_loader_disk.cpp`, `build_r10_logs.cpp`, `build_r2_folders.cpp`, `build_r8_options.cpp` |
 | `0x8d4e63cc` | `void free(void* memory)` | `build_m1_loader_disk.cpp` |
 | `0x8d4f24dc` | `int tape_set(int db, const char* key, const void* value)` | `build_r6b_keeps.cpp` |
 | `0x8d4f2b80` | `void* tape_root(void)` | `build_r6b_keeps.cpp` |
@@ -160,10 +177,10 @@ Each of these is called by the files named. The type is what our code hands over
 | `0x8fca2220` | `u32 classic(void)` | `build_r6d_engines.cpp` |
 | `0x8fca6940` | `u32 tick(u32, u32, u32)` | `build_r2_cost.cpp` |
 | `0x8fcacea0` | `void* root_child(void* behaviour, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_disk.cpp` |
-| `0x8fcaeb10` | `void* make_folder(void* parent, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
-| `0x8fcaed68` | `void* add_file(void* folder, const char* name)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
+| `0x8fcaeb10` | `void* make_folder(void* parent, const char* name)` | `build_m1_loader_disk.cpp`, `build_r10_logs.cpp`, `build_r2_folders.cpp` |
+| `0x8fcaed68` | `void* add_file(void* folder, const char* name)` | `build_m1_loader_disk.cpp`, `build_r10_logs.cpp`, `build_r2_folders.cpp` |
 | `0x8fcba8ac` | `void close(int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcba8c0` | `int write(const void* data, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp` |
 | `0x8fcba954` | `int read(void* buffer, u32 size, u32 count, int handle)` | `build_r2_folders.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
 | `0x8fcba988` | `int open(const char* path, const char* mode)` | `build_r2_folders.cpp`, `build_r4c_door.cpp`, `build_r6d_engines.cpp`, `build_r8_options.cpp` |
-| `0x8fcbabb8` | `void fs_file_ctor(void* obj, const char* path)` | `build_m1_loader_disk.cpp`, `build_r2_folders.cpp` |
+| `0x8fcbabb8` | `void fs_file_ctor(void* obj, const char* path)` | `build_m1_loader_disk.cpp`, `build_r10_logs.cpp`, `build_r2_folders.cpp` |

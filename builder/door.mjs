@@ -38,11 +38,20 @@ export const RETURN_SLOW_MS = 20000;                // back on the page: no answ
 export const RETURN_GIVE_UP_MS = 120000;            // the page stops looking for the unit after this (the owner can look again)
 export const RECORD_KEY = "open-field-change-";     // the record of a change in the browser's storage, followed by the firmware: one record a firmware
 
-export const CMD = Object.freeze({ hello: 0x20, list: 0x21, hash: 0x22, begin: 0x23, data: 0x24, end: 0x25, remove: 0x26, abort: 0x27, commit: 0x28, status: 0x29 });
-const SENDABLE = Object.freeze([CMD.hello, CMD.list, CMD.hash, CMD.begin, CMD.data, CMD.end, CMD.remove, CMD.abort, CMD.commit, CMD.status]);
+export const CMD = Object.freeze({ hello: 0x20, list: 0x21, hash: 0x22, begin: 0x23, data: 0x24, end: 0x25, remove: 0x26, abort: 0x27, commit: 0x28, status: 0x29, logs: 0x2B, logread: 0x2C });
+const SENDABLE = Object.freeze([CMD.hello, CMD.list, CMD.hash, CMD.begin, CMD.data, CMD.end, CMD.remove, CMD.abort, CMD.commit, CMD.status, CMD.logs, CMD.logread]);
 const WRITES = Object.freeze([CMD.begin, CMD.data, CMD.end, CMD.remove, CMD.commit]); // sent only to a door of protocol 3
-const ASKED_AGAIN_ON_13 = Object.freeze([CMD.list, CMD.hash, CMD.remove]);
-export const COMMAND_NAMES = Object.freeze({ 0x20: "hello", 0x21: "list", 0x22: "hash", 0x23: "begin", 0x24: "data", 0x25: "end", 0x26: "remove", 0x27: "abort", 0x28: "commit", 0x29: "status" });
+const ASKED_AGAIN_ON_13 = Object.freeze([CMD.list, CMD.hash, CMD.remove, CMD.logs, CMD.logread]);
+export const COMMAND_NAMES = Object.freeze({ 0x20: "hello", 0x21: "list", 0x22: "hash", 0x23: "begin", 0x24: "data", 0x25: "end", 0x26: "remove", 0x27: "abort", 0x28: "commit", 0x29: "status", 0x2B: "logs", 0x2C: "logread" });
+// The unit's own log files, read through logs and logread (a door of build 6 or later): the last three starts, at most
+// twelve files, each read whole in pieces of 2,048 bytes after a look at its first 128.
+export const LOGS_BUILD = 6;
+export const LOG_PIECE = 2048;
+export const LOG_HEAD = 128;
+export const LOG_STARTS = 3;
+export const LOG_MAX_FILES = 12;
+export const LOG_MAX_SIZE = 16 * 1024 * 1024;       // a log file larger than this is not taken (the unit starts a new one at 512 KiB)
+export const LOG_NAME_MAX = 64;
 
 export const STATUS = Object.freeze({ done: 0, unreadable: 1, nameRefused: 2, noRoom: 3, noSuchCommand: 4, outOfOrder: 5, fingerprintDiffers: 6, asking: 7, cancelled: 8, more: 9, restarting: 10, fileUnreadable: 11, tapeMoves: 12, folderNotReady: 13, applying: 14, loaderRefuses: 15 });
 const STATUS_NAMES = Object.freeze(["done", "arguments unreadable", "name refused", "no room", "no such command", "out of order", "fingerprint differs",
@@ -123,6 +132,7 @@ export function unpack(packed) {
 
 // ---------- numbers, little-endian ----------
 
+function u16(v) { return [v & 0xFF, (v >>> 8) & 0xFF]; }
 function u32(v) { return [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF]; }
 function rd16(b, o) { return b[o] | (b[o + 1] << 8); }
 function rd32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
@@ -148,6 +158,25 @@ export function checkName(name) {
 function nameBytes(name) {
   const why = checkName(name);
   if (why) throw new DoorError("name", "the name " + JSON.stringify(name) + " is not a pack file's: " + why);
+  return Array.from(name, (c) => c.charCodeAt(0));
+}
+// null when the page takes `name` as a log file's name, sends it back in logread and puts it into the .zip as it is,
+// else why not: 1 to 64 printable bytes, not beginning with a dot or a space, none of / \ : * ? " < > |.
+export function checkLogName(name) {
+  if (typeof name !== "string") return "not a text";
+  if (name.length < 1) return "empty";
+  if (name.length > LOG_NAME_MAX) return "longer than " + LOG_NAME_MAX + " bytes";
+  for (let i = 0; i < name.length; i++) {
+    const c = name.charCodeAt(i);
+    if (c < 0x20 || c > 0x7E) return "a character outside 0x20 to 0x7E at " + i;
+    if (NAME_FORBIDDEN.includes(name[i])) return "the character " + name[i] + " at " + i;
+  }
+  if (name[0] === "." || name[0] === " ") return "begins with a dot or a space";
+  return null;
+}
+function logNameBytes(name) {
+  const why = checkLogName(name);
+  if (why) throw new DoorError("name", "the name " + JSON.stringify(name) + " is not a log file's: " + why);
   return Array.from(name, (c) => c.charCodeAt(0));
 }
 
@@ -204,6 +233,16 @@ export const payloads = Object.freeze({
   abortAll: () => [1],
   apply: () => [1],
   status: (protocol) => (protocol >= 3 ? [3] : protocol >= 2 ? [2] : []),
+  // logs: how many of the newest names to skip; logread: the offset, how many bytes (1 to 2,048), the name
+  logs: (first) => {
+    if (!Number.isInteger(first) || first < 0 || first > 255) throw new Error("first out of range");
+    return [first];
+  },
+  logread: (offset, want, name) => {
+    if (!Number.isInteger(offset) || offset < 0 || offset > 0xFFFFFFFF) throw new Error("offset out of range");
+    if (!Number.isInteger(want) || want < 1 || want > LOG_PIECE) throw new Error("want out of range");
+    return [...u32(offset), ...u16(want), ...logNameBytes(name)];
+  },
 });
 
 function text(bytes) {
@@ -318,6 +357,27 @@ export function parseCommit(p) {
   if (p.length !== 8) throw new DoorError("protocol", "commit 01's answer holds " + p.length + " bytes, not 8");
   return { newFiles: p[0], replacing: p[1], removing: p[2], baseComes: p[3] === 1, bytesToCheck: rd32(p, 4) };
 }
+// logs' answer: count (2), first, n (at most 8), then n entries newest first, each its size (4), its name's length and the name.
+export function parseLogs(p) {
+  if (p.length < 4) throw new DoorError("protocol", "logs' answer holds " + p.length + " bytes, fewer than 4");
+  const r = { count: rd16(p, 0), first: p[2], n: p[3], entries: [] };
+  if (r.n > 8) throw new DoorError("protocol", "logs' answer gives " + r.n + " names, more than 8");
+  let o = 4;
+  for (let k = 0; k < r.n; k++) {
+    if (o + 5 > p.length) throw new DoorError("protocol", "logs' answer ends inside entry " + k);
+    const size = rd32(p, o), L = p[o + 4];
+    if (L < 1 || o + 5 + L > p.length) throw new DoorError("protocol", "logs' entry " + k + " has a name length of " + L);
+    r.entries.push({ size, name: String.fromCharCode(...p.subarray(o + 5, o + 5 + L)) });
+    o += 5 + L;
+  }
+  if (o !== p.length) throw new DoorError("protocol", "logs' answer holds " + (p.length - o) + " bytes after its entries");
+  return r;
+}
+// logread's answer: the file's size now (4), the offset (4), then the bytes from there.
+export function parseLogRead(p) {
+  if (p.length < 8) throw new DoorError("protocol", "logread's answer holds " + p.length + " bytes, fewer than 8");
+  return { size: rd32(p, 0), offset: rd32(p, 4), bytes: p.slice(8) };
+}
 
 // ---------- the words a musician reads ----------
 
@@ -360,6 +420,7 @@ const UNIT_REFUSES_WORDS = Object.freeze({
   7: "its card or its lists wouldn't load",
   8: "it clashes with the base, so the base would be left out at the start. Untick it, or bring the version that goes with the new base",
   9: "a folder of that name is in the way in your OP-1's packs folder",
+  10: "that base is larger than the open-field on your OP-1 can check. Update open-field first, then try again",   // door build 6 (protocol notes, section 16)
 });
 export const SWITCH_OFF_AND_ON_WORDS = "Switch your OP-1 off and on, then try again. Nothing changed.";
 // status 13 with 03 (the protocol's 13.8): since it started, the unit got a message of Teenage Engineering's own MIDI service,
@@ -484,6 +545,8 @@ export function checkMessage(bytes, context = {}) {
   if (bytes[4] === CMD.abort && !(p.length === 0 || (p.length === 1 && p[0] === 1))) return "abort with a payload other than none or 01";
   if (bytes[4] === CMD.status && !(p.length === 0 || (p.length === 1 && (p[0] === 2 || p[0] === 3)))) return "status with a payload other than none, 02 or 03";
   if (bytes[4] === CMD.hello && p.length !== 1) return "hello with a payload other than one byte";
+  if (bytes[4] === CMD.logs && p.length !== 1) return "logs with a payload other than one byte";
+  if (bytes[4] === CMD.logread && !(p.length >= 7 && rd16(p, 4) >= 1 && rd16(p, 4) <= LOG_PIECE)) return "logread with no name, or asking for none or more than " + LOG_PIECE + " bytes";
   return null;
 }
 
@@ -1259,6 +1322,173 @@ export class DoorClient {
     out.verdict = holdToRecord(record, out.list, out.hashes);
     return out;
   }
+
+  // ---------- the unit's own log files (a door of build 6 or later) ----------
+  // Read only: logs names the files, newest first, eight a page; logread gives a file's bytes from an offset. Both go
+  // through request(), so a lost answer, the pace and "not ready" just after a start are handled as for list.
+
+  canLogs() { return this.protocol >= 3 && !!this.hello && (this.hello.build ?? 0) >= LOGS_BUILD; }
+
+  // The names, newest first, page after page until `enough` of them or the end; from 0 again (up to three times) when
+  // the count changes between pages (the unit started a new file meanwhile).
+  async listLogs(enough = Infinity) {
+    if (!this.canLogs()) throw new DoorError("protocol", "the door on this unit gives no logs: it is older than build " + LOGS_BUILD);
+    for (let round = 1; ; round++) {
+      let count = null, changed = false;
+      const entries = [];
+      for (let first = 0; ;) {
+        if (this.io.stopped()) throw new DoorError("stopped", "stopped");
+        const a = this.expect(await this.request(CMD.logs, payloads.logs(first)), CMD.logs, [STATUS.done, STATUS.folderNotReady]);
+        if (a.status === STATUS.folderNotReady) throw new DoorError("not ready", "your OP-1 isn't ready yet to give its logs: try again in a few seconds");
+        const L = parseLogs(a.payload);
+        if (L.first !== first) throw new DoorError("protocol", "logs: asked from " + first + ", answered from " + L.first);
+        if (count === null) count = L.count;
+        else if (L.count !== count) { changed = true; break; }
+        entries.push(...L.entries);
+        if (L.n === 0 || first + L.n >= count || entries.length >= enough) break;
+        first += L.n;
+        if (first > 255) break;
+      }
+      if (!changed) return { count, entries };
+      this.fault("the logs changed while they were listed; listing again from the start");
+      if (round >= 3) throw new DoorError("protocol", "the logs kept changing while they were listed");
+    }
+  }
+
+  // One piece of a log file: { size (the file's now), offset, bytes }.
+  async readLogPiece(name, offset, want) {
+    if (!this.canLogs()) throw new DoorError("protocol", "the door on this unit gives no logs: it is older than build " + LOGS_BUILD);
+    if (this.io.stopped()) throw new DoorError("stopped", "stopped");
+    const r = await this.request(CMD.logread, payloads.logread(offset, want, name));
+    const a = this.expect(r, CMD.logread, [STATUS.done, STATUS.nameRefused, STATUS.fileUnreadable, STATUS.folderNotReady]);
+    if (a.status === STATUS.nameRefused) throw new DoorError("name", "your OP-1 refused the log's name " + name);
+    if (a.status === STATUS.fileUnreadable) throw new DoorError("unreadable", "your OP-1 couldn't read its log " + name);
+    if (a.status === STATUS.folderNotReady) throw new DoorError("not ready", "your OP-1 isn't ready yet to give its logs: try again in a few seconds");
+    const p = parseLogRead(a.payload);
+    if (p.offset !== offset) throw new DoorError("protocol", "logread of " + name + ": asked from " + offset + ", answered from " + p.offset);
+    if (p.bytes.length > want) throw new DoorError("protocol", "logread of " + name + ": " + p.bytes.length + " bytes for " + want + " asked");
+    return p;
+  }
+
+  // One log file whole, byte for byte, in pieces of 2,048 bytes, to the size its first piece answered. A file that
+  // ends sooner on the unit (no bytes before that size) is kept as far as it was read, and the client says so.
+  async readLog(name, onProgress = () => {}) {
+    const first = await this.readLogPiece(name, 0, LOG_PIECE);
+    const size = first.size;
+    if (size > LOG_MAX_SIZE) throw new DoorError("protocol", "the log " + name + " is " + size + " bytes, more than the page takes");
+    if (first.bytes.length > size) throw new DoorError("protocol", "logread of " + name + ": " + first.bytes.length + " bytes of a file of " + size);
+    const data = new Uint8Array(size);
+    data.set(first.bytes, 0);
+    let got = first.bytes.length, pieces = 1;
+    onProgress({ name, size, got });
+    while (got < size) {
+      if (++pieces > Math.ceil(size / LOG_PIECE) + 4) throw new DoorError("protocol", "logread of " + name + ": more pieces than the file can hold");
+      const p = await this.readLogPiece(name, got, Math.min(LOG_PIECE, size - got));
+      if (!p.bytes.length) break;
+      data.set(p.bytes, got);
+      got += p.bytes.length;
+      onProgress({ name, size, got });
+    }
+    if (got < size) this.fault("the log " + name + " ended at " + got + " of the " + size + " bytes its first piece said; kept as read");
+    return { name, size: got, data: got < size ? data.slice(0, got) : data, cut: got < size };
+  }
+
+  // The log files of the unit's last three starts. Going from the newest back, the first 128 bytes of each: a file whose
+  // first line is the log's own "log file logs/..." line carries on the start before it; any other file is the first
+  // file of a start. It stops once three starts are whole, or at twelve files, and then reads those files whole.
+  // hooks.onFile(i, of, name) before each whole file. { count, starts, files (newest first, as the unit lists them) }.
+  async collectLogs(hooks = {}) {
+    const onFile = hooks.onFile ?? (() => {});
+    const listing = await this.listLogs(LOG_MAX_FILES);
+    const names = [];
+    for (const e of listing.entries) {
+      const why = checkLogName(e.name);
+      if (why) throw new DoorError("protocol", "your OP-1 lists a log named " + JSON.stringify(e.name) + ", which the page won't use: " + why);
+      if (!names.includes(e.name)) names.push(e.name);
+    }
+    const chosen = [];
+    let starts = 0;
+    for (const name of names.slice(0, LOG_MAX_FILES)) {
+      const head = await this.readLogPiece(name, 0, LOG_HEAD);
+      chosen.push(name);
+      if (!logContinues(head.bytes)) { starts++; if (starts >= LOG_STARTS) break; }
+    }
+    const files = [];
+    for (let i = 0; i < chosen.length; i++) {
+      onFile(i + 1, chosen.length, chosen[i]);
+      files.push(await this.readLog(chosen[i]));
+    }
+    return { count: listing.count, starts, files };
+  }
+}
+
+// ---------- the logs as one .zip: stored, each file's CRC-32, the names as on the unit ----------
+
+// Whether a log file carries on the start before it: its first line holds disk_log's "log file logs/<its name>".
+export function logContinues(head) {
+  let end = head.length;
+  for (let i = 0; i < head.length; i++) if (head[i] === 10 || head[i] === 13) { end = i; break; }
+  const line = String.fromCharCode(...head.subarray(0, end));
+  return line.includes("disk_log") && line.includes("log file logs/");
+}
+
+// The date and time in a log's name (log_2026-11-24_12.32.13_0.txt), or null.
+export function logNameTime(name) {
+  const m = /^log_(\d{4})-(\d{2})-(\d{2})_(\d{2})\.(\d{2})\.(\d{2})/.exec(String(name));
+  if (!m) return null;
+  const [year, month, day, hours, minutes, seconds] = m.slice(1, 7).map(Number);
+  if (year < 1980 || year > 2107 || month < 1 || month > 12 || day < 1 || day > 31 || hours > 23 || minutes > 59 || seconds > 59) return null;
+  return { year, month, day, hours, minutes, seconds, text: m[0].slice(4) };
+}
+export function logsZipName(newest) {
+  const t = logNameTime(newest);
+  return "op1-field-logs" + (t ? "-" + t.text : "") + ".zip";
+}
+
+let crcTable = null;
+export function crc32(bytes) {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// A .zip of files [{ name, data }], each stored as it is (method 0), dated `time` ({ year, month, day, hours, minutes,
+// seconds }; 1980-01-01 when there is none). The names must be log names (checkLogName): plain ASCII, no folder.
+export function makeZip(files, time = null) {
+  const dosTime = time ? (time.hours << 11) | (time.minutes << 5) | (time.seconds >> 1) : 0;
+  const dosDate = time ? ((time.year - 1980) << 9) | (time.month << 5) | time.day : (1 << 5) | 1;
+  const locals = [], centrals = [];
+  let offset = 0;
+  for (const f of files) {
+    const why = checkLogName(f.name);
+    if (why) throw new Error("the name " + JSON.stringify(f.name) + " can't go into the .zip: " + why);
+    const name = Array.from(f.name, (c) => c.charCodeAt(0)), size = f.data.length, crc = crc32(f.data);
+    const common = [...u16(10), ...u16(0), ...u16(0), ...u16(dosTime), ...u16(dosDate), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0)];
+    const head = Uint8Array.from([...u32(0x04034B50), ...common, ...name]);
+    locals.push(head, f.data);
+    centrals.push(Uint8Array.from([...u32(0x02014B50), ...u16(20), ...common, ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...name]));
+    offset += head.length + size;
+  }
+  const centralSize = centrals.reduce((s, c) => s + c.length, 0);
+  const end = Uint8Array.from([...u32(0x06054B50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(centralSize), ...u32(offset), ...u16(0)]);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let o = 0;
+  for (const part of [...locals, ...centrals, end]) { out.set(part, o); o += part.length; }
+  return out;
+}
+
+// The .zip of collectLogs' files (newest first): the files oldest first inside, dated and named by the newest log.
+export function logsZip(files) {
+  const newest = files.length ? files[0].name : "";
+  return { name: logsZipName(newest), bytes: makeZip([...files].reverse(), logNameTime(newest)) };
 }
 
 // ---------- the record of a change, kept in the browser's storage, one a firmware ----------
