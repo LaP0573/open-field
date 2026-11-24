@@ -40,7 +40,8 @@
       "version": 11,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": []
+      "folders": [],
+      "picture": {"path": "8 tracks/picture.png"}
     },
     {
       "id": "fx train",
@@ -54,7 +55,8 @@
       "version": 17,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": [{"name": "fx", "place": "fx"}, {"name": "fx train", "place": "fxtrain"}]
+      "folders": [{"name": "fx", "place": "fx"}, {"name": "fx train", "place": "fxtrain"}],
+      "picture": {"path": "fx train/picture.png"}
     },
     {
       "id": "lfo",
@@ -68,7 +70,8 @@
       "version": 11,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}]
+      "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}],
+      "picture": {"path": "lfo/picture.png"}
     },
     {
       "id": "master mod",
@@ -100,7 +103,8 @@
       "version": 10,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": []
+      "folders": [],
+      "picture": {"path": "sidechain/picture.png"}
     },
     {
       "id": "save mod",

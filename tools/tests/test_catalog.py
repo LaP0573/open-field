@@ -19,6 +19,7 @@ import os
 import struct
 import tempfile
 import unittest
+import zlib
 from contextlib import redirect_stdout
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -95,6 +96,13 @@ def followed_for(data, **change):
     entry["follow"] = "main"
     entry.update(change)
     return entry
+
+
+def png(width, height, colour=6):
+    """A made-up PNG for the tests, no picture of anything: its signature, an IHDR of this width, height and colour
+    type (6 colour with alpha, 2 colour with none), and twelve bytes of zeros."""
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, colour, 0, 0, 0)
+    return check.PNG_SIGNATURE + struct.pack(">I", 13) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr)) + bytes(12)
 
 
 class TheTreesListing(unittest.TestCase):
@@ -279,10 +287,6 @@ class Downloads(unittest.TestCase):
         self.assertIn("f" * 40, asked[0])
 
     def test_a_picture_is_downloaded_from_the_same_repository_at_the_same_commit_and_held(self):
-        import struct, zlib
-        def png(width, height, colour=6):
-            ihdr = struct.pack(">IIBBBBB", width, height, 8, colour, 0, 0, 0)
-            return check.PNG_SIGNATURE + struct.pack(">I", 13) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr)) + bytes(12)
         data = pack()
 
         def entry_with(picture_bytes):
@@ -309,17 +313,72 @@ class Downloads(unittest.TestCase):
     def test_a_picture_s_form(self):
         data = pack()
         for picture in ({"path": "a.jpg", "sha256": "0" * 64, "bytes": 5}, {"path": "../a.png", "sha256": "0" * 64, "bytes": 5},
-                        {"path": "a.png", "sha256": "0" * 64, "bytes": 100 * 1024 + 1}, {"path": "a.png", "sha256": "0" * 64}):
+                        {"path": "a.png", "sha256": "0" * 64, "bytes": 100 * 1024 + 1}, {"path": "a.png", "sha256": "0" * 64},
+                        {"path": "a.png"}):
             said, in_order = run(listing(entry_for(data, picture=picture)))
             self.assertFalse(in_order, picture)
         reserved = {"id": "later", "author": "someone", "status": "reserved", "categories": ["tools"], "description": "Later.",
                     "picture": {"path": "a.png", "sha256": "0" * 64, "bytes": 5}}
         said, in_order = run(listing(reserved))
         self.assertIn("only a listed entry has a picture", said)
-        followed = followed_for(data, picture={"path": "a.png", "sha256": "0" * 64, "bytes": 5})
+
+    def test_a_followed_entry_s_picture_names_its_path_alone(self):
+        """The head of its branch moves: its picture says where, never what. The entries are made up."""
+        data = pack()
+        followed = followed_for(data, picture={"path": "thumbs/a picture (1).png"})
+        self.assertEqual(check.entry_faults(followed, {"tools": "tools"}, FIRMWARES), [])
         said, in_order = run(listing(followed))
-        self.assertFalse(in_order)
-        self.assertIn("a followed entry has no picture", said)
+        self.assertTrue(in_order, said)
+        for picture in ({"path": "a.png", "sha256": "0" * 64, "bytes": 5}, {"path": "a.png", "sha256": "0" * 64},
+                        {"path": "a.png", "bytes": 5}, {}, "a.png"):
+            with self.subTest(picture=picture):
+                said, in_order = run(listing(followed_for(data, picture=picture)))
+                self.assertFalse(in_order, said)
+                self.assertIn("its picture is not a path alone", said)
+        for picture, words in (({"path": "a.jpg"}, "ending in .png"), ({"path": 5}, "ending in .png"),
+                               ({"path": "../a.png"}, "not a plain path inside the repository"),
+                               ({"path": "/a.png"}, "not a plain path inside the repository")):
+            with self.subTest(picture=picture):
+                said, in_order = run(listing(followed_for(data, picture=picture)))
+                self.assertFalse(in_order, said)
+                self.assertIn(words, said)
+        said, in_order = run(listing(dict(followed, status="retired")))
+        self.assertFalse(in_order, said)
+        self.assertIn("only a listed entry has a picture", said)
+
+    def test_a_followed_entry_s_picture_is_downloaded_from_the_head_of_its_branch_and_held(self):
+        """Made-up files: a pack of zeros, and PNGs that are a signature and an IHDR."""
+        data = pack()
+        entry = followed_for(data, picture={"path": "thumbs/tester.png"})
+        good = png(300, 240)
+        asked = []
+
+        def get(url):
+            asked.append(url)
+            return good if url.endswith(".png") else data
+        said, in_order = run(listing(entry), download=True, get=get)
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: tester (listed, follows main, its file held, its picture held)", said)
+        self.assertEqual(asked, ["https://raw.githubusercontent.com/someone/some-pack/refs/heads/main/build/tester.pack",
+                                 "https://raw.githubusercontent.com/someone/some-pack/refs/heads/main/thumbs/tester.png"])
+        largest = good + bytes(check.PICTURE_LARGEST - len(good))
+        said, in_order = run(listing(entry), download=True, get=lambda url: largest if url.endswith(".png") else data)
+        self.assertTrue(in_order, said)
+        for picture, words in ((largest + b"\0", "the picture has 102401 bytes, and a picture has at most 102400"),
+                               (png(320, 240), "not exactly 5:4"), (png(700, 560), "at most 600x480"),
+                               (png(300, 240, 2), "no transparency"), (b"\xff\xd8\xff" + bytes(40), "not a PNG")):
+            with self.subTest(words=words):
+                said, in_order = run(listing(entry), download=True, get=lambda url, p=picture: p if url.endswith(".png") else data)
+                self.assertFalse(in_order, said)
+                self.assertIn(words, said)
+
+        def lost(url):
+            if url.endswith(".png"):
+                raise OSError("nobody home")
+            return data
+        said, in_order = run(listing(entry), download=True, get=lost)
+        self.assertFalse(in_order, said)
+        self.assertIn("its picture could not be downloaded from https://raw.githubusercontent.com/someone/some-pack/refs/heads/main/thumbs/tester.png", said)
 
     def test_a_link_that_does_not_answer_is_the_entry_s_fault(self):
         def get(url):

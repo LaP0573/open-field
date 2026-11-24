@@ -168,6 +168,12 @@
   .tile .hd { display: flex; justify-content: space-between; align-items: center; font: 11px var(--mono); color: var(--mid); }
   .tile svg.pic, .tile img.pic { width: 150px; height: 120px; margin: 12px auto 10px; display: block; }
   .tile img.pic { object-fit: contain; }
+  /* a pack's own picture is drawn for the light page: the dark page flips its tones and keeps its hues (the drawings
+     follow the theme by their colours, and are not flipped) */
+  :root[data-theme="dark"] img.pic { filter: invert(1) hue-rotate(180deg); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) img.pic { filter: invert(1) hue-rotate(180deg); }
+  }
   .tile h3 { margin: 0; font-size: 26px; font-weight: 400; letter-spacing: -.03em; line-height: 1.1; }
   .tile p { margin: 6px 0 0; font-size: 13px; color: var(--mid); line-height: 1.4; }
   .tile .meta { display: flex; justify-content: space-between; gap: 8px; font: 11px var(--mono); color: var(--mid); margin-top: auto; padding-top: 12px; }
@@ -1343,7 +1349,7 @@
   // and holds every file to the record it kept in the browser's storage (one record a firmware).
   import * as D from "./door.mjs";
   import * as P from "./packs-live.mjs";
-  import { readListing, knownVersions, fileName, download, pictureOf, downloadPicture } from "./catalog.mjs";
+  import { readListing, knownVersions, fileName, download, pictureOf, pictureLink, downloadPicture } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
   const FW = window.openFieldFirmware;               // the firmware this page is for, from the install's own script
@@ -1586,43 +1592,56 @@
     return "ours";
   }
 
-  const PICS = {
-    tape: '<circle cx="38" cy="30" r="17"/><circle cx="82" cy="30" r="17"/><circle cx="38" cy="30" r="5"/><circle cx="82" cy="30" r="5"/><path d="M38 13H82"/><g stroke-width="2.4"><path d="M14 58H52M58 58H106M14 62.5H40M70 62.5H96M24 67H84M14 71.5H30M44 71.5H106"/><path class="sb" d="M14 76H66M74 76H92M30 80.5H106M14 85H46M56 85H80M40 89.5H98"/></g><path class="sr" d="M62 53V94"/>',
-    effects: '<path d="M4 81H116"/><rect x="8" y="56" width="26" height="15" rx="2"/><circle cx="14" cy="76" r="4.5" class="fp"/><circle cx="28" cy="76" r="4.5" class="fp"/><rect x="40" y="56" width="26" height="15" rx="2"/><circle cx="46" cy="76" r="4.5" class="fp"/><circle cx="60" cy="76" r="4.5" class="fp"/><path d="M34 66h6M66 66h6"/><circle class="fo" cx="53" cy="49" r="6.5"/><rect x="72" y="40" width="16" height="31" rx="2"/><rect x="88" y="51" width="22" height="20" rx="3"/><circle cx="80" cy="75" r="5.5" class="fp"/><circle cx="95" cy="75" r="5.5" class="fp"/><circle cx="104" cy="32" r="4"/><circle cx="97" cy="23" r="5.5"/><circle cx="87" cy="13" r="7"/>',
-    modulation: '<path d="M60 16V8"/><circle class="fi" cx="60" cy="6.5" r="2.2"/><path d="M44 31a16 15 0 0 1 32 0"/><ellipse class="fp" cx="60" cy="35" rx="36" ry="9"/><circle class="fb" cx="40" cy="36" r="2.4"/><circle class="fb" cx="60" cy="39" r="2.4"/><circle class="fb" cx="80" cy="36" r="2.4"/><path d="M46 44L30 92M74 44L90 92" stroke-dasharray="2 5"/><path class="sr" d="M38 70c5-13 10-13 15 0s10 13 15 0 10-13 15 0"/>',
-    mixer: '<circle cx="50" cy="38" r="10"/><path d="M57 45c5 6 6 14 4 21"/><path class="fo" d="M59.5 34.5l10 3.5-10 4.5z"/><path d="M77 66c0-9 4-16 9-21 2 5 6 6 9 5 3 3 5 9 5 16"/><path class="sb" d="M6 68q7-5 14 0t14 0 14 0 14 0 14 0 14 0 14 0 14 0"/><path class="sb" d="M20 80q7-5 14 0t14 0 14 0 14 0 14 0" stroke-opacity=".45"/>',
-    sequencing: '<path d="M40 86L50 14h20l10 72z"/><path d="M32 86H88"/><path d="M60 76L70 24"/><rect class="fr" x="62" y="39.5" width="10" height="8" rx="1.5" transform="rotate(11 67 43.5)"/><circle class="fi" cx="60" cy="76" r="2.6"/><path d="M28 34a36 36 0 0 1 10-14M92 34a36 36 0 0 0-10-14" stroke-dasharray="1.5 4.5"/>',
-    looks: '<rect x="20" y="10" width="80" height="62" rx="10"/><path class="sl" d="M21 41H99M60 11V71"/><path class="sb" d="M26 41c7-24 13-24 20 0s13 24 20 0 13-24 20 0s5 9 8 3"/><circle cx="32" cy="84" r="4.5"/><circle cx="48" cy="84" r="4.5"/><path d="M68 84h28"/>',
-    tools: '<path d="M48 12v34a12 12 0 0 0 24 0V12"/><path d="M60 58v24"/><circle class="fi" cx="60" cy="86" r="3.5"/><path class="sr" d="M39 17q-5 8 0 16M31 14q-7 11 0 22M81 17q5 8 0 16M89 14q7 11 0 22"/>',
-    library: '<rect x="24" y="20" width="18" height="62" rx="2"/><rect x="46" y="14" width="18" height="68" rx="2"/><path class="fo" d="M70 26l14-4 14 58-14 4z"/><path d="M14 82H106"/>',
-  };
-  function pic(category) {
+  // The one drawing of a pack that shows no picture of its own: a parcel, alike for every pack, so that no pack is set
+  // apart by a drawing of its kind. Drawn in the page's classes, so it follows the theme.
+  const PARCEL = '<path d="M30 36L54 22H94L70 36Z"/><path d="M30 36V82H70V36"/><path d="M70 82L94 68V22"/><path class="fo" d="M44 36h12l24-14H68z"/><path class="fo" d="M44 36h12v16H44z"/><path class="sl" d="M36 66h14M36 72h22"/><path d="M14 88H106"/>';
+  function parcel() {
     const s = document.createElement("span");
-    s.innerHTML = '<svg class="pic" viewBox="0 0 120 96" aria-hidden="true">' + (PICS[category] || PICS.library) + "</svg>";
+    s.innerHTML = '<svg class="pic" viewBox="0 0 120 96" aria-hidden="true">' + PARCEL + "</svg>";
     return s.firstChild;
   }
 
-  // A pack's own picture in the pictogram's slot: downloaded when its tile comes into view, shown only once its
-  // SHA-256 is the listing's and it loads; the category's pictogram stays otherwise. Held once per file.
-  const pictures = new Map();   // sha256 -> Promise of an object URL
+  // A pack's own picture in the drawing's slot: downloaded when its tile comes into view, shown only once it passed the
+  // checks (catalog.mjs's downloadPicture) and loaded. While it comes the slot is empty, at the same size; refused, not
+  // answered or not loaded, the slot shows the parcel. The image is made outside the page and loaded at once (a lazy
+  // image outside the page is never loaded by Chromium): the tile's coming into view is the wait. Held once per file: a
+  // pinned entry's picture by its SHA-256, a followed entry's by its link. A picture that has loaded is drawn again at
+  // once when the tiles are redrawn (no empty slot, no wait for view); a download that failed is forgotten, so a later
+  // redraw that brings its tile into view tries again.
+  const pictures = new Map();   // sha256 or link -> Promise of an object URL, while it comes and once it came
+  const loaded = new Map();     // sha256 or link -> the object URL of a picture that has loaded
   const seen = "IntersectionObserver" in window ? new IntersectionObserver((all) => {
     for (const e of all) if (e.isIntersecting) { seen.unobserve(e.target); e.target._show(); }
   }, { rootMargin: "200px" }) : null;
-  function picFor(entry, category) {
-    const svg = pic(category), picture = pictureOf(entry);
-    if (!picture) return svg;
-    svg._show = () => {
-      if (!pictures.has(picture.sha256)) {
-        pictures.set(picture.sha256, downloadPicture(entry).then((bytes) => URL.createObjectURL(new Blob([bytes], { type: "image/png" }))));
+  function picFor(entry) {
+    const picture = pictureOf(entry);
+    let key = null;
+    try { key = picture && (entry.follow === undefined ? picture.sha256 : pictureLink(entry)); } catch (e) { key = null; }
+    if (!key) return parcel();
+    if (loaded.has(key)) {
+      const img = Object.assign(document.createElement("img"), { className: "pic", alt: entry.id });
+      img.onerror = () => { if (img.isConnected) img.replaceWith(parcel()); };
+      img.src = loaded.get(key);
+      return img;
+    }
+    const slot = parcel();
+    slot.replaceChildren();                                 // the parcel's frame with nothing drawn in it
+    const refused = () => { if (slot.isConnected) slot.replaceWith(parcel()); };
+    slot._show = () => {
+      if (!pictures.has(key)) {
+        const coming = downloadPicture(entry).then((bytes) => URL.createObjectURL(new Blob([bytes], { type: "image/png" })));
+        coming.catch(() => { if (pictures.get(key) === coming) pictures.delete(key); });   // failed: tried again later
+        pictures.set(key, coming);
       }
-      pictures.get(picture.sha256).then((url) => {
-        const img = Object.assign(document.createElement("img"), { className: "pic", alt: entry.id, loading: "lazy", decoding: "async" });
-        img.onload = () => { if (svg.isConnected) svg.replaceWith(img); };
+      pictures.get(key).then((url) => {
+        const img = Object.assign(document.createElement("img"), { className: "pic", alt: entry.id, decoding: "async" });
+        img.onload = () => { loaded.set(key, url); if (slot.isConnected) slot.replaceWith(img); };
+        img.onerror = refused;
         img.src = url;
-      }, () => {});   // refused or not answered: the pictogram stays
+      }, refused);
     };
-    if (seen) seen.observe(svg); else svg._show();
-    return svg;
+    if (seen) seen.observe(slot); else slot._show();
+    return slot;
   }
 
   function choose(fn) { fn(); $("changeSay").textContent = ""; resolved = rowsNow ? P.resolve(rowsNow, choices, listing, base) : null; render(); }
@@ -1637,7 +1656,7 @@
   }
 
   function render() {
-    if (seen) seen.disconnect();   // the tiles are drawn again below: stop watching the old pictograms
+    if (seen) seen.disconnect();   // the tiles are drawn again below: stop watching the old slots
     // the listing's own numbers
     const offered = listing ? listing.offered.size : 0;
     $("offerCount").textContent = offered ? offered + " to pick from" : "none listed yet";
@@ -1720,7 +1739,7 @@
           }
         }
         ft.append(who, acts);
-        t.append(hd, picFor(entry, category.key), h3, p);
+        t.append(hd, picFor(entry), h3, p);
         if (live && r) {
           const st = el("span", "st");
           st.append(Object.assign(el("span", "dot"), { style: "--c:var(--" + P.stateColour(r, v) + ")" }), document.createTextNode(P.stateWords(r, v)));
