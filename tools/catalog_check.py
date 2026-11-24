@@ -35,7 +35,9 @@ card asks for nothing the listing's base for its firmware is too old to serve (B
 way needs base 31 or later, an ask of options base 32 or later), which is no level: an older base of the same level
 leaves that ask aside and runs the rest of the pack.
 An entry's picture (a transparent PNG thumbnail, 5:4, at most 600x480 and 100 KB) is held the same way, from the same
-repository at the same commit: its size, its SHA-256, and what its IHDR and chunks say.
+repository at the same commit: its size, its SHA-256, and what its IHDR and chunks say. A followed entry's picture
+names its path alone, and its file is the one at the head of the branch, downloaded with the pack's: held to all of
+that but the size and the SHA-256 it does not name, and to 100 KB at most.
 
 With `--files`, an author whose file lies in one of the folders is held whole: every entry of theirs that names a file
 is held to it, and one whose file is not there is refused. So the entries whose files a build of this repository
@@ -126,7 +128,7 @@ FOLDERS_MOST = pack_build.FOLDERS_MOST
 LARGEST = 2 * 1024 * 1024                                       # a pack file larger than this is not downloaded
 PICTURE_LARGEST = 100 * 1024                                    # a picture larger than this is refused
 PICTURE_SIDE_MOST = (600, 480)                                  # its width and its height at most, in pixels
-PICTURE_ASPECT = (5, 4)                                         # its width to its height, exactly: the tile's pictogram slot
+PICTURE_ASPECT = (5, 4)                                         # its width to its height, exactly: the tile's picture slot
 PICTURE_KINDS = (".png",)
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 RAW = "https://raw.githubusercontent.com/%s/%s/%s/%s"           # a file of a repository at a commit: a web page can read it too
@@ -227,9 +229,14 @@ def path_faults(path):
     return []
 
 
-def picture_faults(picture):
-    """The form of an entry's picture: {path, sha256, bytes}, a transparent PNG in the pack's repository."""
-    if not isinstance(picture, dict) or set(picture) != {"path", "sha256", "bytes"}:
+def picture_faults(picture, followed=False):
+    """The form of an entry's picture: {path, sha256, bytes}, a transparent PNG in the pack's repository; a followed
+    entry's {path} alone, the file at the head of its branch, which moves."""
+    if followed:
+        if not isinstance(picture, dict) or set(picture) != {"path"}:
+            return ["its picture is not a path alone: a followed entry's picture is the one at the head of its branch, "
+                    "which moves, so it names no sha256 or size"]
+    elif not isinstance(picture, dict) or set(picture) != {"path", "sha256", "bytes"}:
         return ["its picture is not a path, a sha256 and a size in bytes"]
     faults = []
     path = picture["path"]
@@ -237,6 +244,8 @@ def picture_faults(picture):
         faults.append("its picture's path is not one to two hundred plain characters ending in .png")
     elif any(part in ("", ".", "..") or not PATH_PART.fullmatch(part) for part in path.split("/")):
         faults.append("its picture's path is not a plain path inside the repository: parts of letters, digits, spaces and . _ ( ) + -, parted by /")
+    if followed:
+        return faults
     if not (isinstance(picture["sha256"], str) and SHA256_FORM.fullmatch(picture["sha256"])):
         faults.append("its picture's sha256 is not sixty-four digits of 0-9 and a-f")
     if not (is_int(picture["bytes"]) and 0 < picture["bytes"] <= PICTURE_LARGEST):
@@ -264,11 +273,16 @@ def png_facts(data):
 
 
 def picture_file_faults(picture, data):
-    """What a picture's file is that the entry does not say, or that a picture may not be: none for one in order."""
+    """What a picture's file is that the entry does not say, or that a picture may not be: none for one in order. A
+    followed entry's picture names no size or SHA-256 (picture_faults): its file is held to the largest a picture may
+    be instead, and to the rest alike."""
     faults = []
-    if len(data) != picture["bytes"]:
+    if "bytes" not in picture:                                  # a followed entry's, from the head of its branch
+        if len(data) > PICTURE_LARGEST:
+            faults.append("the picture has %d bytes, and a picture has at most %d" % (len(data), PICTURE_LARGEST))
+    elif len(data) != picture["bytes"]:
         faults.append("the picture has %d bytes, the entry says %d" % (len(data), picture["bytes"]))
-    if hashlib.sha256(data).hexdigest() != picture["sha256"]:
+    if "sha256" in picture and hashlib.sha256(data).hexdigest() != picture["sha256"]:
         return faults + ["the picture's SHA-256 is %s, not the entry's" % hashlib.sha256(data).hexdigest()]
     facts = png_facts(data)
     if isinstance(facts, str):
@@ -370,9 +384,7 @@ def entry_faults(entry, categories, known_firmwares):
     if PICTURE in entry:
         if status != "listed":                                  # the base row shows no picture
             faults.append("only a listed entry has a picture")
-        elif followed:                                          # the page shows a picture only from the entry's commit
-            faults.append("a followed entry has no picture: a picture lies at the commit an entry names")
-        faults += picture_faults(entry[PICTURE])
+        faults += picture_faults(entry[PICTURE], followed)      # a followed entry's: its path alone, at the head of its branch
     return faults
 
 
@@ -718,7 +730,7 @@ def check(listing, known_firmwares, before=None, folders=(), download=False, get
                     shown = repository_file(picture["path"])
                     if shown is None:
                         faults.append("its picture is not in this repository at %s" % picture["path"])
-                elif where is not None and where.startswith("https://"):   # downloaded: the picture too, from the same repository and commit
+                elif where is not None and where.startswith("https://"):   # downloaded: the picture too, at the same commit or branch head
                     link = raw_link(entry, picture["path"])
                     try:
                         shown = get(link)

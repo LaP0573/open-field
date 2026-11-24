@@ -17,7 +17,9 @@
 // firmware is downloaded once (resolveFollowed), held to its entry (checkFollowed: its name, its firmware, a version at
 // least the entry's, the packs, the level of the base and the folders it needs among those the listing allows), and
 // kept: a ticked followed pack goes on the unit with exactly the bytes checked then. Such a file's new versions reach
-// the page without a review, whoever its author; the page's row says where the file comes from.
+// the page without a review, whoever its author; the page's row says where the file comes from. Its picture, if it
+// names one, is a path alone, taken from the same branch: with no SHA-256 to hold it to, it is held to its size, the
+// PNG signature and the PNG's own width and height (downloadPicture).
 //
 // Runs in the browser and in Node (no Node APIs in this file), so that validate-install.mjs runs the same code.
 
@@ -150,7 +152,7 @@ export function knownVersions(data, firmware) {
   return out;
 }
 
-// The one load from another site: a file of a repository at a commit (rawLink, pictureLink).
+// The one load from another site: a file of a repository at a commit or a followed branch's head (rawLink, pictureLink).
 const fetchRaw = (url, options) => fetch(url, options);
 
 // The bytes the host answers for `url`, or an error that says what went wrong (the caller names the pack). With
@@ -367,31 +369,49 @@ export async function resolveFollowed(data, firmware, get, wait = FOLLOWED_WAIT)
   return { data: { ...data, packs }, problems: problems.filter((p) => p) };
 }
 
-// A listed entry's picture, if it names one in form: {path, sha256, bytes}, a PNG in the pack's repository (or null).
+// A listed entry's picture, if it names one in form, or null. A pinned entry's is {path, sha256, bytes}, a PNG in the
+// pack's repository at its commit; a followed entry's is {path} and nothing else, a PNG on the branch it follows (the
+// file there changes when its author pushes, so no SHA-256 or size can be named for it).
 export const PICTURE_LARGEST = 100 * 1024;
+export const PICTURE_WIDEST = 600, PICTURE_TALLEST = 480;          // a followed picture's most, in pixels, 5:4
 export function pictureOf(entry) {
-  const p = entry && entry.follow === undefined && entry.picture;   // a followed entry has no commit to take a picture at
-  if (!p || typeof p !== "object" || typeof p.path !== "string" || !/\.png$/i.test(p.path) || !SHA256.test(p.sha256 ?? "") ||
-      !Number.isInteger(p.bytes) || p.bytes <= 0 || p.bytes > PICTURE_LARGEST) return null;
+  const p = entry && entry.picture;
+  if (!p || typeof p !== "object" || typeof p.path !== "string" || !/\.png$/i.test(p.path)) return null;
   if (!p.path.split("/").every((part) => part && part !== "." && part !== ".." && PATH_PART.test(part))) return null;
+  if (entry.follow !== undefined) return entry.commit === undefined && Object.keys(p).join() === "path" ? p : null;
+  if (!SHA256.test(p.sha256 ?? "") || !Number.isInteger(p.bytes) || p.bytes <= 0 || p.bytes > PICTURE_LARGEST) return null;
   return p;
 }
 
-// The link of an entry's picture: the same repository, at the same commit, as its pack.
+// The link of an entry's picture: the same repository as its pack, at the same commit, or at the head of the branch a
+// followed entry follows (built as rawLink builds its pack's link).
 export function pictureLink(entry) {
-  const found = REPOSITORY.exec(entry.repository);
-  if (!found || !COMMIT.test(entry.commit ?? "") || !pictureOf(entry)) throw new Error(entry.id + ": no picture in form");
-  return RAW + found[1] + "/" + found[2] + "/" + entry.commit + "/" + entry.picture.path.split("/").map(encodeURIComponent).join("/");
+  const found = REPOSITORY.exec(entry.repository), picture = pictureOf(entry);
+  if (!found || !picture || (entry.follow === undefined && !COMMIT.test(entry.commit ?? ""))) throw new Error(entry.id + ": no picture in form");
+  const at = entry.follow !== undefined ? "refs/heads/" + branchOf(entry) : entry.commit;
+  return RAW + found[1] + "/" + found[2] + "/" + at + "/" + picture.path.split("/").map(encodeURIComponent).join("/");
 }
 
-// An entry's picture, downloaded at its commit and held to its size, its SHA-256 and the PNG signature: the bytes,
-// or an error. The page shows it only then, and the category's pictogram otherwise.
+// An entry's picture, downloaded and held to the entry: the bytes, or an error that names the pack. A pinned entry's is
+// held to its size, its SHA-256 and the PNG signature; a followed entry's to PICTURE_LARGEST bytes, the PNG signature
+// and the width and height its header (IHDR) gives: exactly 5:4, at most PICTURE_WIDEST by PICTURE_TALLEST. The page
+// shows it only then, and the parcel otherwise.
 export async function downloadPicture(entry, get = fetchRaw) {
-  const url = pictureLink(entry), picture = entry.picture;
+  const url = pictureLink(entry), picture = pictureOf(entry), follows = entry.follow !== undefined;
   let bytes;
   try { bytes = await fileAt(url, get, PICTURE_LARGEST, " for a picture"); } catch (e) { throw new Error(entry.id + ": the picture " + e.message); }
-  if (bytes.length !== picture.bytes) throw new Error(entry.id + ": the picture has " + bytes.length + " bytes, the listing says " + picture.bytes);
-  if (await sha256(bytes) !== picture.sha256) throw new Error(entry.id + ": the picture is not the one the listing names (its SHA-256 differs)");
+  if (!follows) {
+    if (bytes.length !== picture.bytes) throw new Error(entry.id + ": the picture has " + bytes.length + " bytes, the listing says " + picture.bytes);
+    if (await sha256(bytes) !== picture.sha256) throw new Error(entry.id + ": the picture is not the one the listing names (its SHA-256 differs)");
+  }
   if (![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => bytes[i] === b)) throw new Error(entry.id + ": the picture is not a PNG");
+  if (follows) {
+    // the first chunk of a PNG is its header: 13 bytes long, named IHDR, its width and its height first (big-endian)
+    if (bytes.length < 24 || ![0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52].every((b, i) => bytes[8 + i] === b)) throw new Error(entry.id + ": the picture's PNG has no header where it should be");
+    const read = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), width = read.getUint32(16), height = read.getUint32(20);
+    const said = entry.id + ": the picture is " + width + " by " + height + " pixels";
+    if (!width || !height || width * 4 !== height * 5) throw new Error(said + ", not 5:4");
+    if (width > PICTURE_WIDEST || height > PICTURE_TALLEST) throw new Error(said + ", more than the " + PICTURE_WIDEST + " by " + PICTURE_TALLEST + " the page takes");
+  }
   return bytes;
 }

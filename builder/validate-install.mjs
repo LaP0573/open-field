@@ -449,7 +449,10 @@ async function selfChecks() {
   check("a picture's link is the repository's file at the entry's commit", pictureLink(pictured) === RAW + "someone/packs/" + COMMIT + "/thumbs/one.png");
   check("a picture out of form is none", pictureOf(entry("one", { picture: { path: "../x.png", sha256: pictured.picture.sha256, bytes: 64 } })) === null &&
     pictureOf(entry("one", { picture: { path: "x.jpg", sha256: pictured.picture.sha256, bytes: 64 } })) === null && pictureOf(entry("one")) === null);
-  check("a followed entry's picture is none: it has no commit to take it at", pictureOf(followed({ picture: pictured.picture })) === null);
+  check("a followed entry's picture with a SHA-256 or a size is none: the file on its branch changes", pictureOf(followed({ picture: pictured.picture })) === null &&
+    pictureOf(followed({ picture: { path: "picture.png", sha256: pictured.picture.sha256 } })) === null && pictureOf(followed({ picture: { path: "picture.png", bytes: 64 } })) === null);
+  check("a followed entry's picture out of form is none", pictureOf(followed({ picture: { path: "../x.png" } })) === null &&
+    pictureOf(followed({ picture: { path: "x.jpg" } })) === null && pictureOf(followed({ picture: { path: "a//x.png" } })) === null && pictureOf(followed({ picture: "x.png" })) === null);
   check("a picture that is the entry's is taken", (await downloadPicture(pictured, answer(png))).length === 64 && answer.asked?.options?.redirect === "error");
   const notPng = new Uint8Array(64).fill(1), wrongKind = entry("one", { picture: { path: "a.png", sha256: await sha256(notPng), bytes: 64 } });
   for (const [what, e, get, words] of [
@@ -458,6 +461,34 @@ async function selfChecks() {
     ["a picture that is no PNG is refused", wrongKind, answer(notPng), /not a PNG/],
     ["a picture larger than the page takes is refused", pictured, answer(new Uint8Array(100 * 1024 + 1)), /more than the 102,400 the page takes for a picture/],
   ]) await downloadPicture(e, get).then(() => check(what, false), (err) => check(what, words.test(err.message), err.message));
+
+  // a followed entry's picture: a path alone, on the branch it follows, held to the size limit, the PNG signature and
+  // the width and height of the PNG's header (5:4, at most 600 by 480)
+  const pngOf = (width, height, size = 64) => {
+    const b = new Uint8Array(size), view = new DataView(b.buffer);
+    b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+    view.setUint32(16, width); view.setUint32(20, height);
+    return b;
+  };
+  const followPictured = followed({ follow: "dev-1.x", picture: { path: "8 tracks/picture.png" } });
+  check("a followed entry's picture is taken: a path alone", pictureOf(followPictured)?.path === "8 tracks/picture.png");
+  check("a followed picture's link is its branch's head, refs/heads, each part encoded", pictureLink(followPictured) === RAW + "someone/veff/refs/heads/dev-1.x/8%20tracks/picture.png");
+  check("a followed picture of 5:4 within 600 by 480 is taken, from its branch", (await downloadPicture(followPictured, answer(pngOf(600, 480)))).length === 64 &&
+    answer.asked?.url === pictureLink(followPictured) && answer.asked?.options?.redirect === "error" && (await downloadPicture(followPictured, answer(pngOf(150, 120)))).length === 64);
+  const noHeader = pngOf(600, 480); noHeader[12] = 0x58;
+  for (const [what, get, words] of [
+    ["a followed picture that is no PNG is refused", answer(new Uint8Array(64).fill(1)), /not a PNG/],
+    ["a followed picture larger than the page takes is refused", answer(pngOf(600, 480, 100 * 1024 + 1)), /more than the 102,400 the page takes for a picture/],
+    ["a followed picture with no PNG header is refused", answer(noHeader), /no header/],
+    ["a followed picture that is not 5:4 is refused", answer(pngOf(400, 300)), /400 by 300 pixels, not 5:4/],
+    ["a followed picture of no pixels is refused", answer(pngOf(0, 0)), /0 by 0 pixels, not 5:4/],
+    ["a followed picture larger than 600 by 480 is refused", answer(pngOf(750, 600)), /750 by 600 pixels, more than the 600 by 480/],
+  ]) await downloadPicture(followPictured, get).then(() => check(what, false), (err) => check(what, words.test(err.message) && err.message.startsWith("veff: "), err.message));
+
+  // the page shows a pack's picture: its image is loaded at once (Chromium never loads a lazy image outside the page),
+  // and a pack with none shows the one parcel, no drawing per category
+  const pageText = readFileSync(join(here, "index.html"), "utf8");
+  check("the page's picture is not loaded lazily, and it keeps no drawing per category", !pageText.includes('loading: "lazy"') && !/\bPICS\b/.test(pageText));
 
   // the bootloader: every verdict names one the model knows, and none is assumed
   check("a version with +0 is the model's", bootloaderVersion("1000.2.0+0") === "1000.2.0" && bootloaderVersion("1000.1.1+0") === "1000.1.1" &&
