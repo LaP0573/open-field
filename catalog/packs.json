@@ -16,7 +16,9 @@
       "id": "base",
       "author": "open-field",
       "status": "bundled",
-      "categories": ["library"],
+      "categories": [
+        "library"
+      ],
       "description": "The shared pack every other pack relies on. Every unit with open-field needs it.",
       "path": "builder/base.pack",
       "sha256": "b307bdbc5bedbd61b58bbd590a2b9a016810dc0cd850b017ad2048da7113d788",
@@ -32,7 +34,9 @@
       "id": "8 tracks",
       "author": "Faust",
       "status": "listed",
-      "categories": ["tape"],
+      "categories": [
+        "tape"
+      ],
       "description": "Eight tape tracks instead of four, on the tape and in the mixer.",
       "repository": "https://github.com/LaP0573/open-field-packs",
       "follow": "main",
@@ -41,13 +45,17 @@
       "firmware": "1.7.3",
       "needs": [],
       "folders": [],
-      "picture": {"path": "8 tracks/picture.png"}
+      "picture": {
+        "path": "8 tracks/picture.png"
+      }
     },
     {
       "id": "fx train",
       "author": "Faust",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A chain of effects on every sound, with its presets kept as files.",
       "repository": "https://github.com/LaP0573/open-field-packs",
       "follow": "main",
@@ -55,14 +63,27 @@
       "version": 17,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": [{"name": "fx", "place": "fx"}, {"name": "fx train", "place": "fxtrain"}],
-      "picture": {"path": "fx train/picture.png"}
+      "folders": [
+        {
+          "name": "fx",
+          "place": "fx"
+        },
+        {
+          "name": "fx train",
+          "place": "fxtrain"
+        }
+      ],
+      "picture": {
+        "path": "fx train/picture.png"
+      }
     },
     {
       "id": "lfo",
       "author": "Faust",
       "status": "listed",
-      "categories": ["modulation"],
+      "categories": [
+        "modulation"
+      ],
       "description": "Four LFOs on every sound, with their page and their presets.",
       "repository": "https://github.com/LaP0573/open-field-packs",
       "follow": "main",
@@ -70,14 +91,28 @@
       "version": 11,
       "firmware": "1.7.3",
       "needs": [],
-      "folders": [{"name": "lfo", "place": "lfo"}, {"name": "lfo", "place": "lfomoved"}],
-      "picture": {"path": "lfo/picture.png"}
+      "folders": [
+        {
+          "name": "lfo",
+          "place": "lfo"
+        },
+        {
+          "name": "lfo",
+          "place": "lfomoved"
+        }
+      ],
+      "picture": {
+        "path": "lfo/picture.png"
+      }
     },
     {
       "id": "master mod",
       "author": "Reverdy-Carrasco",
       "status": "listed",
-      "categories": ["mixer", "looks"],
+      "categories": [
+        "mixer",
+        "looks"
+      ],
       "description": "Encoder remap on the Master page, L/R post-makeup on the master compressor, matching SVGs.",
       "repository": "https://github.com/Reverdy-Carrasco/master-mod",
       "commit": "781ea4ffbe61a8e52750fb88e2c48310174f0999",
@@ -95,7 +130,9 @@
       "id": "sidechain",
       "author": "Faust",
       "status": "listed",
-      "categories": ["mixer"],
+      "categories": [
+        "mixer"
+      ],
       "description": "One tape track ducks another, set on a page under shift and the mixer key.",
       "repository": "https://github.com/LaP0573/open-field-packs",
       "follow": "main",
@@ -104,13 +141,18 @@
       "firmware": "1.7.3",
       "needs": [],
       "folders": [],
-      "picture": {"path": "sidechain/picture.png"}
+      "picture": {
+        "path": "sidechain/picture.png"
+      }
     },
     {
       "id": "save mod",
       "author": "Reverdy-Carrasco",
       "status": "listed",
-      "categories": ["tape", "mixer"],
+      "categories": [
+        "tape",
+        "mixer"
+      ],
       "description": "Keeps per tape the master EQ, effect (with its switch and a pack's effect on it), compressor, tape speed and M1/M2.",
       "repository": "https://github.com/Reverdy-Carrasco/save-mod",
       "commit": "554fd8d9ce8421bb520d65316ffa8a1883546ca2",
@@ -128,7 +170,9 @@
       "id": "wink",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of level 1: a red dot that blinks on the tempo screen.",
       "path": "wink.pack",
       "sha256": "35ff760bd94daf67f20f960d8c3304d3bf533b07c094d6530c942f9df05b5085",
@@ -144,7 +188,9 @@
       "id": "yoyo",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of level 2: shift and the metronome key open a page where the blue knob moves a yoyo.",
       "path": "yoyo.pack",
       "sha256": "e0b949f11b525a880582617c00c6491e3703dd3d9ce1444fafb47fa4aee7ef54",
@@ -160,7 +206,9 @@
       "id": "list",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of level 3: shift and the help key open a page that lists the files of its own folder.",
       "path": "list.pack",
       "sha256": "39e1aa2190c646a214d0f95e28de3214372051826104707d7f9555fc24b626d7",
@@ -170,13 +218,20 @@
       "places": 0,
       "needs": [],
       "level": 3,
-      "folders": [{"name": "list", "place": "list"}]
+      "folders": [
+        {
+          "name": "list",
+          "place": "list"
+        }
+      ]
     },
     {
       "id": "sketch",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of level 4: shift and the metronome key open a drawing board painted on the frame, kept in its own folder.",
       "path": "sketch.pack",
       "sha256": "b64d25dbc3d62a9f9a0c7b645da116b398cd098984b94ef630ce9f4868466ae9",
@@ -186,13 +241,20 @@
       "places": 0,
       "needs": [],
       "level": 4,
-      "folders": [{"name": "sketch", "place": "sketch"}]
+      "folders": [
+        {
+          "name": "sketch",
+          "place": "sketch"
+        }
+      ]
     },
     {
       "id": "echo",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of level 5: a sequencer of its own in the unit's list, each note repeated in time, each repeat softer.",
       "path": "echo.pack",
       "sha256": "6903736446c110246b78d9de9dfaec79d662470fe55b0d930d494ef102b29118",
@@ -202,13 +264,20 @@
       "places": 0,
       "needs": [],
       "level": 5,
-      "folders": [{"name": "echo", "place": "echo"}]
+      "folders": [
+        {
+          "name": "echo",
+          "place": "echo"
+        }
+      ]
     },
     {
       "id": "dub",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of levels 6 and 7: an echo on everything the unit plays, its values kept with each tape.",
       "path": "dub.pack",
       "sha256": "44ffaa72d81c80be725ae3d6e9b8ffbbb461608bd4b935a1eb0839a73cf0314f",
@@ -218,13 +287,20 @@
       "places": 0,
       "needs": [],
       "level": 7,
-      "folders": [{"name": "dub", "place": "dub"}]
+      "folders": [
+        {
+          "name": "dub",
+          "place": "dub"
+        }
+      ]
     },
     {
       "id": "crush",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of levels 8 and 10: an effect in the unit's own lists, fewer bits and a lower rate, riding on punch.",
       "path": "crush.pack",
       "sha256": "a417e9012a0734b7ab60d739d95b9fa63cd7beb01c8843e1c8fefaa2c500a2dd",
@@ -240,7 +316,9 @@
       "id": "ping",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of levels 8 and 10: an echo in time with the tempo in the unit's own lists of effects, riding on delay.",
       "path": "ping.pack",
       "sha256": "3b20570aa78c4d3f3d8de1d9846cc8d723eaeccec3169c26b2ef3baecb63c3c0",
@@ -256,7 +334,9 @@
       "id": "pluck",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of levels 9 and 10: a plucked string, a synth engine in the unit's own list, with two sounds of its own.",
       "path": "pluck.pack",
       "sha256": "baaa8de587624465f969a856cac7dd00ec8de5247d8b22f52e6f191063602645",
@@ -272,7 +352,9 @@
       "id": "fold",
       "author": "open-field",
       "status": "reserved",
-      "categories": ["examples"],
+      "categories": [
+        "examples"
+      ],
       "description": "The example of levels 9 and 10: a wave folder in two channels, a synth engine in the unit's own list, with two sounds.",
       "path": "fold.pack",
       "sha256": "fa52ddd3c41fb4d04225e96d5aaf8b767e97368e56ceb0fbf6fc62ffca2722b5",
@@ -288,7 +370,9 @@
       "id": "veffbode",
       "author": "galfaroth",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A Bode frequency shifter in a delay's feedback loop, with an animated page, in the unit's lists of effects and on fx train's wagons.",
       "repository": "https://github.com/galfaroth/open-field-veff",
       "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
@@ -301,13 +385,19 @@
       "needs": [],
       "level": 10,
       "folders": [],
-      "picture": {"path": "thumbs/veffbode.png", "sha256": "125265388fc71f281d68a4e8d630e943b2485cac134edb05bef6bcbe26f8060e", "bytes": 22248}
+      "picture": {
+        "path": "thumbs/veffbode.png",
+        "sha256": "125265388fc71f281d68a4e8d630e943b2485cac134edb05bef6bcbe26f8060e",
+        "bytes": 22248
+      }
     },
     {
       "id": "veffrosion",
       "author": "galfaroth",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A degrader after Erosion: a tiny delay wobbled by a sine or band-passed noise, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
       "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
@@ -320,13 +410,19 @@
       "needs": [],
       "level": 10,
       "folders": [],
-      "picture": {"path": "thumbs/veffrosion.png", "sha256": "80800ac50fab5d4152d3789b314225d89f61422931f6571c944f1fcce79339b2", "bytes": 12046}
+      "picture": {
+        "path": "thumbs/veffrosion.png",
+        "sha256": "80800ac50fab5d4152d3789b314225d89f61422931f6571c944f1fcce79339b2",
+        "bytes": 12046
+      }
     },
     {
       "id": "veffsaturator",
       "author": "galfaroth",
       "status": "retired",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A saturator with six curves, colour, soft clip and 2x oversampling, in the unit's lists of effects. Renamed veffurator.",
       "level": 10
     },
@@ -334,7 +430,9 @@
       "id": "veffurator",
       "author": "galfaroth",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A saturator with six curves, colour, soft clip and 2x oversampling, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
       "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
@@ -347,13 +445,19 @@
       "needs": [],
       "level": 10,
       "folders": [],
-      "picture": {"path": "thumbs/veffurator.png", "sha256": "8098cecb840edb3255037f63b300caedb32a3caf6a739434aa02becfcbca3420", "bytes": 17234}
+      "picture": {
+        "path": "thumbs/veffurator.png",
+        "sha256": "8098cecb840edb3255037f63b300caedb32a3caf6a739434aa02becfcbca3420",
+        "bytes": 17234
+      }
     },
     {
       "id": "veffshaper",
       "author": "galfaroth",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A parametric waveshaper with an animated transfer curve, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
       "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
@@ -366,13 +470,19 @@
       "needs": [],
       "level": 10,
       "folders": [],
-      "picture": {"path": "thumbs/veffshaper.png", "sha256": "89c4dbba0f0ae5664fd6604a53a5cd49fce7b1ca1a7b021d39dd8d63aba6e4c0", "bytes": 19644}
+      "picture": {
+        "path": "thumbs/veffshaper.png",
+        "sha256": "89c4dbba0f0ae5664fd6604a53a5cd49fce7b1ca1a7b021d39dd8d63aba6e4c0",
+        "bytes": 19644
+      }
     },
     {
       "id": "veffgrrr",
       "author": "galfaroth",
       "status": "retired",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A two-stage distortion with filters and a feedback loop, in the unit's lists of effects. Renamed veffrrrr.",
       "level": 10
     },
@@ -380,7 +490,9 @@
       "id": "veffrrrr",
       "author": "galfaroth",
       "status": "listed",
-      "categories": ["effects"],
+      "categories": [
+        "effects"
+      ],
       "description": "A two-stage distortion with filters and a feedback loop, with an animated page, in the unit's lists of effects.",
       "repository": "https://github.com/galfaroth/open-field-veff",
       "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
@@ -393,7 +505,36 @@
       "needs": [],
       "level": 10,
       "folders": [],
-      "picture": {"path": "thumbs/veffrrrr.png", "sha256": "fa027d8bd0c1d6a9992fb1ff533e4fa0828564fb316c896a7e4ed438f002f6c3", "bytes": 15015}
+      "picture": {
+        "path": "thumbs/veffrrrr.png",
+        "sha256": "fa027d8bd0c1d6a9992fb1ff533e4fa0828564fb316c896a7e4ed438f002f6c3",
+        "bytes": 15015
+      }
+    },
+    {
+      "id": "midiplayer",
+      "author": "dzwerg",
+      "status": "listed",
+      "categories": [
+        "sequencing"
+      ],
+      "description": "Play MIDI files on OP-1 Field with a scrolling piano roll, transport controls, looping, speed and live transpose.",
+      "repository": "https://github.com/dzwerg/midi-field-player",
+      "commit": "e2c5a98a123b008a1c7c69e703ae5f3f212246d1",
+      "path": "midiplayer.pack",
+      "sha256": "6daa84ab8483a79933281394d16667c5fa71800b4573b4e966017811fbc9aeba",
+      "bytes": 15220,
+      "version": 14,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 5,
+      "folders": [
+        {
+          "name": "midiplayer",
+          "place": "midiplayer"
+        }
+      ]
     }
   ]
 }
