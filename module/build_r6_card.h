@@ -391,6 +391,7 @@ struct Op1fCard;
 //            it, and never write it yourself (its layout is the base's to know). What a pack paints lies over
 //            everything for this frame and is gone at the next: paint again at every frame
 struct Op1fFrame { unsigned bytes, frame, ms, mode, screen, shift, popup; const Op1fCard* page; unsigned disk; void* canvas; };   // 40 bytes at level 4
+enum { OP1F_POPUP_POWER = 1, OP1F_POPUP_TOP = 0x100 };   // the frame's popup bits (base 33; build_r6e_card.h says them)
 
 // What happened, for an input function (level 2).
 //   OP1F_DOWN        a key went down

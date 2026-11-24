@@ -410,14 +410,16 @@ struct Op1fCard;
 //            sequencer (level 5) also sees 7 here: the sequencer's screen is up
 //   screen   the number of the screen that is shown
 //   shift    not 0 while shift is held
-//   popup    not 0 while the power popup is on the screen: the last moment to say something on the log
+//   popup    not 0 while the power popup is on the screen: the last moment to say something on the log. Base 33: bit
+//            0 (OP1F_POPUP_POWER) is the power popup; OP1F_POPUP_TOP is set while the base's own top page (below) is
+//            asked for or up. A pack that paints over its own page paints nothing while it is set
 //   page     level 2: the card whose page the GUI shows now, 0 when it shows none. Compare it with your own card's
 //            address: it is yours when they are the same. The base takes a page asked for at its next frame and the
 //            GUI shows it at the frame after, from which on `page` names it; it stops when the page is closed or when
 //            the mode changes. Level 4: while a page shown with op1f_page_show lies over another, `page` names the one on top.
 //            A page of the base's own (its top page, which asks the owner to confirm something) may lie over a pack's
 //            page for a moment: the pack's page is still the one `page` names, and no key or knob reaches any pack
-//            until it is gone. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
+//            until it is gone; from base 33 `popup` has OP1F_POPUP_TOP while it is asked for or up. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
 //            while the unit is in another mode `page` is 0, and it names the page again once the unit is back in
 //            the page's mode
 //   disk     level 3: not 0 while the disk mode is open (the COM key, the computer connected): the computer owns the
@@ -429,6 +431,7 @@ struct Op1fCard;
 //            it, and never write it yourself (its layout is the base's to know). What a pack paints lies over
 //            everything for this frame and is gone at the next: paint again at every frame
 struct Op1fFrame { unsigned bytes, frame, ms, mode, screen, shift, popup; const Op1fCard* page; unsigned disk; void* canvas; };   // 40 bytes at level 4
+enum { OP1F_POPUP_POWER = 1, OP1F_POPUP_TOP = 0x100 };   // the frame's popup bits (OP1F_POPUP_TOP from base 33; 0 before)
 
 // What happened, for an input function (level 2).
 //   OP1F_DOWN        a key went down

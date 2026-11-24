@@ -1,4 +1,12 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 33 (hasis): files per tape (R7, module/build_r7_tapes.cpp, a weak name whose frame work this unit calls behind
+// the values' unit's; the line of the kinds this base does not know passes kind 9 by), and the frame's `popup` has OP1F_POPUP_TOP while the base's top page is asked for or up (op1f_top_open to the
+// frame top_frame takes it off), so that a pack painting over its own page under 77, which the top page covers while
+// the frame's `page` still names that pack, stands back: snowtrain's page hid the door's install question. The power
+// popup is bit 0, OP1F_POPUP_POWER, as before; the base's own quiet line asks that bit alone.
+//
+// What base 32 said follows and holds.
+//
 // Base 32 (R8), the base pack: base 31's cards, edited in place (base 31's text is release 0.13's, in this repository's history), with one kind
 // of ask more for a card of level 6 or later, a pack's options (OP1F_ASK_OPTIONS): the options unit's
 // (module/build_r8_options.cpp), whose frame work this unit calls once a frame behind the values' unit's, a weak name
@@ -2963,7 +2971,7 @@ extern "C" void op1f_cards_frame() {
     now.mode = RD32(CURRENT_MODE);
     now.screen = RD32(CURRENT_SCREEN);
     now.shift = STOCK_SHIFT() != 0 ? 1u : 0u;
-    now.popup = RD8(POWER_POPUP_SHOWN) != 0 ? 1u : 0u;
+    now.popup = (RD8(POWER_POPUP_SHOWN) != 0 ? (u32)OP1F_POPUP_POWER : 0u) | (top.wanted || top.shown ? (u32)OP1F_POPUP_TOP : 0u);   // base 33: the top page told to every pack
     page_frame(now.frame, now.mode);
     stand_frame(now.frame, now.mode, stands, &standing);    // R3: the stand-in placed, kept or closed
     away_frame(now.frame, now.mode);                        // R4c: the page set aside back where 77 is free, or closed
@@ -3002,7 +3010,7 @@ extern "C" void op1f_cards_frame() {
     }
     pages.canvas = 0;                                       // R1
     popups_frame(&now, page);                               // R4c: the unit's own popups over a pack's page, after every frame function
-    int why = quiet_popup(&state.quiet, now.popup != 0);    // the lines once more before the unit is off
+    int why = quiet_popup(&state.quiet, (now.popup & (u32)OP1F_POPUP_POWER) != 0);   // the lines once more before the unit is off
     int period = --state.countdown <= 0;                    // a countdown, not a modulo: nothing is divided
     if (!period && !why) return;
     if (period) {

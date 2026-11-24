@@ -41,7 +41,7 @@ What happens to a stack:
 - **Closing the top page shows the one under it again.** Four pages can lie under the shown one. When a fifth would go under, the lowest is dropped, with a line in the log.
 - **A mode change closes them all**, unless the top page was shown with `OP1F_PAGE_STAYS`.
 - A page opened the old way, with `op1f_page_open`, still behaves the old way. A page shown over it closes it.
-- **The base's own top page can come over yours** for a moment. It's the page that asks you to confirm something, such as the packs a computer sent over USB MIDI. While it's up, the frame's `page` still names your card, and no key or knob reaches any pack until it's gone.
+- **The base's own top page can come over yours** for a moment. It's the page that asks you to confirm something, such as the packs a computer sent over USB MIDI. While it's up, the frame's `page` still names your card, and no key or knob reaches any pack until it's gone. From base 33 the frame's `popup` has the bit `OP1F_POPUP_TOP` while it's asked for or up: if you paint over your own page, paint nothing while `popup & OP1F_POPUP_TOP`, or your painting hides the question (on an older base the bit is never set).
 - `op1f_page_show` answers 0 for a document your card didn't make, for a card the base doesn't have in use, and for a flag the base doesn't know. Taken is not the same as shown. The frame's `page` is what tells you your page is up.
 
 `sketch` opens and closes its page on one key:

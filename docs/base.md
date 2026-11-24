@@ -106,7 +106,7 @@ extern "C" void wink_frame(const Op1fFrame* now) OP1F_NAMED("wink_frame");
 | `mode` | The mode the unit is in: 0 synth, 1 drum, 2 tape, 3 mixer. A pack with a sequencer also sees 7 while the sequencer's screen is up ([level 5](level-5.md)) |
 | `screen` | The number of the screen that is shown. The tempo screen is 42 |
 | `shift` | Not 0 while shift is held |
-| `popup` | Not 0 while the power popup is on the screen: the last moment to say something in the log |
+| `popup` | Not 0 while the power popup is on the screen: the last moment to say something in the log. From base 33, bit 0 (`OP1F_POPUP_POWER`) is the power popup and `OP1F_POPUP_TOP` (0x100) is set while the base's own top page is asked for or up ([level 4](level-4.md)) |
 | `page` | Level 2: the card whose page is shown, or 0 ([below](#level-2-a-page-with-keys-and-knobs)) |
 | `disk` | Level 3: not 0 while the disk mode is open ([below](#the-disk-mode)) |
 | `canvas` | Level 4: this frame's picture, for the painting helpers ([level 4](level-4.md), "Painting") |
