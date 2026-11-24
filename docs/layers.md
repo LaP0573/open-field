@@ -7,7 +7,7 @@ An effect of [level 8](level-8.md) stands on one of the unit's effects and takes
 
 Neither is a level. The level stays 10, and a card with a layer names the mark `op1f_layer_1`, so the loader leaves it out under a base before 35.
 
-Our `lfo` in [open-field-packs](https://github.com/LaP0573/open-field-packs), from its version 12, is an LFO layer: its row `ufo` in the LFO list of every synth and drum sound brings its four LFOs. Read it for a whole pack built this way.
+Our `lfo` in [open-field-packs](https://github.com/LaP0573/open-field-packs), from its version 12, is an LFO layer: its row `ufo` in the LFO list of every synth and drum sound brings its four LFOs. Our `fx train` there, from its version 18, is an effect layer with no `process`: its row `train` in the lists of effects of every synth and drum sound brings its four wagons, which the pack plays itself, and T3 shows its own page for a sound that rides it. Read them for whole packs built this way.
 
 The words of the interface are in the header `module/build_r6e_card.h`, the section "Base 35: layers". Where this page and the header disagree, the header is right.
 
