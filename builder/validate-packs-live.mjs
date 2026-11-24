@@ -8,7 +8,8 @@
 // every state a row can have; the eight rules (a tick is "on the unit after the change"; an update only when its
 // button is pressed; a new base brings every listed pack on the unit to the listing's file, ticked and locked; the base
 // never comes off; a pack another needs is ticked with it; 32 packs at most and no name the loader would not take; the
-// plan's order, removals first and base.pack last; the way back for one pack is to untick it). Exit 0 when every check passes.
+// plan's order, removals first and base.pack last; the way back for one pack is to untick it), and rule 8, the pack
+// files picked on the computer with the + tile. Exit 0 when every check passes.
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -250,6 +251,92 @@ const row = (rows, key) => [rows.base, ...rows.listed, ...rows.others].find((r) 
   const r = P.resolve(rows, choices, listing, pageBase(R2));
   check("the plan: the removals, and the files with base.pack last", r.plan.remove.join(",") === "wink.pack,yoyo.pack" && r.plan.send.map((s) => s.name).join(",") === "lfo.pack,base.pack", JSON.stringify(r.plan.send.map((s) => s.name)));
   check("about how long it takes, in words the bar can use", P.secondsFor(r.counts.bytes) >= 3 && P.secondsFor(4000000) > P.secondsFor(400000));
+}
+
+// ---------- 6. rule 8: pack files picked on the computer ----------
+
+{
+  // as checkPickedFile answers, with the bytes the page read as `data`
+  const pick = (name, more = {}) => Object.assign({ name, file: name + ".pack", version: 3, needs: [], level: null, size: 5000, sha256: (name.length % 10).toString().repeat(64), data: new Uint8Array(5000), from: name + "-build.pack" }, more);
+  const orphan = { id: "orphan", author: "someone", status: "listed", categories: ["sequencing"], description: "needs what the list lacks", repository: "https://github.com/someone/orphan", commit: LATER,
+    path: "orphan.pack", sha256: "dd".repeat(32), bytes: 50000, version: 2, firmware: OS, places: 0, needs: ["base", "nowhere"], folders: [] };
+  const data = listingOf(N1, FIRST, [orphan]);
+  const files = n1Unit().filter((f) => f.name !== "sidechain.pack").concat([
+    { name: "dub.pack", size: 9000, sha256: "aa".repeat(32), isPack: true },
+    Object.assign({ name: "Cool v2.pack", size: 700, sha256: "ab".repeat(32), isPack: true }, { headerVersion: 2, headerName: "cool", headerOsId: 0x1AEB34D1 })]);
+  const { listing, rows } = rowsFor(data, files, { baseVersion: 17, release: "0.3" }, pageBase(R2));
+  const choices = P.initialChoices(rows);
+  const zap = pick("zap");
+  const r = P.resolve(rows, choices, listing, pageBase(R2), [zap]);
+  const zapSend = r.plan.send.find((s) => s.kind === P.ACTION.picked);
+  check("a picked file the unit and the list don't know: sent under its pack's name, with its own bytes and SHA-256", r.plan.send.length === 1 && zapSend.name === "zap.pack" && zapSend.id === "zap" &&
+    zapSend.version === 3 && zapSend.sha256 === zap.sha256 && zapSend.bytes === 5000 && zapSend.data === zap.data && zapSend.replaces === null && r.plan.remove.length === 0, JSON.stringify(zapSend));
+  check("it counts as new, and the bar says it is yours", r.counts.added === 1 && r.counts.updated === 0 && JSON.stringify(P.changeLines(rows, r)) === JSON.stringify([{ sign: "+", text: "zap (your file)" }]), JSON.stringify(P.changeLines(rows, r)));
+  check("its place: new, not the same as a file on the unit", JSON.stringify(r.placed.get(zap)) === JSON.stringify({ replaces: null, same: false }));
+  check("no picked file: the plan as before", P.resolve(rows, choices, listing, pageBase(R2)).plan.send.length === 0 && P.resolve(rows, choices, listing, pageBase(R2), []).placed.size === 0);
+  // in place of a file on the unit: by its name, or by the pack's name in a file's own header
+  const dub = pick("dub"), cool = pick("cool");
+  choices.ticked.delete("dub.pack");                                                        // unticked before: the picked file wins
+  const r2 = P.resolve(rows, choices, listing, pageBase(R2), [dub, cool]);
+  check("a picked file of the name of a file on the unit not in the list takes its place, never with a removal", r2.plan.send.some((s) => s.name === "dub.pack" && s.replaces === "dub.pack" && s.kind === P.ACTION.picked) &&
+    !r2.plan.remove.includes("dub.pack") && r2.view.get("dub.pack").action === P.ACTION.picked && r2.view.get("dub.pack").locked, JSON.stringify(r2.plan));
+  check("a picked file whose pack another file's header names takes that file's place, under the unit's name", r2.plan.send.some((s) => s.name === "Cool v2.pack" && s.id === "cool" && s.replaces === "Cool v2.pack" && s.from === 2) &&
+    !r2.plan.send.some((s) => s.name === "cool.pack"), JSON.stringify(r2.plan.send.map((s) => s.name)));
+  check("each counts as updated, the bar's sign an arrow", r2.counts.updated === 2 && r2.counts.added === 0 && P.changeLines(rows, r2).every((l) => l.sign === "↑" && l.text.endsWith(" (your file)")), JSON.stringify(P.changeLines(rows, r2)));
+  check("its tile's words and dot, where a row shows it", P.stateWords(row(rows, "dub.pack"), r2.view.get("dub.pack")) === "your file goes in its place" && P.stateColour(row(rows, "dub.pack"), r2.view.get("dub.pack")) === "ochre");
+  choices.ticked.add("dub.pack");
+  // the very same file as the unit's: nothing sent
+  const again = pick("dub", { sha256: "aa".repeat(32) });
+  const r3 = P.resolve(rows, choices, listing, pageBase(R2), [again]);
+  check("the same file as the unit's: nothing sent, said as the same", r3.plan.send.length === 0 && r3.placed.get(again).same && r3.placed.get(again).replaces === "dub.pack" && r3.view.get("dub.pack").action === P.ACTION.keep);
+  check("a row a picked file takes is marked so, the same file or not, and no other row is", r2.view.get("dub.pack").picked && r3.view.get("dub.pack").picked && !r2.view.get("wink.pack").picked && !r2.view.get("lfo.pack").picked);
+  // in place of a listed pack: on the unit, even when a new base comes; not on the unit
+  const lfo = pick("lfo"), side = pick("sidechain");
+  choices.updates.add("base.pack");
+  const r4 = P.resolve(rows, choices, listing, pageBase(R2), [lfo, side]);
+  check("a picked file of a listed pack's name on the unit takes its place, even when a new base brings the list's files", r4.plan.send.filter((s) => s.key === "lfo.pack").length === 1 &&
+    r4.plan.send.find((s) => s.key === "lfo.pack").kind === P.ACTION.picked && r4.view.get("lfo.pack").action === P.ACTION.picked, JSON.stringify(r4.plan.send.map((s) => [s.name, s.kind])));
+  check("a picked file of a listed pack's name not on the unit goes on instead of the list's file", r4.plan.send.filter((s) => s.key === "sidechain.pack").length === 1 && r4.plan.send.find((s) => s.key === "sidechain.pack").kind === P.ACTION.picked &&
+    r4.placed.get(side).replaces === null);
+  check("the other listed packs stay held to the new base, and base.pack is still last", ["8 tracks.pack", "fx train.pack"].every((k) => r4.view.get(k).locked && r4.view.get(k).why === "already the one that goes with the new base") &&
+    r4.plan.send.map((s) => s.name).join(",") === "lfo.pack,sidechain.pack,base.pack", JSON.stringify(r4.plan.send.map((s) => s.name)));
+  check("a listed row a picked file takes: its words", P.stateWords(row(rows, "lfo.pack"), r4.view.get("lfo.pack")) === "your file goes in its place" && /takes its place/.test(r4.view.get("lfo.pack").why));
+  choices.updates.delete("base.pack");
+  // what a picked file needs: the list's comes with it; a pack nothing brings is a problem
+  const needy = pick("needy", { needs: ["sidechain", "base"] });
+  const r5 = P.resolve(rows, choices, listing, pageBase(R2), [needy]);
+  check("rule 5 for a picked file: the listed pack it needs is ticked with it and locked", r5.plan.send.some((s) => s.name === "sidechain.pack" && s.kind === "add") && r5.view.get("sidechain.pack").locked && r5.view.get("sidechain.pack").why === "needy needs it" && r5.problems.length === 0, JSON.stringify(r5.problems));
+  check("a picked file needing another picked file: no problem", P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["zap"] }), zap]).problems.length === 0);
+  check("a picked file needing a file on the unit that stays: no problem", P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["dub"] })]).problems.length === 0);
+  choices.ticked.delete("dub.pack");
+  const r6 = P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["dub", "nowhere"] })]);
+  check("a picked file needing a pack nothing brings, or one coming off: refused with words", r6.problems.length === 2 && r6.problems.every((p) => /^needy needs the pack (dub|nowhere), which isn't on your OP-1/.test(p)), JSON.stringify(r6.problems));
+  choices.ticked.add("dub.pack");
+  // never the base; 32 at most with the picked files counted
+  const r7 = P.resolve(rows, choices, listing, pageBase(R2), [pick("base")]);
+  check("a picked base.pack is never sent", r7.plan.send.length === 0 && r7.problems.length === 1 && /only comes with this page/.test(r7.problems[0]));
+  const many = Array.from({ length: 22 }, (_, i) => pick("mine" + String(i).padStart(2, "0")));
+  check("31 pack files after the change with the picked ones: allowed", P.resolve(rows, choices, listing, pageBase(R2), many).counts.packsAfter === 31 && P.resolve(rows, choices, listing, pageBase(R2), many).problems.length === 0);
+  const r8 = P.resolve(rows, choices, listing, pageBase(R2), many.concat([pick("mine22"), pick("mine23")]));
+  check("33 with the picked ones: refused with words", r8.counts.packsAfter === 33 && r8.problems.some((p) => /32 at most/.test(p)), JSON.stringify(r8.problems));
+  // the review of 2026-11-24: the order of the matches, and needs that nothing brings
+  const sideTest = Object.assign({ name: "side test.pack", size: 900, sha256: "cd".repeat(32), isPack: true }, { headerVersion: 9, headerName: "sidechain", headerOsId: 0x1AEB34D1 });
+  const alt = rowsFor(data, files.concat([sideTest]), { baseVersion: 17, release: "0.3" }, pageBase(R2));
+  const altChoices = P.initialChoices(alt.rows);
+  altChoices.ticked.add("sidechain.pack");                                                    // the listed pack ticked too
+  const side2 = pick("sidechain");
+  const r9 = P.resolve(alt.rows, altChoices, alt.listing, pageBase(R2), [side2]);
+  check("a file on the unit whose header names the picked pack is matched before a listed pack of that name not on the unit", r9.placed.get(side2).replaces === "side test.pack" &&
+    r9.plan.send.map((s) => s.name).join(",") === "side test.pack", JSON.stringify(r9.plan.send.map((s) => s.name)));
+  check("that listed pack is then never added beside it, even ticked", r9.view.get("sidechain.pack").action === P.ACTION.none && r9.view.get("sidechain.pack").locked && !r9.view.get("sidechain.pack").picked);
+  const r10 = P.resolve(alt.rows, altChoices, alt.listing, pageBase(R2), [pick("sidechain", { sha256: "cd".repeat(32) })]);
+  check("and when the picked file is that very file: nothing sent at all", r10.plan.send.length === 0 && r10.problems.length === 0, JSON.stringify(r10.plan.send.map((s) => s.name)));
+  check("a header's pack name is matched whatever its capitals", P.resolve(rows, choices, listing, pageBase(R2), [pick("Cool")]).plan.send.map((s) => s.name).join(",") === "Cool v2.pack");
+  const r11 = P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["orphan"] })]);
+  check("a picked file needing a listed pack that can't go on: refused with words", r11.problems.length === 1 && /^needy needs the pack orphan/.test(r11.problems[0]) && r11.view.get("orphan.pack").action === P.ACTION.none, JSON.stringify(r11.problems));
+  const r12 = P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["cool"] }), pick("cool v2")]);
+  check("a needed pack whose file another picked file replaces doesn't count as there", r12.problems.length === 1 && /^needy needs the pack cool,/.test(r12.problems[0]), JSON.stringify(r12.problems));
+  check("a needed pack whose file stays counts by its header's name", P.resolve(rows, choices, listing, pageBase(R2), [pick("needy", { needs: ["cool"] })]).problems.length === 0);
 }
 
 console.log((failed ? "FAILED: " : "OK: ") + passed + " passed, " + failed + " failed");

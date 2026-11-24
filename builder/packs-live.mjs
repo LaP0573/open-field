@@ -14,6 +14,10 @@
 // 5. A pack another needs is ticked with it, and stays ticked while the other does.
 // 6. At most 32 pack files after the change, and a name the loader would not take is never offered.
 // 7. The plan: the removals, then the files to send with base.pack last (the unit moves it last as well).
+// 8. A pack file the owner picked on the computer (catalog.mjs's checkPickedFile) goes on as it is, under its pack's own
+//    name. It takes the place of the unit's file of that name, or of a file whose own header names the same pack, or of a
+//    listed pack of that name; the same file already on the unit is not sent again. The listed packs it needs are ticked
+//    with it (rule 5), and a pack it needs that nothing brings is a problem.
 
 import { checkName } from "./door.mjs";
 import { fileName, withNeeds, neededBy, entryForFile } from "./catalog.mjs";
@@ -21,7 +25,7 @@ import { fileName, withNeeds, neededBy, entryForFile } from "./catalog.mjs";
 export const MOST_PACKS = 32;
 export const BASE = "base.pack";
 export const STATE = Object.freeze({ on: "on", update: "update", different: "different", absent: "absent", notListed: "not listed", leftOut: "left out" });
-export const ACTION = Object.freeze({ keep: "keep", add: "add", update: "update", remove: "remove", none: "none" });
+export const ACTION = Object.freeze({ keep: "keep", add: "add", update: "update", remove: "remove", none: "none", picked: "picked" });
 
 const key = (name) => String(name).toLowerCase();
 
@@ -103,12 +107,49 @@ export function updateOffered(row) {
   return row.kind === "listed" && (row.state === STATE.update || row.state === STATE.different);
 }
 
-// The rules applied to the owner's choices: { view: Map key -> { ticked, locked, why, action }, plan, problems, counts, baseComes }.
-// plan = { send: [{ key, name, id, version, kind: "add" | "update" | "base", entry, bytes, sha256 }], remove: [names] }, base.pack last.
-export function resolve(rows, choices, listing, base) {
+// Rule 8: each picked file matched to the row whose place it takes, in three rounds: the unit's file of its name; else a
+// file on the unit whose own header names the same pack (one put on in disk mode under another name), any capitals; else
+// a listed pack of its name that is not on the unit. { taken: Map row key -> picked, fresh: [picked] }.
+function placePicked(rows, picked) {
+  const all = [...rows.listed, ...rows.others].filter((r) => r.state !== STATE.leftOut);
+  const onUnit = all.filter((r) => r.unit), notOn = all.filter((r) => !r.unit);
+  const rounds = [
+    [onUnit, (r, p) => r.key === key(p.file)],
+    [onUnit, (r, p) => !!r.unit.headerName && key(r.unit.headerName) === key(p.name)],
+    [notOn, (r, p) => r.key === key(p.file)],
+  ];
+  const taken = new Map();
+  let rest = picked;
+  for (const [among, fits] of rounds) {
+    const left = [];
+    for (const p of rest) {
+      const r = among.find((x) => !taken.has(x.key) && fits(x, p));
+      if (r) taken.set(r.key, p); else left.push(p);
+    }
+    rest = left;
+  }
+  return { taken, fresh: rest };
+}
+
+// The rules applied to the owner's choices: { view: Map key -> { ticked, locked, why, action, picked }, plan, problems, counts, baseComes, placed }.
+// A view's `picked` is true where a picked file takes the row's place (its action then "picked", or "keep" when it is the same file).
+// plan = { send: [{ key, name, id, version, kind: "add" | "update" | "picked" | "base", entry, bytes, sha256 }], remove: [names] }, base.pack last.
+// picked: the files picked on the computer, each checkPickedFile's answer with its bytes as `data`. placed: Map picked ->
+// { replaces (the unit's file it takes the place of, or null), same (that file is already this one, so nothing is sent) }.
+export function resolve(rows, choices, listing, base, picked = []) {
   const view = new Map();
   const problems = [];
   const baseComes = updateOffered(rows.base) && choices.updates.has(BASE);
+  picked = picked.filter((p) => {
+    if (key(p.file) !== BASE) return true;
+    problems.push("The base only comes with this page, so " + p.file + " from your computer can't go on.");
+    return false;
+  });
+  const { taken, fresh } = placePicked(rows, picked);
+  const pickedNames = new Set(picked.map((p) => key(p.name)));
+  // a listed pack not on the unit that a picked file already is (one found on the unit by its header): never added beside it
+  const pickedIsIt = (r) => !r.unit && !taken.has(r.key) && pickedNames.has(key(r.entry.id));
+  const same = (r) => !!(r.unit && r.unit.sha256 && r.unit.sha256 === taken.get(r.key).sha256);
   // rule 3: a new base brings every listed pack on the unit to the listing's file
   const forced = new Set();
   if (baseComes) for (const r of rows.listed) if (r.unit) forced.add(r.key);
@@ -119,13 +160,19 @@ export function resolve(rows, choices, listing, base) {
     const missing = (r.entry.needs ?? []).filter((n) => n !== "base" && !listing.offered.has(n));
     if (missing.length) blocked.set(r.key, "it needs " + missing.join(", ") + ", which the listing doesn't offer");
   }
-  const own = rows.listed.filter((r) => !blocked.has(r.key) && (choices.ticked.has(r.key) || forced.has(r.key))).map((r) => r.entry.id);
-  const wanted = withNeeds(listing, own).ids;
+  const own = rows.listed.filter((r) => !blocked.has(r.key) && !taken.has(r.key) && !pickedIsIt(r) && (choices.ticked.has(r.key) || forced.has(r.key))).map((r) => r.entry.id);
+  // rule 8: what a picked file needs from the listing comes with it, unless a picked file is that pack
+  const pickedNeeds = picked.flatMap((p) => (p.needs ?? []).filter((n) => n !== "base" && !pickedNames.has(key(n)) && listing.offered.has(n)));
+  const wanted = withNeeds(listing, [...own, ...pickedNeeds]).ids;
+  const pickedTaken = (r) => (same(r) ? { ticked: true, locked: true, picked: true, why: "the file you picked is this very one", action: ACTION.keep }
+    : { ticked: true, locked: true, picked: true, why: "a file you picked on your computer takes its place", action: ACTION.picked });
   for (const r of rows.listed) {
     const id = r.entry.id;
+    if (taken.has(r.key)) { view.set(r.key, pickedTaken(r)); continue; }
+    if (pickedIsIt(r)) { view.set(r.key, { ticked: false, locked: true, why: "a file you picked is this pack, under another name on your OP-1", action: ACTION.none }); continue; }
     if (blocked.has(r.key) && !r.unit) { view.set(r.key, { ticked: false, locked: true, why: blocked.get(r.key), action: ACTION.none }); continue; }
     const ticked = wanted.has(id) || (blocked.has(r.key) && choices.ticked.has(r.key));
-    const needers = neededBy(listing, own, id);
+    const needers = [...neededBy(listing, own, id), ...picked.filter((p) => (p.needs ?? []).includes(id)).map((p) => p.name)];
     let locked = false, why = "";
     if (forced.has(r.key)) { locked = true; why = r.state === STATE.on ? "already the one that goes with the new base" : "comes with the new base"; }
     else if (needers.length && ticked) { locked = true; why = needers.join(", ") + " needs it"; }
@@ -136,12 +183,20 @@ export function resolve(rows, choices, listing, base) {
   }
   for (const r of rows.others) {
     if (r.state === STATE.leftOut) { view.set(r.key, { ticked: true, locked: true, why: "the loader doesn't take its name, so your OP-1 leaves it out", action: ACTION.keep }); continue; }
+    if (taken.has(r.key)) { view.set(r.key, pickedTaken(r)); continue; }
     const ticked = choices.ticked.has(r.key);
     view.set(r.key, { ticked, locked: false, why: "", action: ticked ? ACTION.keep : ACTION.remove });
   }
   view.set(BASE, { ticked: true, locked: true, why: "every pack runs on it", action: baseComes ? ACTION.update : ACTION.keep });
   // the plan
-  const send = [], remove = [];
+  const send = [], remove = [], placed = new Map();
+  // a picked file keeps the unit's own name for the file it takes the place of, as an update does
+  const sendPicked = (p, r) => {
+    const replaces = r && r.unit ? r.unit.name : null;
+    placed.set(p, { replaces, same: !!r && same(r) });
+    if (r && same(r)) return;
+    send.push({ key: key(replaces ?? p.file), name: replaces ?? p.file, id: p.name, version: p.version, kind: ACTION.picked, entry: null, bytes: p.size, sha256: p.sha256, from: r && r.unit ? r.unitVersion : null, replaces, data: p.data });
+  };
   for (const r of rows.listed) {
     const v = view.get(r.key);
     if (v.action === ACTION.remove) remove.push(r.unit.name);
@@ -149,22 +204,43 @@ export function resolve(rows, choices, listing, base) {
     if (v.action === ACTION.add || v.action === ACTION.update) {
       send.push({ key: r.key, name: r.unit ? r.unit.name : fileName(r.entry), id: r.entry.id, version: r.entry.version, kind: v.action, entry: r.entry, bytes: r.entry.bytes, sha256: r.entry.sha256, from: r.unitVersion });
     }
+    if (taken.has(r.key)) sendPicked(taken.get(r.key), r);
   }
-  for (const r of rows.others) if (view.get(r.key).action === ACTION.remove) remove.push(r.unit.name);
+  for (const r of rows.others) {
+    if (view.get(r.key).action === ACTION.remove) remove.push(r.unit.name);
+    if (taken.has(r.key)) sendPicked(taken.get(r.key), r);
+  }
+  for (const p of fresh) sendPicked(p, null);
+  // rule 8: every pack a picked file needs runs after the change. What runs then, by pack name: each file on the unit that
+  // stays and the loader takes (by its header's name, else its listing id, else its file's name), each listed pack added,
+  // and each picked file (a row a picked file takes counts as the picked pack, not as the file it replaces).
+  const runs = new Set(picked.map((p) => key(p.name)));
+  for (const r of [...rows.listed, ...rows.others]) {
+    const v = view.get(r.key);
+    if (v.picked || r.state === STATE.leftOut || (r.otherFirmware && v.action !== ACTION.update)) continue;
+    if (r.unit ? v.action === ACTION.remove : v.action !== ACTION.add) continue;
+    runs.add(key((r.unit && v.action !== ACTION.update && r.unit.headerName) || (r.entry ? r.entry.id : r.name.replace(/\.pack$/i, ""))));
+  }
+  for (const p of picked) {
+    for (const n of p.needs ?? []) {
+      if (n !== "base" && !runs.has(key(n))) problems.push(p.name + " needs the pack " + n + ", which isn't on your OP-1, in the list or among the files you picked.");
+    }
+  }
   if (baseComes) send.push({ key: BASE, name: BASE, id: "base", version: base.version, kind: "base", entry: null, bytes: base.size, sha256: base.sha256, from: rows.base.unitVersion });
   // rule 6: the pack files after the change
   const onUnit = [rows.base, ...rows.listed, ...rows.others].filter((r) => r.unit && r.unit.isPack).map((r) => r.unit.name.toLowerCase());
   const after = new Set(onUnit.filter((n) => !remove.some((x) => x.toLowerCase() === n)));
   for (const s of send) after.add(s.name.toLowerCase());
   if (after.size > MOST_PACKS) problems.push("That would leave " + after.size + " packs on your OP-1, and it loads " + MOST_PACKS + " at most. Untick a few.");
+  const isNew = (s) => s.kind === ACTION.add || (s.kind === ACTION.picked && !s.replaces);
   const counts = {
-    added: send.filter((s) => s.kind === "add").length,
-    updated: send.filter((s) => s.kind !== "add").length,
+    added: send.filter(isNew).length,
+    updated: send.filter((s) => !isNew(s)).length,
     removed: remove.length,
     bytes: send.reduce((n, s) => n + (s.bytes || 0), 0),
     packsAfter: after.size,
   };
-  return { view, plan: { send, remove }, problems, counts, baseComes };
+  return { view, plan: { send, remove }, problems, counts, baseComes, placed };
 }
 
 // The changes waiting, as short lines for the bar: [{ sign: "+" | "↑" | "−", text }].
@@ -173,6 +249,7 @@ export function changeLines(rows, resolved) {
   const name = (s) => s.replace(/\.pack$/i, "");
   for (const s of resolved.plan.send) {
     if (s.kind === "add") out.push({ sign: "+", text: s.id });
+    else if (s.kind === ACTION.picked) out.push({ sign: s.replaces ? "↑" : "+", text: s.id + " (your file)" });
     else if (s.kind === "base") out.push({ sign: "↑", text: "base " + (s.from ?? "?") + " → " + s.version });
     else out.push({ sign: "↑", text: s.id + (s.from !== null && s.from !== undefined ? " " + s.from + " → " + s.version : " → v" + s.version) });
   }
@@ -187,6 +264,7 @@ export function secondsFor(bytes) { return Math.max(3, Math.round(bytes / 250000
 // The short words of a row's state, for its tile.
 export function stateWords(row, v) {
   if (v && v.action === ACTION.remove) return "coming off";
+  if (v && v.action === ACTION.picked) return "your file goes in its place";
   if (row.otherFirmware) return "made for another OS version, so your OP-1 leaves it out";
   switch (row.state) {
     case STATE.on: return "on your OP-1";
@@ -207,7 +285,7 @@ export function stateWords(row, v) {
 // The colour of a row's dot, by the four knobs: blue on the unit, ochre an update, grey not on it, red coming off.
 export function stateColour(row, v) {
   if (v && v.action === ACTION.remove) return "red";
-  if (row.state === STATE.update) return "ochre";
+  if (row.state === STATE.update || (v && v.action === ACTION.picked)) return "ochre";
   if (row.state === STATE.absent || row.state === STATE.leftOut || row.otherFirmware) return "grey";
   return "blue";
 }
