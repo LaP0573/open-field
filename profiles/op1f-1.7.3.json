@@ -496,6 +496,13 @@
    "sum": "0x4a08d6e5",
    "group": "base",
    "name": "The entry of the function that gives the row a sound's list of LFOs opens on. The lists of synth and drum sounds both call it, and nothing else does."
+  },
+  {
+   "address": "0x8f00b7b0",
+   "length": 8,
+   "sum": "0xd0f0e34c",
+   "group": "base",
+   "name": "The entry of the function that puts what the tape has lifted into a synth sound's sample: the drop key on the sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work. Nothing else calls it."
   }
  ],
  "image": [
@@ -981,6 +988,14 @@
      "room": "op1f_layer_lh_room",
      "copies": 8,
      "does": "A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise."
+    },
+    {
+     "address": "0x8f00b7b0",
+     "form": "jump",
+     "target": "op1f_sample_sd_stub",
+     "room": "op1f_sample_sd_room",
+     "copies": 8,
+     "does": "A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline."
     }
    ]
   }

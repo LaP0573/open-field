@@ -14,7 +14,7 @@ Read the whole page before you begin. The install changes the firmware of your u
   - A **Mac** with **Chrome**, `python3` (it comes with Apple's command line tools) and libusb (`brew install libusb`, with Homebrew).
   - **Linux** with `python3`, `curl`, `libusb-1.0` and a Chromium browser that has folder access. The install reported from Linux was made with Brave, with `brave://flags/#file-system-access-api` switched on.
 
-  One install from a Mac and one from Linux were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.20 and the helper as it is now have not been tried there, and neither has the way back.
+  One install from a Mac and one from Linux were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.21 and the helper as it is now have not been tried there, and neither has the way back.
 - A **charged** unit. A write that loses power halfway can leave nothing to start from.
 - Half an hour in which you will not be interrupted.
 
@@ -37,14 +37,14 @@ open-field is for OS 1.7.3 only. Update a unit still on OS 1.7.0 first, with Tee
 
 If your unit is already on `1.7.3+1`, you can use this page. A copy of that version's `os.ldr` given to the maintainer is byte for byte the original 1.7.3 file. The contributor of this part reported the same of their own copy. Yours is checked all the same: the SHA-256 check in step 5 decides, not the label on the screen.
 
-Expect the label to stay through the install and the way back. Wherever this guide quotes `1.7.3` on the start screen, such a unit shows `1.7.3+1` in its place: after a good install `1.7.3+1 - open-field 0.20`, after the way back `1.7.3+1`.
+Expect the label to stay through the install and the way back. Wherever this guide quotes `1.7.3` on the start screen, such a unit shows `1.7.3+1` in its place: after a good install `1.7.3+1 - open-field 0.21`, after the way back `1.7.3+1`.
 
 `1.7.3+1` comes with bootloader **1000.2.0**. The page reads the version in step 1 and plans the write for it. Know how little that rests on:
 
 - Three of the numbers the page plans with are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that one write with them, on one unit, landed (2026-11-20). The maintainer has not read that bootloader or tried a unit with it.
 - If those numbers, or that assumption, are wrong for your unit, the write can land in the wrong place. With 1000.1.1 such a write stops, and the stop erases the unit's spare copy of its firmware, as [Write](#write) says under the install. What 1000.2.0 does with one has not been seen.
 - The page's button that switches the developer menu on has no report on 1000.2.0.
-- The install was reported from a Mac, on open-field 0.3 with an earlier form of the helper. The base and packs of 0.20 and the helper as it is now have not been tried on 1000.2.0.
+- The install was reported from a Mac, on open-field 0.3 with an earlier form of the helper. The base and packs of 0.21 and the helper as it is now have not been tried on 1000.2.0.
 - The way back to the original firmware has not been tried there. Windows with 1000.2.0 has not been tried at all.
 
 If that is too little for you, wait. And on a unit already on OS 1.7.3, do not update, change or write anything to get `1.7.3+1` or 1000.2.0: open-field needs neither.
@@ -89,11 +89,11 @@ The way back to the original firmware (step 5's second choice) puts no pack on.
 4. When the line `firmware written ok!` shows, switch the unit off with its switch. That line by itself proves nothing: the bootloader prints it whatever happened.
 5. Switch the unit on with no key held.
 
-**The proof is the start screen.** Under the version it says what runs. On a unit on `1.7.3+1` each line below begins with `1.7.3+1` in place of `1.7.3`, and that is a good write all the same: `1.7.3+1 - open-field 0.20`.
+**The proof is the start screen.** Under the version it says what runs. On a unit on `1.7.3+1` each line below begins with `1.7.3+1` in place of `1.7.3`, and that is a good write all the same: `1.7.3+1 - open-field 0.21`.
 
 | The start screen reads | What it means |
 | --- | --- |
-| `1.7.3 - open-field 0.20` | The loader is in, and `base.pack` and your feature files run. `0.20` is the release of the base |
+| `1.7.3 - open-field 0.21` | The loader is in, and `base.pack` and your feature files run. `0.21` is the release of the base |
 | `1.7.3 stock (no pack)` | The loader is in, and there is no pack file on the unit: the unit behaves exactly as before |
 | `1.7.3 stock (4 need base)` | The loader is in, and the feature files cannot run because `base.pack` is not on the unit. Copy it into `packs`: it is [`builder/base.pack`](../builder/base.pack) in this repository. On a Mac, run the install again instead: it puts it on |
 | `1.7.3` or `1.7.3+1`, and nothing behind it | The loader does not run. After the way back to the original firmware that is what you want. On a first install, the write did not take, and the unit runs its firmware of before |
@@ -115,7 +115,7 @@ The easiest way is the install page's packs section: switch the unit on as usual
 3. Copy the file into `packs`.
 4. Leave the disk mode and switch the unit off and on.
 
-The start screen reads `1.7.3 - open-field 0.20` (`1.7.3+1 - open-field 0.20` on a unit on `1.7.3+1`). It does not name the packs: each shows itself where it is used, as its author's manual says.
+The start screen reads `1.7.3 - open-field 0.21` (`1.7.3+1 - open-field 0.21` on a unit on `1.7.3+1`). It does not name the packs: each shows itself where it is used, as its author's manual says.
 
 You can also copy the files in the bootloader's drive mode (hold COM, switch on, `3`, `2`); the folder is then `user/pk`.
 

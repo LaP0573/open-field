@@ -1,18 +1,18 @@
 # The base: what it offers a pack
 
-**The base** is the shared pack every other pack relies on: the file `base.pack`, in the folder `user/pk` of the unit like any pack file. It holds the interface every pack uses, ours and yours alike, and nothing made for one pack: a call every frame, pictures, a page of its own with keys and knobs, folders and files on the unit's disk, and text on its page (levels 1 to 3, on this page), then painting and pages that stack (level 4), a sequencer of a pack's own and the notes heard (level 5), a place in the sound and working memory (level 6), values kept in the unit's own tapes and sounds (level 7), an effect of a pack's own in the unit's lists of effects (level 8), a synth engine of a pack's own in the unit's list of engines (level 9), and the value as the sound plays it (level 10), each on a page of its own. After level 10 come parts with a mark of their own instead of a level: a page that holds its picture or redraws only its changed parts (bases 33 and 36), and layers, rows of a pack's own in the unit's lists of effects and LFOs (bases 35 and 37). This page says what it offers, how a pack asks for it, and what it does not offer yet.
+**The base** is the shared pack every other pack relies on: the file `base.pack`, in the folder `user/pk` of the unit like any pack file. It holds the interface every pack uses, ours and yours alike, and nothing made for one pack: a call every frame, pictures, a page of its own with keys and knobs, folders and files on the unit's disk, and text on its page (levels 1 to 3, on this page), then painting and pages that stack (level 4), a sequencer of a pack's own and the notes heard (level 5), a place in the sound and working memory (level 6), values kept in the unit's own tapes and sounds (level 7), an effect of a pack's own in the unit's lists of effects (level 8), a synth engine of a pack's own in the unit's list of engines (level 9), and the value as the sound plays it (level 10), each on a page of its own. After level 10 come parts with a mark of their own instead of a level: a page that holds its picture or redraws only its changed parts (bases 33 and 36), layers, rows of a pack's own in the unit's lists of effects and LFOs (bases 35 and 37), and a cut the tape has lifted, dropped into the sample of a sound that plays a pack's engine (base 39). This page says what it offers, how a pack asks for it, and what it does not offer yet.
 
 The base is a pack like any other ([packs](packs.md)), built from `packs/base.json`. Two things set it apart: **every unit with open-field needs it**, and its release is what the start screen shows. Without `base.pack` no feature runs, and the start screen says `1.7.3 stock (4 need base)`.
 
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 38 |
-| Release | `0.20`: the start screen reads `1.7.3 - open-field 0.20` |
+| Version | 39 |
+| Release | `0.21`: the start screen reads `1.7.3 - open-field 0.21` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
-| Its changes of the firmware | Sixty-three: [the change list](changes.md), "The base, `base.pack`" |
+| Its changes of the firmware | Sixty-four: [the change list](changes.md), "The base, `base.pack`" |
 
 Since the base is a file, a new base is a new file copied into `user/pk`, with no install. The **loader**, our small piece inside the firmware file, only reads, places and joins the pack files. It hands the base what it needs and knows nothing of what the base offers.
 
@@ -75,6 +75,7 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 36 | [A held page whose changed parts are drawn again](held-page.md#redrawing-only-the-parts-that-changed-base-36): the pack names the rectangles that changed and the parts of its picture there | `op1f_parts_1` |
 | 37 | [Drum sounds ride an LFO layer](layers.md#an-lfo-layer) too, when it says so | none: `op1f_layer_start` answers for a drum's place |
 | 38 | An effect switched off for its cost plays again after a new pick, and the runs of effects inside packs are handed on once no place runs them ([level 8](level-8.md)); no canvas while the base's own top page is up ([level 4](level-4.md)) | none |
+| 39 | [A sound's sample](sample.md): a cut the tape has lifted, dropped by the unit into the sample of a synth sound that plays the pack's engine, as its sampler takes one and kept over a restart; and any synth or drum sound's sample read | `op1f_sample_1` |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 
@@ -262,6 +263,8 @@ It answers not 0 to take the event: the firmware then never sees it, and no pack
 | 1 | The metronome key |
 | 2 to 5 | The synth, drum, tape and mixer keys |
 | 6 to 9 | The four keys under the screen, T1 to T4 |
+| 10 | The lift key |
+| 11 | The drop key |
 | 38 | Shift |
 | 54 to 57 | A knob's click: the firmware makes one, a down and then an up, when a knob that was pressed comes up without having been turned |
 | 61 to 64 | A knob pressed down and let go |
@@ -282,7 +285,7 @@ It answers not 0 to take the event: the firmware then never sees it, and no pack
 ### The threads
 
 - **A frame function runs on the display thread.** It may write into the log, and at level 3 read and write files.
-- **An input function runs on the thread that handles keys, never on the display thread.** For the keys of the keyboard, the ones that play notes, the firmware may hand a key in at once on the thread that brought it, **which can be the audio thread**. So an input function does what the audio thread may do: it writes no line in the log, it waits for nothing, it calls nothing of the firmware's, and it comes back quickly. It counts, and the frame function says it. It may call `op1f_page_open` and `op1f_page_close`.
+- **An input function runs on the thread that handles keys, never on the display thread.** For the keys of the keyboard, the ones that play notes, the firmware may hand a key in at once on the thread that brought it, **which can be the audio thread**. So an input function does what the audio thread may do: it writes no line in the log, it waits for nothing, it calls nothing of the firmware's, and it comes back quickly. It counts, and the frame function says it. It may call `op1f_page_open` and `op1f_page_close`, and from base 39, for an event on the key thread, `op1f_sample_drop`, which asks the unit for a drop and waits for nothing ([your engine's sample](sample.md)).
 - The two share single words, never a structure: either can find the other halfway through its work. `examples/yoyo/yoyo.cpp` shows the form: a few words the input function writes and the frame function reads.
 
 ## Level 3: folders, files and text
@@ -426,6 +429,8 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_effects` | `effect:` | Level 8: the packs' effects in the unit's lists, which place plays which, their memory and their period |
 | `op1f_lfos` | `lfo:` | Base 35: the packs' LFO layers in the unit's lists, which place rides which ([layers](layers.md#the-lines-the-base-writes)) |
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |
+| `op1f_sample` | `sample:` | Base 39: each drop a pack asked for, its end with the frames put in, a refusal and why, and the count of the unit's own drops into its sampler ([your engine's sample](sample.md#the-lines-the-base-writes)) |
+| `op1f_sample_restore` | `sample:` | Base 39: after a start, each cut put back into a sound that plays a pack's engine, or why not |
 | `op1f_tape_art` | `artwork` | A picture put together on the unit, and from what |
 | | `aud` | Every sixteenth second: the share of the processor the audio thread took, the longest block, and the blocks a second |
 | | `os heap:` | Every sixteenth second: how much of the firmware's own heap is free at its top, and the least it has been |

@@ -747,6 +747,15 @@ extern "C" int op1f_engines_standing(Op1fStanding* out, unsigned* mode, unsigned
 extern "C" int op1f_engines_ahead(Op1fStanding* out, unsigned* mode, unsigned* screen, const char** name) OP1F_NAMED("op1f_engines_ahead") __attribute__((weak));
 #endif
 
+// R17 (base 39): the sample unit's (module/build_r17_sample.cpp): its frame work, once a frame behind the engines
+// unit's and before the frame functions: the lines of the drops, an ended drop freed. Weak: away, nothing of it is done.
+#if defined(OP1F_HOST)
+static void (*const r17_none_sample_frame)() = 0;
+#define op1f_sample_frame (*r17_none_sample_frame)
+#else
+extern "C" void op1f_sample_frame() OP1F_NAMED("op1f_sample_frame") __attribute__((weak));
+#endif
+
 // R11 (base 35): the kind of ask of a layer of a sound's list of LFOs, its one flag, the size of its table and how many
 // the packs may register, as the header of base 35 (module/build_r6e_card.h) names them: this unit reads base 29's
 // header, so it names the same numbers here where that header is not read. The entry of the table of screens an LFO's
@@ -1084,9 +1093,11 @@ unsigned op1f_cards_stand_in_shown;
 // R3: the calls the base is making into packs outside their frame functions now, a place each: the kind, the slot + 1
 // whose call runs (0: the place is free) and where the stack stood. Taken, given back and read in masked instants,
 // from any thread, in no order. `missed`: calls that found every place taken, since the start.
+// R17 (base 39): and for an input call, the event's `thread` word, written by the dispatch once the place is taken and
+// cleared with it (0 for every other kind), for op1f_cards_input_keyed.
 enum { RECORDS_MOST = 8 };
 static struct {
-    volatile u32 kind, who, sp;
+    volatile u32 kind, who, sp, thread;
 } records[RECORDS_MOST];
 static volatile u32 records_missed;
 
@@ -1561,6 +1572,7 @@ extern "C" OP1F_APART void op1f_cards_call_in(unsigned kind, unsigned slot, Op1f
         if (records[i].who != 0) continue;
         records[i].kind = kind;
         records[i].sp = sp;
+        records[i].thread = 0;                                                      // R17: the dispatch writes an input call's
         records[i].who = slot + 1u;
         place = i + 1u;
         break;
@@ -1575,6 +1587,7 @@ extern "C" OP1F_APART void op1f_cards_call_out(unsigned kind, const Op1fCallKept
     (void)kind;
     if (place == 0 || place > (u32)RECORDS_MOST) return;
     MASK_OFF(mask);
+    records[place - 1u].thread = 0;                                                 // R17: the input call's mark cleared with it
     records[place - 1u].who = 0;                                                    // exactly the place this call took
     MASK_ON(mask);
 }
@@ -1614,6 +1627,34 @@ extern "C" int op1f_cards_inside(const Op1fCard* card) {
     if (slot < 0) return 0;
     u32 best = nearest_call(stack_here());
     return best != 0 && (best >> 16) <= (u32)OP1F_CALL_INPUT + 1u && (best & 0xffffu) == (u32)slot + 1u ? 1 : 0;
+}
+
+// R17 (base 39): 1 when the nearest of the base's calls into packs around the caller is an input call of this card for
+// an event on the key thread (the record's thread word, which the dispatch wrote for that call); 0 otherwise: a frame
+// function, a tick, another card's input call, an event of the keys that play notes. nearest_call's walk, with the
+// thread word read in the same masked instant as the record's other words. For op1f_sample_drop
+// (module/build_r17_sample.cpp), which posts to the firmware's queue only from the key thread.
+extern "C" int op1f_cards_input_keyed(const Op1fCard* card) OP1F_NAMED("op1f_cards_input_keyed");
+extern "C" OP1F_APART int op1f_cards_input_keyed(const Op1fCard* card) {
+    int slot = slot_of(card);
+    if (slot < 0) return 0;
+    u32 here = stack_here(), nearest = 0xffffffffu, best = 0, best_thread = 0;
+    for (u32 i = 0; i < (u32)RECORDS_MOST; ++i) {
+        u32 mask, who, at, kind, thread;
+        MASK_OFF(mask);
+        who = records[i].who;
+        at = records[i].sp;
+        kind = records[i].kind;
+        thread = records[i].thread;
+        MASK_ON(mask);
+        if (who == 0 || !around(at, here) || at >= nearest) continue;
+        nearest = at;
+        best = (kind + 1u) << 16 | who;
+        best_thread = thread;
+    }
+    u32 calling = state.calling, at = state.calling_sp;
+    if (calling != 0 && around(at, here) && at < nearest) return 0;                 // inside a frame function
+    return best == (((u32)OP1F_CALL_INPUT + 1u) << 16 | ((u32)slot + 1u)) && best_thread == (u32)OP1F_KEY_THREAD ? 1 : 0;
 }
 
 // R1: a page asked for, by op1f_page_open and op1f_page_show alike, from any thread: the document, how it was asked
@@ -2778,9 +2819,12 @@ static OP1F_APART void paint_name(void* canvas) {
 // OP1F_SEEN from a card of level 4, which for a down records the card as a watcher of the key (told its up), with
 // interrupts masked for the instant; a turn has no up. From a card of level 3 or less any answer not 0 takes it.
 // R3: a card's input function called inside a record of its kind, for op1f_cards_inside.
+// R17 (base 39): the record marked with the event's thread word for the call (op1f_cards_input_keyed), cleared with
+// the record at its end. The place is this call's alone while it runs: a single word.
 static inline __attribute__((always_inline)) int input_call(u32 i, const Op1fCard* card, Op1fInput* e) {
     Op1fCallKept kept;
     op1f_cards_call_in(OP1F_CALL_INPUT, i, &kept);
+    if (kept.who != 0 && kept.who <= (u32)RECORDS_MOST) records[kept.who - 1u].thread = e->thread;
     int answer = card->input(e);
     op1f_cards_call_out(OP1F_CALL_INPUT, &kept);
     return answer;
@@ -3439,7 +3483,8 @@ extern "C" void op1f_cards_frame() {
     if (&op1f_options_frame != 0) op1f_options_frame();     // R8 (base 32): the options unit's, before any frame function
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
-    said_passed();                                          // R4: the pictures a card of level 6 carries and a screen was not served
+    if (&op1f_sample_frame != 0) op1f_sample_frame();       // R17 (base 39): the sample unit's, behind the engines unit's
+    said_passed();                                         // R4: the pictures a card of level 6 carries and a screen was not served
     Op1fStanding standing;
     int stands = op1f_seq_standing(&standing);              // R3: does a pack's page stand in for the sequencer's screen now
     fx.asked = 0;                                           // R5
