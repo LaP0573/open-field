@@ -434,6 +434,17 @@ static volatile u32 tape_loads;
 static const u32 LOADS_UNTOLD = 1u << OP1F_KEPT_LOADED | 1u << OP1F_KEPT_MADE;
 static char store_text[STORE_ROOM];
 
+// R17 (base 39): the kept cut of a drop into a synth slot's sample (module/build_r17_restore.cpp puts it back at the
+// next start), the slot's member beside its ride: the frames (0: none) and the channels (1 stereo). In the store it is
+// the slot's row's member "sample", [frames, stereo], written only while the slot holds the ride (op1f_engine), so a
+// store with no kept cut is base 38's byte for byte. Base 38's reader takes a row's host, name, slot, type and values by
+// name and nothing else: it reads such a store whole, the ride with it, passes the member by and leaves it out of the
+// next store it writes. The display thread's alone: set by op1f_keeps_sample_set, read at the first frame and by the
+// store's writer. The pool's halfwords, as module/build_r17_sample.h's OP1F_SAMPLE_POOL.
+static const char SAMPLE_KEY[] = "sample";
+enum { SAMPLE_POOL = 529200 };
+static u32 sample_frames[SLOTS], sample_stereo[SLOTS];
+
 template <typename Marked> static void mark_copy(Marked* to, const Mark* from);
 
 // R6b (M4): the mark a save gave a slot's sound, waiting until the slot's record shows it. Written by the save's
@@ -1702,6 +1713,13 @@ static int store_compose(u32* slots_kept, u32* bytes) {
         put_number(&t, (i32)(index >= (u32)SLOTS ? 1 : 0));
         put_chars(&t, ",\"name\":");
         put_quoted(&t, c->mark_name, length_of(c->mark_name, MARK));
+        if (index < (u32)SLOTS && sample_frames[index] != 0 && entry_of(c, BASE_ENGINE) >= 0) {   // R17: the kept cut, beside the ride
+            put_chars(&t, ",\"sample\":[");
+            put_number(&t, (i32)sample_frames[index]);
+            put_char(&t, ',');
+            put_number(&t, (i32)sample_stereo[index]);
+            put_char(&t, ']');
+        }
         put_chars(&t, ",\"slot\":");
         put_number(&t, (i32)(index & (u32)(SLOTS - 1)));
         put_chars(&t, ",\"type\":");
@@ -1890,6 +1908,22 @@ static u32 store_master(const void* document, Holder* h) {
     return STORE_READ;
 }
 
+// R17 (base 39): the kept cut of the store's slot row `i`, synth slot `index`, whose values `h` were just kept: 1 taken,
+// 0 none there, 2 one not as this unit writes it (or with no ride beside it), left aside: the slot's values stay kept.
+static u32 sample_take(const void* document, u32 i, u32 index, const Holder* h) {
+    sample_frames[index] = 0;
+    sample_stereo[index] = 0;
+    const void* v = member(STOCK_JSON_ELEMENT(member(document, "slots"), i), SAMPLE_KEY);
+    if (v == 0) return 0;
+    i32 frames = 0, stereo = -1;
+    if (entry_of(h, BASE_ENGINE) < 0 || kind_of(v) != (u32)KIND_LIST || STOCK_JSON_SIZE(v) != 2u || !whole_of(STOCK_JSON_ELEMENT(v, 0), &frames) ||
+        !whole_of(STOCK_JSON_ELEMENT(v, 1), &stereo) || (stereo != 0 && stereo != 1) || frames <= 0 || (u32)frames > ((u32)SAMPLE_POOL >> (u32)stereo))
+        return 2;
+    sample_frames[index] = (u32)frames;
+    sample_stereo[index] = (u32)stereo;
+    return 1;
+}
+
 // ---------------------------------------------------------------- once a frame (the display thread)
 
 static Mark now_mark;                                                              // the display's: the mark of a record read at the first frame
@@ -1910,7 +1944,7 @@ static void first_frame() {
     }
     if (state == (u32)STORE_READ) state = store_master_names(&document);             // R5: the master's section held to its form too
     if (state == (u32)STORE_READ) state = store_master(&document, &display_copy);
-    u32 kept = 0, dropped = 0;
+    u32 kept = 0, dropped = 0, cuts_taken = 0, cuts_aside = 0;
     if (state == (u32)STORE_READ) {
         for (u32 i = 0; i < count; ++i) {                                           // then each slot, held to the sound on it now
             u32 index = 0;
@@ -1921,6 +1955,8 @@ static void first_frame() {
             if (same(now_mark.mark_name, s->mark_name) && same(now_mark.mark_type, s->mark_type)) {
                 ++kept;
                 put_in(index, s, OP1F_KEPT_START, 0);
+                u32 cut = index < (u32)SLOTS ? sample_take(&document, i, index, s) : 0u;   // R17: the kept cut beside the ride
+                if (cut) ++(cut == 1u ? cuts_taken : cuts_aside);
             } else {
                 ++dropped;
                 tell(index, OP1F_KEPT_DROPPED);
@@ -1929,6 +1965,8 @@ static void first_frame() {
         }
         if (kept || dropped)
             op1f_log(3, LOG_FILE, 4, "keeps: %u slot(s) of sounds with values read from the base's file, %u let go: their sound changed", kept, dropped);
+        if (cuts_taken || cuts_aside)                                               // R17
+            op1f_log(3, LOG_FILE, 17, "keeps: the kept cut of %u synth sound(s) read beside its ride, %u not as written: left aside", cuts_taken, cuts_aside);
         store_master(&document, &display_copy);                                    // R5: the master's values, kept whatever sound plays
         if (display_copy.bytes != 0) put_in(MASTER, &display_copy, OP1F_KEPT_START, 0);
         unit.store_known = 1;
@@ -2315,4 +2353,31 @@ extern "C" int op1f_keeps_lfo_set(unsigned where, unsigned which, const char* te
     if (where == (unsigned)OP1F_KEEP_MASTER || !base_holder(where, which, &index)) return OP1F_BAD_NAME;
     if (ready == 0) return OP1F_NOT_NOW;
     return value_set_at(index, BASE_LFO, text, SET_BASE);
+}
+
+// ---------------------------------------------------------------- R17: the kept cut, for the restore unit
+
+// From the display thread (module/build_r17_restore.cpp). The kept cut of synth slot `slot`: 1 with its frames and
+// channels, 0 none, -1 before the first frame read the store.
+extern "C" int op1f_keeps_sample_get(unsigned slot, unsigned* frames, unsigned* stereo) OP1F_NAMED("op1f_keeps_sample_get");
+extern "C" int op1f_keeps_sample_get(unsigned slot, unsigned* frames, unsigned* stereo) {
+    if (slot >= (unsigned)SLOTS) return 0;
+    if (!ready) return -1;
+    if (frames) *frames = sample_frames[slot];
+    if (stereo) *stereo = sample_stereo[slot];
+    return sample_frames[slot] != 0 ? 1 : 0;
+}
+
+// The kept cut set (a drop's end), or ended (`frames` 0: a sound loaded there): the store written as for a value, half a
+// second on, never while the disk mode is open; a cut that passes the pool at its channels is kept as none.
+extern "C" void op1f_keeps_sample_set(unsigned slot, unsigned frames, unsigned stereo) OP1F_NAMED("op1f_keeps_sample_set");
+extern "C" void op1f_keeps_sample_set(unsigned slot, unsigned frames, unsigned stereo) {
+    if (slot >= (unsigned)SLOTS) return;
+    u32 s = stereo ? 1u : 0u;
+    u32 f = frames > ((u32)SAMPLE_POOL >> s) ? 0u : frames;
+    if (f == 0) s = 0;
+    if (sample_frames[slot] == f && sample_stereo[slot] == s) return;
+    sample_frames[slot] = f;
+    sample_stereo[slot] = s;
+    store_changed();
 }

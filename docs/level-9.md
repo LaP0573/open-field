@@ -194,6 +194,8 @@ Level 9 adds no helper. Level 8's answer for an engine as for an effect, with a 
 
 [Level 10](level-10.md)'s `op1f_param_heard` answers for an engine too.
 
+From base 39 a sound that plays your engine can take a cut the tape has lifted into its sample, as the sampler does, and your engine can read any sound's sample: [your engine's sample](sample.md).
+
 ## Two engines
 
 Two engine packs play on different sounds. Only one synth sound plays at a time, so only one engine renders at a time, and switching sounds hands the voices to the other one with `OP1F_VOICE_FRESH`. Their memory is their own.

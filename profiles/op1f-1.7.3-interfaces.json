@@ -615,6 +615,30 @@
    "what": "Not 0 when the unit holds the file `content/op1.classic`. The first call looks on the disk; every call after gives back what it found.",
    "thread": "Not the audio thread. Ours: the display thread."
   },
+  "0x8f00b564": {
+   "name": "synth_drop_post",
+   "group": "sounds",
+   "what": "Asks the unit's clipboard work for a drop of what the tape has lifted into the sample of synth slot `slot` (0 to 7), as the drop key on the sampler's page does. It does not wait: the unit does the drop later, in its own turn. The clipboard work takes one request at a time, from a queue whose read place is the word at `0x84bdd930` and write place the word at `0x84bdd934`: the two are the same when nothing waits, and a post moves the write place. It gives nothing back and may post nothing: our code calls it only while the two are the same and the disk mode is shut (the word at `0x84d25bcc` is 0), and takes a post after which the write place has not moved as not taken.",
+   "thread": "Ours: the key thread only, inside a pack's input function, as the unit's own drop key. It is not safe on two threads at once."
+  },
+  "0x8f01aea4": {
+   "name": "synth_holder",
+   "group": "sounds",
+   "what": "The holder of synth slot `slot` (0 to 7): its word in the table at `0x0802f73c` (the drum's slots have theirs at `0x0802f0ac`). The holder's first word is the slot's object, and the object's first word is where its sample is: for synth slot i from `0x840b0bec` + i x 0x102660 (529,200 halfwords), for drum slot i from `0x8d518598` + i x 0x35d540; our code holds it there before it reads more of the object. The object's frames stand at +0xd768, its channels byte at +0xd770 (0 mono). Our code hands the object to the clipboard's import, at its entry `0x8f004204` (where `8 tracks` holds its place when it is on the unit), which puts what the tape has lifted into the sample.",
+   "thread": "Ours: the main task, in the unit's clipboard work."
+  },
+  "0x8f00b78c": {
+   "name": "clip_many",
+   "group": "sounds",
+   "what": "The clipboard's item test: not 0 when the clipboard holds more than one item. Our code reads it with the size of a copied sound, the word at `0x84bdda00`, not 0 while one is held: at most one item while a copied sound is held means there is no lifted cut. What the tape has lifted our code reads through two words more: its length in frames at `0x84bdd9e4`, and its list of lifted tracks, a word a track, from the word at `0x84bdd948` up to the word at `0x84bdd94c`.",
+   "thread": "Ours: the key thread, the main task in the unit's clipboard work."
+  },
+  "0x8d4eb6b2": {
+   "name": "sample_mark",
+   "group": "sounds",
+   "what": "Marks the sample of synth slot `slot` (0 to 7) to be kept over a restart, as the unit keeps its sampler's: in the file `user/audio/synth/synth_N.raw` of its disk, N the slot from 0, the sample from its 16th byte on. The unit puts that file back at the start only into a sound that plays its sampler; for a sound that plays a pack's engine the base reads it back itself. After it our code calls method 6 of the slot's record with the record: the records are 52 bytes a slot from `0x080235dc`, a record's first word is its table of functions, and method 6 is the table's +0x18.",
+   "thread": "Ours: the main task, in the unit's clipboard work."
+  },
   "0x8f007d68": {
    "name": "note_record",
    "group": "notes",

@@ -311,6 +311,10 @@ static volatile u32 rows_added;                        // the rows added at the 
 // not here, `away_name[slot]`). Written by the pick, the assign and the frame, inside a mask; read by every thread.
 static volatile u32 rides[SLOTS];
 static char away_name[SLOTS][NAME];
+// R17 (base 39): the sounds loaded onto each synth slot since the start (the assign's OP1F_KEPT_LOADED, whatever the
+// sound names), for the sample unit's `dropped` (op1f_engines_ride), which asks only whether the count moved: a plain
+// increment, no mask (two assigns at once still move it), so a load at rest takes no mask, as before base 39.
+static volatile u32 loads_counted[SLOTS];
 
 struct Voice;
 static u32 voice_destroy(Voice* self, u32 a, u32 b);
@@ -718,6 +722,7 @@ extern "C" void op1f_engines_assign(unsigned slot, unsigned how, void* json, con
         return;
     }
     if (how != (u32)OP1F_KEPT_LOADED) return;
+    loads_counted[slot] = loads_counted[slot] + 1u;                                 // R17: every load counted, an engine named or not
     if (name == 0 && rides[slot] == 0) return;                                      // at rest, and the sound names no engine: nothing
     u32 r = 0;
     char held[NAME];
@@ -1579,6 +1584,32 @@ extern "C" int op1f_engines_riding(unsigned card_slot, unsigned ask, unsigned* b
         if (engine_of_ride(rides[s]) == e) b |= 1u << s;
     *bits = b;
     return 0;
+}
+
+// R17 (base 39): synth slot `slot`'s ride, for the sample unit (module/build_r17_sample.cpp), which names it weakly.
+// Answers 0 when the slot rides no registered engine (nothing, an engine whose pack is away, or no such slot); else 1
+// with `card` the card's slot in op1f_cards and `ask` the ask's number in its list, or 2 with them written while a sound
+// loaded onto the slot is not told yet (its assign seen and not yet said at a frame, or its member still to be read
+// once its build has come: the ride may change at a frame). `loads` (not 0): the sounds loaded onto the slot since the
+// start. From any thread: single words read in one masked instant, nothing called.
+extern "C" unsigned op1f_engines_ride(unsigned slot, unsigned* card, unsigned* ask, unsigned* loads) OP1F_NAMED("op1f_engines_ride");
+extern "C" unsigned op1f_engines_ride(unsigned slot, unsigned* card, unsigned* ask, unsigned* loads) {
+    if (slot >= (u32)SLOTS) {
+        if (loads) *loads = 0;
+        return 0;
+    }
+    u32 mask, r, untold, count;
+    MASK_OFF(mask);
+    r = rides[slot];
+    untold = (loaded | told) & (1u << slot);
+    count = loads_counted[slot];
+    MASK_ON(mask);
+    if (loads) *loads = count;
+    const Engine* e = engine_of_ride(r);
+    if (e == 0) return 0;
+    if (card) *card = e->slot;
+    if (ask) *ask = e->ask;
+    return untold ? 2u : 1u;
 }
 
 // ---------------------------------------------------------------- the engines' own sounds

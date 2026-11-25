@@ -73,6 +73,7 @@ op1f_boot_table:
     .long 0x00080014, 0x8d4f3a54, op1f_layer_lg_stub, 0xbaed63c3, op1f_layer_lg_room    /* A jump to ours, which puts a pack's LFO on the sound or takes it off, and lets the firmware's function run (through a trampoline). */
     .long 0x00080014, 0x8d4f7a34, op1f_layer_eh_stub, 0x4a08d6e5, op1f_layer_eh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. */
     .long 0x00080014, 0x8d4f7ad0, op1f_layer_lh_stub, 0x4a08d6e5, op1f_layer_lh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. */
+    .long 0x00080014, 0x8f00b7b0, op1f_sample_sd_stub, 0xd0f0e34c, op1f_sample_sd_room    /* A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

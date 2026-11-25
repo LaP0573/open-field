@@ -1905,4 +1905,79 @@ extern "C" int op1f_page_redraw(const Op1fCard* card, int x, int y, int w, int h
 // address is not 0.
 extern "C" const unsigned op1f_parts_1 OP1F_NAMED("op1f_parts_1");
 
+// Base 39: a sound's sample (step R17, 2026-11-25). Up to here every word is the earlier bases' (base 36's parts last);
+// this part only adds behind it, and a pack that does not call it runs as before. No new level, kind of ask or field of
+// the card: level stays 10.
+//
+// Every synth sound and every drum sound has a sample of its own, whatever it plays: the unit's sampler plays it, and
+// the unit's drop key on the sampler's page puts what the tape has lifted into it. From base 39 a pack's engine can have
+// the same. op1f_sample_drop asks the unit to put what is lifted into the sample of a synth sound that plays one of the
+// card's own engines; the unit does the work in its own turn, as for its sampler, and keeps it over a restart as it
+// keeps the sampler's. op1f_sample_get reads any sound's sample, its engine or not.
+//
+// How, in order: on the key's down, fade your voices on that sound (the unit mutes nothing); on its up, ask, from the
+// input function; in the frame function read op1f_sample_get until `done` is your ticket; read `answer` and `dropped`,
+// play again. What the unit never lets happen: two drops at once (one for the whole unit, any pack's); a cut that would
+// not fit (it is refused, never cut by the base); a drop into a sound that does not play the card's engine; anything of
+// the pack's running in the unit's turn. Several lifted tracks are mixed as the unit mixes them for its sampler, and a
+// cut longer than the sound's `capacity` is cut there by the unit, as for its sampler: `answer` says how much was put in.
+//
+// Two answers more, beside level 3's and level 8's (the header had none below -8).
+//   OP1F_BUSY   a drop is under way (any pack's), or the unit has clipboard work waiting: ask again later
+//   OP1F_EMPTY  no cut of the tape is lifted (nothing, or a copied sound)
+enum { OP1F_BUSY = -9, OP1F_EMPTY = -10 };
+
+// A sound's sample, as op1f_sample_get hands it (36 bytes at base 39; a later base may hand more: read `bytes`).
+//   bytes     what the base wrote
+//   data      the sample, 16-bit, left and right in turn when stereo. It stays where it is for the run: hand it to your
+//             `render` through your own words. A sample read while the unit writes it sounds wrong, never faults
+//   stereo    1 or 0, as the unit holds it for the sound
+//   room      the frames its memory holds at that channel count (264,600 stereo, 529,200 mono for a synth sound):
+//             a drop never passes it
+//   capacity  the unit's own frames for the sound (what a sound's load sets; a sound never loaded says a little more
+//             than `room`): a drop puts in at most this many
+//   dropped   the frames of the last drop here, or put back at the start; 0 after a sound is loaded there
+//   ticket    the drop into this place under way, queued or running; 0 when none
+//   done      the ticket of the last drop into this place that ended; 0 when none since the start
+//   answer    how `done` ended: the frames put in (0 or more), or a refusal in the unit's turn (less than 0)
+struct Op1fSample {
+    unsigned bytes;
+    const short* data;
+    unsigned stereo, room, capacity, dropped, ticket, done;
+    int answer;
+};
+static_assert(sizeof(Op1fSample) == 36 && OP1F_PLACE_IN(Op1fSample, dropped) == 20 && OP1F_PLACE_IN(Op1fSample, answer) == 32,
+              "a sound's sample, 36 bytes at base 39");
+
+// Asks the unit to put what the tape has lifted into the sample of synth sound `place` (0 to 7), which must play the
+// card's engine `ask` (its ask of kind OP1F_ASK_ENGINE, by its number in the card's list). Only inside the card's own
+// input function, for an event on the key thread (the event's `thread`, level 4); any key or knob of the pack's own.
+// It waits for nothing. Answers the ticket, 1 or more: the unit does it in its own turn; watch `done`. Or less than 0,
+// and nothing is asked of the unit:
+//   OP1F_NOT_NOW    not in this card's input function for an event on the key thread; the disk mode is open; the
+//                   sound's sample is being put back after a start
+//   OP1F_BAD_NAME   no ask of kind engine with that number; a place that is not a synth sound's (a drum sound's place,
+//                   OP1F_PLACE_DRUM + slot, on base 39)
+//   OP1F_NOT_HERE   the sound does not play that engine now, or a sound loaded there is not told yet
+//   OP1F_BUSY       a drop is under way (any pack's), or the unit has clipboard work waiting
+//   OP1F_EMPTY      no cut of the tape is lifted (nothing, or a copied sound)
+//   OP1F_TOO_LARGE  the cut, as the sound takes it, would pass its memory (`room`)
+//   OP1F_FAILED     the sound's sample is not where it should be; a lifted track the unit cannot render; the unit did
+//                   not take the job. The log says which
+// In its own turn the unit checks again: `answer` is then the frames put in, or OP1F_NOT_HERE, OP1F_EMPTY,
+// OP1F_TOO_LARGE, OP1F_NOT_NOW or OP1F_FAILED, with nothing put in and nothing written.
+extern "C" int op1f_sample_drop(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_drop");
+
+// Fills `out` for any synth sound's place (0 to 7) or drum sound's (OP1F_PLACE_DRUM + slot). Answers 0, or less than 0:
+// OP1F_BAD_NAME (another place, the card not in use), OP1F_NOT_NOW (not from the card's frame function), OP1F_FAILED
+// (the sample is not where it should be: only `bytes` written). From the frame function only. It calls nothing of the
+// unit's: it reads the base's words and three of the sound's.
+extern "C" int op1f_sample_get(const Op1fCard* card, unsigned place, Op1fSample* out) OP1F_NAMED("op1f_sample_get");
+
+// The mark of a base whose packs may drop a lifted cut into their engine's sound and read any sound's sample (a
+// constant 1). A pack that must have it names it; under a base before 39 the loader then leaves the pack out. A pack
+// that also runs without it asks for op1f_sample_drop and op1f_sample_get weakly and calls them only when their address
+// is not 0.
+extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
+
 #endif
