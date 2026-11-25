@@ -259,6 +259,14 @@ Three things to keep in mind:
 
 **Our `fx train` is such a pack.** With it on the unit, your effect is offered on the wagons of the train too, in the same order as the unit's list. From version 18 it is not offered on the wagon under the lamp, which holds the sound's own effect, and a tap on a wagon that holds yours opens nothing. A wagon that holds it is drawn as the effect yours stands on, with your effect's name in the unit's own letters. If your pack is taken off, the wagon stays on the train, silent, keeps the name, and plays again when the pack is back.
 
+**Your own wagon picture.** Your effect can offer its own picture for a train to draw instead of the picture of the effect it stands on. A train that knows the field draws it (hasis's `snowtrain` does); `fx train` draws the effect yours stands on, and a train that does not know the field never reads it. Add `"wagon"` to the ask, naming a constant `Op1fWagonArt` of your pack (`module/op1f_wagon_art.h`):
+
+```json
+{"kind": "effect", "name": "boost", "rides": "punch", "wagon": "wagon_art", ...}
+```
+
+The pack tool then writes the ask's table 184 bytes long, with the picture's address at +180. A base of level 8 accepts the longer table as it is. The picture is at most 80 by 64 pixels: one byte per pixel, each byte an index into up to 256 RGB565 colours, index 0 see-through. Draw it the way the train's own characters are drawn: line art in `#A2A4A6`, near-black `#000005` fills that hide what lies behind, its soft edges already mixed on black. A train paints it on the frame's canvas where the character would stand. It follows the wagon's moves and sways a little on the line, and it's all dim grey on the siding. Without the field, or with a picture outside the header's limits, the wagon is drawn as the effect it stands on, as before.
+
 ## Two packs, and your pack's own places
 
 - **Two effects of two packs** play together at two places: one on a sound and one on the master, or each on different sounds. At one place there's one effect, as on the unit.
