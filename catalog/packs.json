@@ -449,6 +449,32 @@
       "places": 1,
       "needs": [],
       "folders": []
+    },
+    {
+      "id": "midiplayer",
+      "author": "dzwerg",
+      "status": "listed",
+      "categories": [
+        "sequencing"
+      ],
+      "description": "Play MIDI files on OP-1 Field with a scrolling piano roll, transport controls, looping, speed and live transpose.",
+      "repository": "https://github.com/dzwerg/midi-field-player",
+      "commit": "b6fbeb6755330abfd70be59edf0dba5d66bfa8c5",
+      "path": "midiplayer.pack",
+      "sha256": "6daa84ab8483a79933281394d16667c5fa71800b4573b4e966017811fbc9aeba",
+      "bytes": 15220,
+      "version": 14,
+      "firmware": "1.7.3",
+      "places": 0,
+      "needs": [],
+      "level": 5,
+      "folders": [
+        {
+          "name": "midiplayer",
+          "place": "midiplayer"
+        }
+      ],
+      "picture": {"path": "thumbs/midiplayer.png", "sha256": "e6578cc3cedac19ff9727b85a39b74c060fd5d96de24837233d9a3723010e839", "bytes": 70702}
     }
   ]
 }
