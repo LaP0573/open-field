@@ -60,3 +60,64 @@ op1f_popups_place:
     RETS = [SP++];
     RTS;                                        /* into the loop, behind the eight bytes */
 .size op1f_popups_place, .-op1f_popups_place
+
+/* Base 33 (R9): the place in the firmware's render loop where it fills the whole buffer black, once a frame, for the
+ * frame's first screen that draws (at 0x8fc26744: an absolute call of eight bytes
+ * of the fill helper). The logic is in module/build_r6d_cards.cpp: the frame call asks the next loop to hold a pack's
+ * page at 77 by writing the object of that screen into op1f_hold_screen, and op1f_popups_loop leaves out the render
+ * of 77 only in a frame whose fill this entry left out.
+ *
+ *   op1f_fill_place   The base's table writes an absolute call of this entry over the eight bytes, so that it
+ *                     returns behind them. At the place the loop has the canvas in R0, for the fill helper, and the
+ *                     screen being drawn in R4. When op1f_hold_screen is not 0 and is that screen, the entry leaves
+ *                     the fill out: it writes the frame counter of the measuring unit plus one into op1f_fill_left
+ *                     (the frame's mark, which op1f_popups_loop reads) and goes back into the loop. Otherwise it
+ *                     jumps on to the fill helper with the loop's R0 and the loop's return address: the fill goes
+ *                     back into the loop itself.
+ *
+ * The registers. The loop sets R0 again behind the place and keeps nothing in R0 to R3, P0 to P2 or ASTAT across the
+ * call (the fill helper is compiled code); R4 to R7, P3 to P5 and FP are the loop's, of which this entry only reads
+ * R4. It decides with R1, P0, P1 and CC. No stack, no call.
+ *
+ *   op1f_hold_screen  The frame call's ask for the next loop: the object of the screen at 77 to hold, or 0. It is 0
+ *                     at the start, and nothing is held while it is: the entry then always goes on to the fill.
+ *   op1f_fill_left    The frame counter plus one of the last loop whose fill the entry left out, 0 before any.
+ */
+.set STOCK_FILL, 0x11a0a0a6                    /* the render loop's fill helper (its canvas) */
+
+.global op1f_fill_place
+.type op1f_fill_place, STT_FUNC
+op1f_fill_place:
+    P0.H = op1f_hold_screen;
+    P0.L = op1f_hold_screen;
+    R1 = [P0];
+    CC = R1 == 0;                               /* a plain number */
+    IF CC JUMP .Lfill;
+    CC = R1 == R4;
+    IF !CC JUMP .Lfill;
+    P0.H = op1f_frame_counter;
+    P0.L = op1f_frame_counter;
+    R1 = [P0];
+    R1 += 1;
+    P0.H = op1f_fill_left;
+    P0.L = op1f_fill_left;
+    [P0] = R1;                                  /* this loop's mark: the fill left out */
+    RTS;                                        /* into the loop, behind the eight bytes */
+.Lfill:
+    P1.H = STOCK_FILL;
+    P1.L = STOCK_FILL;
+    JUMP (P1);                                  /* the fill, with the loop's R0: it returns into the loop */
+.size op1f_fill_place, .-op1f_fill_place
+
+.section .data
+.balign 4
+.global op1f_hold_screen
+.type op1f_hold_screen, STT_OBJECT
+op1f_hold_screen:
+    .long 0
+.size op1f_hold_screen, .-op1f_hold_screen
+.global op1f_fill_left
+.type op1f_fill_left, STT_OBJECT
+op1f_fill_left:
+    .long 0
+.size op1f_fill_left, .-op1f_fill_left

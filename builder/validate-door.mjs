@@ -128,7 +128,7 @@ for (const [name, to, from] of EX) {
   check("commit with no payload is refused", !ok(D.buildMessage(D.CMD.commit, 1), context3));
   check("commit 02 (a test stop) is refused", !ok(D.buildMessage(D.CMD.commit, 1, [2, 1]), context3));
   check("the speed test's message (0x2A) is refused", !ok(D.buildMessage(0x2A, 1, [1, 2, 3]), context3));
-  check("every command this client does not have is refused", [0x00, 0x10, 0x14, 0x1F, 0x2A, 0x2B, 0x2F, 0x30, 0x3F].every((c) => !ok(D.buildMessage(c, 1), context3)));
+  check("every command this client does not have is refused", [0x00, 0x10, 0x14, 0x1F, 0x2A, 0x2D, 0x2F, 0x30, 0x3F].every((c) => !ok(D.buildMessage(c, 1), context3)));
   check("writes go only to a door that can apply", [D.CMD.begin, D.CMD.data, D.CMD.end, D.CMD.remove, D.CMD.commit].every((c) => !ok(D.buildMessage(c, 1, c === D.CMD.commit ? [1] : [0]), { maxMessage: 131072, maxOther: 128, protocol: 2 })));
   check("hello, list, hash, status and abort go to any door", ok(D.buildMessage(D.CMD.hello, 1, [3]), {}) && ok(D.buildMessage(D.CMD.list, 1, [0]), {}) && ok(D.buildMessage(D.CMD.status, 1, []), {}) && ok(D.buildMessage(D.CMD.abort, 1, []), {}));
   check("before hello, 64 bytes at most", !ok(D.buildMessage(D.CMD.list, 1, new Array(60).fill(0)), {}) && ok(D.buildMessage(D.CMD.hash, 1, D.payloads.hashStart("a".repeat(34) + ".pack")), {}));
@@ -180,6 +180,10 @@ class UnitModel {
     this.xfer = null; this.lastX = { state: 0, outcome: 0, name: "", size: 0, received: 0, checked: 0 };
     this.hashing = null; this.restartAsked = false; this.messages = 0; this.answers = 0;
     this.noDoor = !!options.noDoor; this.noUnit = !!options.noUnit;
+    this.build = options.build ?? 5;       // the door's build, hello's field 58
+    this.logs = options.logs ?? [];        // the log files, newest first: { name, data }
+    this.logsNotReady = 0;                 // logs and logread answer 13 this many times
+    this.logReads = [];                    // every logread: { name, offset, want }
   }
   start() {                                // a start: the waiting folder emptied, the marks forgotten
     this.pkin.clear(); this.removals.clear(); this.state = 0; this.aState = 0; this.aOutcome = 0; this.counts = null; this.t1 = false;
@@ -235,7 +239,7 @@ class UnitModel {
     if (cmd === D.CMD.hello) {
       const rel = [...bytesOf("0.7")]; while (rel.length < 16) rel.push(0);
       const payload = [3, 1, this.base & 255, this.base >> 8, ...rel, ...le32(this.osId), ...le32(131072), ...le32(114681), ...le32(128), ...le32(16384), 8, this.state, 0, 0,
-        ...le32(16384), ...le32(4194304), ...le32(8388608), 32, [...this.pkin.values()].filter((f) => f.checked).length, 5, 0, 32, this.removals.size, 0xDC, 0x05, 0, 0, 0, 0];
+        ...le32(16384), ...le32(4194304), ...le32(8388608), 32, [...this.pkin.values()].filter((f) => f.checked).length, this.build, 0, 32, this.removals.size, 0xDC, 0x05, 0, 0, 0, 0];
       return A(this.state === 2 ? 7 : this.state === 6 ? 14 : 0, payload);
     }
     if (cmd === D.CMD.status) {
@@ -319,6 +323,25 @@ class UnitModel {
       this.counts = { moves: waiting.length, removals: this.removals.size, bytes };
       this.state = 2; this.aState = 1; this.since = 0;
       return A(0, [waiting.length - replacing, replacing, this.removals.size, this.pkin.has("base.pack") ? 1 : 0, ...le32(bytes)]);
+    }
+    if (cmd === D.CMD.logs || cmd === D.CMD.logread) {
+      if (this.build < 6) return A(4);
+      if (this.logsNotReady > 0) { this.logsNotReady--; return A(13); }
+    }
+    if (cmd === D.CMD.logs) {
+      const first = p[0], page = this.logs.slice(first, first + 8);
+      const payload = [this.logs.length & 255, this.logs.length >> 8, first, page.length];
+      for (const f of page) { const nb = bytesOf(f.name); payload.push(...le32(f.data.length), nb.length, ...nb); }
+      return A(0, payload);
+    }
+    if (cmd === D.CMD.logread) {
+      const offset = (p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)) >>> 0, want = p[4] | (p[5] << 8), name = String.fromCharCode(...p.subarray(6));
+      if (!/^log_.*\.txt$/.test(name)) return A(2);                    // a name outside the log files' rule
+      const f = this.logs.find((x) => x.name === name);
+      if (!f) return A(11, [...le32(0xFFFFFFFF), ...le32(offset)]);    // a log not there: its size unreadable
+      this.logReads.push({ name, offset, want });
+      const from = Math.min(offset, f.data.length);
+      return A(0, [...le32(f.data.length), ...le32(offset), ...f.data.subarray(from, Math.min(f.data.length, offset + want))]);
     }
     return A(4);
   }
@@ -558,6 +581,185 @@ function pack3(name, size, seed) {
     check("idle, the unit going away drops the page's MIDI access", glue.held().access === null && model.onstatechange === null);
     check("and the page says so and shows connect again", said.includes("moment connect") && said.some((t) => /went away/.test(String(t))));
   } catch (e) { check("the page's port functions run against the model", false, e.message); }
+}
+
+// ---------- 11. save logs: the unit's log files of its last three starts, in one .zip (a door of build 6) ----------
+// logs (0x2B) names the files newest first, eight a page; logread (0x2C) gives a file's bytes from an offset. The link
+// reads the first 128 bytes of each file from the newest back (a file whose first line is the log's own "log file logs/"
+// line carries on the start before it), stops at three starts or twelve files, reads those whole in 2,048-byte pieces
+// and makes one stored .zip of them, read back here.
+
+{
+  const logName = (i) => "log_2026-11-" + String(24 - Math.floor(i / 4)).padStart(2, "0") + "_" + String(12 - (i % 4)).padStart(2, "0") + ".32.13_0.txt";
+  const bodyOf = (size, seed) => { const d = new Uint8Array(size); for (let i = 0; i < size; i++) d[i] = (i * 31 + seed * 7) & 255; return d; };
+  // a file that carries on a start: its first line names it, as the unit's own line does; any other file begins a start
+  const carriesOn = (name, size, seed) => { const d = bodyOf(size, seed); d.set(bytesOf("[ 0.000001] I disk_log[89]: log file logs/" + name + "\n")); return d; };
+  const begins = (size, seed) => { const d = bodyOf(size, seed); d.set(bytesOf("[ 0.000001] I start\n")); return d; };
+  const logUnit = (logs, build = 6) => new UnitModel({ "base.pack": pack3("b", 3000, 1) }, { build, logs });
+  const readZip = (z) => {
+    const v = new DataView(z.buffer, z.byteOffset, z.byteLength);
+    const e = z.length - 22;
+    if (v.getUint32(e, true) !== 0x06054B50) return { error: "no end record" };
+    const n = v.getUint16(e + 10, true), cdSize = v.getUint32(e + 12, true), cdAt = v.getUint32(e + 16, true);
+    if (v.getUint16(e + 8, true) !== n || cdAt + cdSize !== e) return { error: "the end record's counts" };
+    const files = [];
+    for (let k = 0, o = cdAt; k < n; k++) {
+      if (v.getUint32(o, true) !== 0x02014B50) return { error: "central entry " + k };
+      const c = { method: v.getUint16(o + 10, true), time: v.getUint16(o + 12, true), date: v.getUint16(o + 14, true), crc: v.getUint32(o + 16, true), packed: v.getUint32(o + 20, true), size: v.getUint32(o + 24, true), nameLen: v.getUint16(o + 28, true), at: v.getUint32(o + 42, true) };
+      c.name = String.fromCharCode(...z.subarray(o + 46, o + 46 + c.nameLen));
+      o += 46 + c.nameLen + v.getUint16(o + 30, true) + v.getUint16(o + 32, true);
+      const L = c.at;
+      if (v.getUint32(L, true) !== 0x04034B50) return { error: "local header " + k };
+      const ln = v.getUint16(L + 26, true), lx = v.getUint16(L + 28, true);
+      const local = { method: v.getUint16(L + 8, true), time: v.getUint16(L + 10, true), date: v.getUint16(L + 12, true), crc: v.getUint32(L + 14, true), packed: v.getUint32(L + 18, true), size: v.getUint32(L + 22, true), name: String.fromCharCode(...z.subarray(L + 30, L + 30 + ln)) };
+      c.local = local;
+      c.data = z.subarray(L + 30 + ln + lx, L + 30 + ln + lx + local.packed);
+      files.push(c);
+    }
+    return { files, error: null };
+  };
+  // the CRC-32 by another hand: bit by bit, no table
+  const crcBits = (bytes) => { let c = ~0; for (const b of bytes) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); } return (~c) >>> 0; };
+
+  // the messages, byte for byte
+  check("logs: the message to the unit, byte for byte", same(D.buildMessage(D.CMD.logs, 1, D.payloads.logs(8)), hex("F0 7D 4F 46 2B 01 00 08 F7")));
+  const lr = D.buildMessage(D.CMD.logread, 2, D.payloads.logread(4096, 904, "log_2026-11-24_12.32.13_0.txt"));
+  check("logread: the offset, the bytes wanted, then the name", lr[4] === 0x2C && same(D.unpack(lr.subarray(6, lr.length - 1)).bytes, [0x00, 0x10, 0, 0, 0x88, 0x03, ...bytesOf("log_2026-11-24_12.32.13_0.txt")]));
+  const ok = (bytes) => D.checkMessage(bytes, context3) === null;
+  check("the check lets logs and logread through", ok(D.buildMessage(D.CMD.logs, 1, [0])) && ok(lr) && ok(D.buildMessage(D.CMD.logread, 1, D.payloads.logread(0, 2048, "a"))));
+  check("the check refuses logs with another payload, and logread with no name or more than 2,048 bytes",
+    !ok(D.buildMessage(D.CMD.logs, 1, [])) && !ok(D.buildMessage(D.CMD.logs, 1, [0, 1])) && !ok(D.buildMessage(D.CMD.logread, 1, [0, 0, 0, 0, 0, 8])) &&
+    !ok(D.buildMessage(D.CMD.logread, 1, [0, 0, 0, 0, 0x01, 0x08, 0x61])) && !ok(D.buildMessage(D.CMD.logread, 1, [0, 0, 0, 0, 0, 0, 0x61])));
+  check("a log name with a folder or a dot first is refused before anything is built",
+    ["../x.txt", "logs/x.txt", ".x", "a\\b", "", "x".repeat(65)].every((n) => { try { D.payloads.logread(0, 1, n); return false; } catch (e) { return e.kind === "name"; } }));
+  check("the start rule reads the first line only", D.logContinues(bytesOf("[ 1.0] I disk_log[89]: log file logs/log_x.txt\nmore")) && !D.logContinues(bytesOf("[ 1.0] I start\n[ 1.1] I disk_log[89]: log file logs/log_x.txt\n")) && !D.logContinues(new Uint8Array(0)));
+  check("the CRC-32 of 123456789 is CBF43926", D.crc32(bytesOf("123456789")) === 0xCBF43926 && crcBits(bytesOf("123456789")) === 0xCBF43926);
+
+  // eleven files over two pages, newest first: the newest start is two files (0 carries on, 1 begins it), 2 begins the
+  // next, and 3, empty, begins the third (no first line names it): three starts, and files 4 to 10 never read
+  const logs = [
+    { name: logName(0), data: carriesOn(logName(0), 5000, 0) },
+    { name: logName(1), data: begins(300, 1) },
+    { name: logName(2), data: begins(2048, 2) },
+    { name: logName(3), data: new Uint8Array(0) },
+    { name: logName(4), data: carriesOn(logName(4), 700, 4) },
+    { name: logName(5), data: begins(4100, 5) },
+    ...Array.from({ length: 5 }, (_, k) => ({ name: logName(6 + k), data: begins(100, 6 + k) })),
+  ];
+  const unit = logUnit(logs);
+  unit.logsNotReady = 2;                                                // just after a start: "not ready" twice, then the answer
+  const b = bench(unit);
+  const client = new D.DoorClient(b.io);
+  await client.connect();
+  check("a door of build 6: the link's action is offered", client.canLogs() === true && client.hello.build === 6);
+  const L = await client.listLogs();
+  const logsSent = b.sent.filter((m) => m[1] === 0x7D && m[4] === D.CMD.logs).map((m) => D.unpack(m.subarray(6, m.length - 1)).bytes[0]);
+  check("logs over two pages of eight, newest first, after 'not ready' twice", L.count === 11 && L.entries.length === 11 && L.entries.every((e, i) => e.name === logName(i) && e.size === logs[i].data.length) && unit.logsNotReady === 0 && same(logsSent, [0, 0, 0, 8]), JSON.stringify(logsSent));
+  unit.logReads.length = 0;
+  const got = await client.collectLogs();
+  // from the newest back: 0 carries on, 1 begins (start 1 = 0, 1); 2 begins (start 2); 3 is empty and begins (start 3)
+  check("the start rule: a start of two files, then two of one, and no file beyond the third start read",
+    got.starts === 3 && got.files.length === 4 && got.files.map((f) => f.name).join() === [0, 1, 2, 3].map(logName).join() && !unit.logReads.some((r) => r.name === logName(4)),
+    JSON.stringify(got.files.map((f) => f.name)));
+  check("each file byte for byte as the unit has it", got.files.every((f, i) => same(f.data, logs[i].data) && !f.cut));
+  const heads = unit.logReads.filter((r) => r.want === 128).map((r) => r.name);
+  check("the heads read first, 128 bytes each, from the newest back", heads.join() === [0, 1, 2, 3].map(logName).join() && unit.logReads.slice(0, 4).every((r) => r.want === 128 && r.offset === 0));
+  const first = unit.logReads.filter((r) => r.name === logName(0) && r.want !== 128).map((r) => r.offset + "/" + r.want);
+  check("5,000 bytes in pieces of 2,048 with a short last one", first.join() === "0/2048,2048/2048,4096/904", first.join());
+  const exact = unit.logReads.filter((r) => r.name === logName(2) && r.want !== 128).map((r) => r.offset + "/" + r.want);
+  check("2,048 bytes in one piece, an empty file in one", exact.join() === "0/2048" && unit.logReads.filter((r) => r.name === logName(3) && r.want !== 128).length === 1, exact.join());
+  check("the pace held while the logs were read", b.breaches.length === 0, b.breaches.join("; "));
+  check("nothing sent but the door's reads", b.sent.every((m) => (m[0] === 0xF0 && m[1] === 0x7D && [0x20, 0x29, 0x2B, 0x2C].includes(m[4])) || same(m, D.IDENTITY_REQUEST)));
+
+  // the .zip, read back
+  const zip = D.logsZip(got.files);
+  check("the .zip is named by the newest log's date and time", zip.name === "op1-field-logs-2026-11-24_12.32.13.zip", zip.name);
+  const z = readZip(zip.bytes);
+  check("the .zip reads back: an end record, a central directory and a local header for each file", z.error === null && z.files.length === 4, z.error);
+  if (!z.error) {
+    const wanted = [...got.files].reverse();
+    check("the .zip holds the files oldest first, named as on the unit", z.files.map((f) => f.name).join() === wanted.map((f) => f.name).join() && z.files.every((f) => f.local.name === f.name));
+    check("every file stored (no compression), its sizes and data as read",
+      z.files.every((f, i) => f.method === 0 && f.local.method === 0 && f.size === wanted[i].data.length && f.packed === f.size && f.local.size === f.size && same(f.data, wanted[i].data)));
+    check("every file's CRC-32 in both headers is its data's", z.files.every((f) => f.crc === crcBits(f.data) && f.local.crc === f.crc));
+    const t = z.files[0];
+    check("every file dated with the newest log's time, 2026-11-24 12:32:12 (two-second steps)",
+      z.files.every((f) => f.date === t.date && f.time === t.time && f.local.date === t.date && f.local.time === t.time) &&
+      (t.date >> 9) + 1980 === 2026 && ((t.date >> 5) & 15) === 11 && (t.date & 31) === 24 && (t.time >> 11) === 12 && ((t.time >> 5) & 63) === 32 && (t.time & 31) * 2 === 12);
+  }
+
+  // the 12-file cap: every file carries on, so no start is whole
+  const many = Array.from({ length: 14 }, (_, i) => ({ name: logName(i), data: carriesOn(logName(i), 200 + i, i) }));
+  const u2 = logUnit(many), b2 = bench(u2), c2 = new D.DoorClient(b2.io);
+  await c2.connect();
+  const g2 = await c2.collectLogs();
+  check("at twelve files it stops: twelve listed, twelve read, the thirteenth never asked for",
+    g2.files.length === 12 && g2.starts === 0 && !u2.logReads.some((r) => r.name === logName(12) || r.name === logName(13)) && g2.files.every((f, i) => same(f.data, many[i].data)));
+
+  // a lost answer to logread: status, then the same piece again
+  const u3 = logUnit([{ name: logName(0), data: begins(3000, 1) }]), b3 = bench(u3), c3 = new D.DoorClient(b3.io);
+  await c3.connect();
+  u3.drop.add(c3.number + 2);                                           // logs, the head, then the first whole piece: lost once
+  const g3 = await c3.collectLogs();
+  const tail = b3.sent.filter((m) => m[1] === 0x7D).map((m) => m[4]);
+  check("a lost logread answer: status after two seconds, then the piece again, the file whole", g3.files.length === 1 && same(g3.files[0].data, u3.logs[0].data) && tail.includes(D.CMD.status) && b3.breaches.length === 0);
+
+  // a door of build 5: no logs, nothing asked
+  const u4 = logUnit(logs, 5), b4 = bench(u4), c4 = new D.DoorClient(b4.io);
+  await c4.connect();
+  let refused = null;
+  try { await c4.collectLogs(); } catch (e) { refused = e; }
+  check("a door of build 5: the link's action is not offered, and nothing is asked", c4.canLogs() === false && refused instanceof D.DoorError && refused.kind === "protocol" && !b4.sent.some((m) => m[1] === 0x7D && (m[4] === D.CMD.logs || m[4] === D.CMD.logread)));
+
+  // 14 while the door applies, 2 for a refused name, 13 to the end
+  const u5 = logUnit(logs), b5 = bench(u5), c5 = new D.DoorClient(b5.io);
+  await c5.connect();
+  u5.state = 6;
+  let e5 = null;
+  try { await c5.collectLogs(); } catch (e) { e5 = e; }
+  check("while the door applies (14): the logs stop with 'applying'", e5 && e5.kind === "applying");
+  u5.state = 0;
+  let e6 = null, e8 = null;
+  try { await c5.readLog("notes.txt"); } catch (e) { e6 = e; }
+  check("a name the unit refuses (2): stopped with 'name'", e6 && e6.kind === "name");
+  try { await c5.readLog("log_gone.txt"); } catch (e) { e8 = e; }
+  check("a log no longer there (11 with its 8 bytes): stopped with 'unreadable'", e8 && e8.kind === "unreadable");
+  u5.logsNotReady = 1000;
+  let e7 = null;
+  try { await c5.listLogs(); } catch (e) { e7 = e; }
+  check("'not ready' to the end: asked again 40 times, then stopped with 'not ready'", e7 && e7.kind === "not ready" && u5.logsNotReady === 1000 - 41, e7 && e7.message);
+  check("no logs: an empty list and no file", (await (async () => { const u = logUnit([]), c = new D.DoorClient(bench(u).io); await c.connect(); const g = await c.collectLogs(); return g.files.length === 0 && g.count === 0; })()));
+
+  // the page: the link after disconnect in section 1's header, hidden until a door of build 6 says hello, one talk at a time
+  const page = readFileSync(join(here, "index.html"), "utf8");
+  check("the link sits right after disconnect, in its style, hidden at first",
+    /<button type="button" class="linkish" id="disconnect">disconnect<\/button><button type="button" class="linkish hidden" id="saveLogs"[^>]*>save logs<\/button><\/span>/.test(page));
+  const scripts = [...page.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
+  const live = scripts.find((s) => s.includes('import * as D from "./door.mjs";')) || "";
+  const part = (head, end = "\n  }\n") => { const at = live.indexOf(head); if (at < 0) return ""; const rest = live.slice(at); const stop = rest.indexOf(end); return stop < 0 ? rest : rest.slice(0, stop + end.length); };
+  const handler = part('  $("saveLogs").addEventListener("click", () => guarded(async () => {', "\n  }));\n");
+  check("the link's press is one guarded talk, which takes the ports before it reads", handler.length > 0 && handler.indexOf("if (!takePorts()) throw") < handler.indexOf("await client.collectLogs(") && handler.includes("D.logsZip(got.files)"));
+  const fns = [part("  function logsLink() {"), part("  function logsSay(words, ms) {")];
+  const btn = { hidden: true, disabled: false, textContent: "", classList: { toggle(c, on) { if (c === "hidden") btn.hidden = on; } } };
+  const timers = [];
+  const env = { $: () => btn, client: { canLogs: () => false }, running: false, setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout: () => {} };
+  try {
+    // eslint-disable-next-line no-new-func
+    const glue = new Function("env", "with (env) { let logsWords = \"\", logsTimer = null;\n" + fns.join("\n") + "\n return { logsLink, logsSay }; }")(env);
+    glue.logsLink();
+    check("a door of build 5 or none: the link stays hidden", btn.hidden === true && btn.textContent === "save logs");
+    env.client = { canLogs: () => true };
+    glue.logsLink();
+    check("a door of build 6: the link shows, 'save logs'", btn.hidden === false && btn.disabled === false && btn.textContent === "save logs");
+    env.running = true;
+    glue.logsSay("saving logs 3 of 5");
+    check("while it works: 'saving logs 3 of 5', and it can't be pressed", btn.textContent === "saving logs 3 of 5" && btn.disabled === true);
+    env.running = false;
+    glue.logsSay("saved", 4000);
+    check("at the end 'saved', then 'save logs' again a few seconds later", btn.textContent === "saved" && btn.disabled === false && timers.length === 1 && (timers[0](), btn.textContent === "save logs"));
+  } catch (e) { check("the page's link functions run against a model", false, e.message); }
+  const refresh = part("  function refreshButtons() {");
+  check("every start and end of a talk sets the link (refreshButtons)", refresh.includes("logsLink();"));
 }
 
 console.log((failed ? "FAILED: " : "OK: ") + passed + " passed, " + failed + " failed");

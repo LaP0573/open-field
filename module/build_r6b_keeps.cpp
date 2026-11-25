@@ -301,6 +301,19 @@ extern "C" void op1f_engines_changed(unsigned where, unsigned which, unsigned ho
 extern "C" void op1f_engines_assign(unsigned slot, unsigned how, void* json, const char* name) OP1F_NAMED("op1f_engines_assign") __attribute__((weak));
 #endif
 
+// R11: the LFO unit's word of what changed of the base's third member, op1f_lfo; weak: away, nothing is told.
+#if defined(OP1F_HOST)
+#ifdef OP1F_R11_HOST_LFOS
+extern "C" void (*mock_lfos_changed)(unsigned where, unsigned which, unsigned how);
+#define op1f_lfos_changed (*mock_lfos_changed)
+#else
+static void (*const r11_none_lfos_changed)(unsigned where, unsigned which, unsigned how) = 0;
+#define op1f_lfos_changed (*r11_none_lfos_changed)
+#endif
+#else
+extern "C" void op1f_lfos_changed(unsigned where, unsigned which, unsigned how) OP1F_NAMED("op1f_lfos_changed") __attribute__((weak));
+#endif
+
 // The return addresses into the five jobs that put a sound on a slot's record (each calls it with a call of four
 // bytes): three loads from a file, two changes of the engine.
 static const u32 CALLER_SYNTH_PRESET = 0x8d4ea95au, CALLER_DRUM = 0x8d4ebf9au, CALLER_SYNTH_SAMPLER = 0x8d4ec968u;
@@ -327,7 +340,7 @@ enum {
     HOLDER_BYTES = 4096, VALUE_MOST = OP1F_VALUE_MOST, DEPTH_MOST = 4, NAMES_MOST = 64, NAME = OP1F_KEY_BYTES,
     // R5: the base's own name first in the list, beside the sixty-four the packs may keep; its owner, which no card's
     // slot + 1 is; the places a key of a card of level 8 may name; a holder's bits of the names, one for each
-    NAMES_ROOM = NAMES_MOST + 2, BASE_NAME = 0, BASE_ENGINE = 1, OWNER_BASE = OP1F_CARDS_MOST + 1,   // R6: two names of the base's own
+    NAMES_ROOM = NAMES_MOST + 3, BASE_NAME = 0, BASE_ENGINE = 1, BASE_LFO = 2, OWNER_BASE = OP1F_CARDS_MOST + 1,   // R6: two names of the base's own
     KEEP_PLACES = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM | OP1F_KEEP_TAPE,
     KEEP_ALL = KEEP_PLACES | OP1F_KEEP_MASTER, BITS = (NAMES_ROOM + 31) >> 5,
     KEYS = OP1F_KEYS_MOST, TABLE_BYTES = 324, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, CARDS = OP1F_CARDS_MOST,
@@ -361,6 +374,7 @@ static const char NAMES_OF_THE_UNIT[][24] = {
 // R5: the base's own member, kept as a pack's values are: which pack's effect a place rides, and its switch.
 static const char BASE_KEY[] = "op1f_effect";
 static const char ENGINE_KEY[] = "op1f_engine";        // R6: the base's second own member
+static const char LFO_KEY[] = "op1f_lfo";              // R11: the third, the layer an LFO of a sound rides ({"name": "<layer>"})
 
 // ---------------------------------------------------------------- what is kept
 
@@ -1166,7 +1180,11 @@ static void enrol() {
     copy_text(engine->name, ENGINE_KEY, NAME);
     engine->files = OP1F_KEEP_SYNTH;
     engine->owner = OWNER_BASE;
-    names_count = BASE_ENGINE + 1u;
+    Name* lfo = &names[BASE_LFO];                                                  // R11: the LFO layer of a synth or drum sound
+    copy_text(lfo->name, LFO_KEY, NAME);
+    lfo->files = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM;                                 // never the master
+    lfo->owner = OWNER_BASE;
+    names_count = BASE_LFO + 1u;
     u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;
@@ -1210,7 +1228,7 @@ static void enrol() {
                 u32 places = card->level >= 8u ? key->files : key->files & ~(u32)OP1F_KEEP_MASTER;
                 if (!plain_key(key->name) || places == 0 || (places & ~(u32)KEEP_ALL) != 0 || twice) why = "is not a name a file can hold";
                 else if (name_of_the_unit(key->name)) why = "is a name of the unit's own files";
-                else if (same(key->name, BASE_KEY) || same(key->name, ENGINE_KEY)) why = "is a name of the base's own";   // R6: the second too
+                else if (same(key->name, BASE_KEY) || same(key->name, ENGINE_KEY) || same(key->name, LFO_KEY)) why = "is a name of the base's own";   // R6: the second too; R11: the third
                 else if (name_index(key->name) >= 0) why = "an earlier pack keeps";
                 else if (names_count >= (u32)NAMES_ROOM) why = "would be the sixty-fifth name";
                 if (why) {
@@ -1661,9 +1679,10 @@ static int store_compose(u32* slots_kept, u32* bytes) {
     put_chars(&t, "\"names\":[");
     int base_listed = a_slot_holds(BASE_NAME);
     int engine_listed = a_slot_holds(BASE_ENGINE);                                 // R6
+    int lfo_listed = a_slot_holds(BASE_LFO);                                       // R11
     for (u32 i = 0, listed = 0; i < names_count; ++i) {
         u32 places = names[i].files & (u32)KEEP_PLACES;
-        if (places == 0 || (i == (u32)BASE_NAME && !base_listed) || (i == (u32)BASE_ENGINE && !engine_listed)) continue;
+        if (places == 0 || (i == (u32)BASE_NAME && !base_listed) || (i == (u32)BASE_ENGINE && !engine_listed) || (i == (u32)BASE_LFO && !lfo_listed)) continue;
         if (listed++) put_char(&t, ',');
         put_char(&t, '[');
         put_quoted(&t, names[i].name, length_of(names[i].name, NAME));
@@ -2000,6 +2019,7 @@ static void tell_cards(u32 index, u32 how) {
     u32 which = which_of_holder(index);
     if ((names[BASE_NAME].files & where) != 0 && EFFECTS_CHANGED) EFFECTS_CHANGED(where, which, how);
     if ((names[BASE_ENGINE].files & where) != 0 && &op1f_engines_changed != 0) op1f_engines_changed(where, which, how);   // R6
+    if ((names[BASE_LFO].files & where) != 0 && &op1f_lfos_changed != 0) op1f_lfos_changed(where, which, how);   // R11
     for (u32 k = 0; k < keeps_count; ++k) {
         if ((keeps[k].files & where) == 0 || keeps[k].table->changed == 0) continue;
         Op1fCallKept kept;
@@ -2275,4 +2295,24 @@ extern "C" int op1f_keeps_engine_set(unsigned slot, const char* text) {
     if (!base_holder((unsigned)OP1F_KEEP_SYNTH, slot, &index)) return OP1F_BAD_NAME;
     if (ready == 0) return OP1F_NOT_NOW;                                            // before the first frame, as the effects' member
     return value_set_at(index, BASE_ENGINE, text, SET_BASE);
+}
+
+// R11: the base's third own member, op1f_lfo, at a synth slot (where OP1F_KEEP_SYNTH) or a drum slot (OP1F_KEEP_DRUM),
+// from the display thread: as op1f_keeps_base_get and op1f_keeps_base_set, but never the master (OP1F_BAD_NAME).
+// Declared with the names the LFO unit calls them by (module/build_r11_lfos.cpp), as build_r6_base.h declares the
+// engine's pair: without it the unit's compiler names them with a leading underscore and the base does not link.
+extern "C" int op1f_keeps_lfo_get(unsigned where, unsigned which, char* out, unsigned room) OP1F_NAMED("op1f_keeps_lfo_get");
+extern "C" int op1f_keeps_lfo_set(unsigned where, unsigned which, const char* text) OP1F_NAMED("op1f_keeps_lfo_set");
+extern "C" int op1f_keeps_lfo_get(unsigned where, unsigned which, char* out, unsigned room) {
+    u32 index = 0;
+    if (where == (unsigned)OP1F_KEEP_MASTER || !base_holder(where, which, &index)) return OP1F_BAD_NAME;
+    if (!ready) return OP1F_NO_FILE;
+    return value_get_at(index, BASE_LFO, out, room);
+}
+
+extern "C" int op1f_keeps_lfo_set(unsigned where, unsigned which, const char* text) {
+    u32 index = 0;
+    if (where == (unsigned)OP1F_KEEP_MASTER || !base_holder(where, which, &index)) return OP1F_BAD_NAME;
+    if (ready == 0) return OP1F_NOT_NOW;
+    return value_set_at(index, BASE_LFO, text, SET_BASE);
 }
