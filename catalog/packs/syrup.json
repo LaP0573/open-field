@@ -1,0 +1,25 @@
+{
+  "id": "syrup",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Driven filter with frequency, resonance, drive and wet/dry mix.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
+  "path": "packs/syrup.pack",
+  "sha256": "5afdcffaeddb074c91cebecdd8fe5efe3ba2692eeed009cfdec9af0262143244",
+  "bytes": 270997,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/syrup.png",
+    "sha256": "3f72e317497b5b9a7ffbd47482ca24af1c40d39f4916037509a391e6261d4ba8",
+    "bytes": 22718
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "pattern mode",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "The pattern sequencer keeps its play mode (backward, ping-pong or forward) over a restart.",
+  "repository": "https://github.com/hooligan333/open-field-pattern-mode",
+  "commit": "b502208e88113f1fd9add9ab528ad05a4e9d1fc4",
+  "path": "pattern mode.pack",
+  "sha256": "5486cc01426eb91a40de9ed992905f42e55ef242b10738ae62cc9a7a3cb15769",
+  "bytes": 1016,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 1,
+  "needs": [],
+  "folders": []
+}

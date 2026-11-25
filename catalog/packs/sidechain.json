@@ -1,0 +1,19 @@
+{
+  "id": "sidechain",
+  "author": "Faust",
+  "status": "listed",
+  "categories": [
+    "mixer"
+  ],
+  "description": "One tape track ducks another, set on a page under shift and the mixer key.",
+  "repository": "https://github.com/LaP0573/open-field-packs",
+  "follow": "main",
+  "path": "sidechain.pack",
+  "version": 10,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "sidechain/picture.png"
+  }
+}

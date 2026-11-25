@@ -1,0 +1,25 @@
+{
+  "id": "wave",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "Wavetable synthesizer with eight banks, wavetable sweep, pulse shaping and twin oscillators.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
+  "path": "packs/wave.pack",
+  "sha256": "15085d474ed88bafb06e948098a25e127b66379abc09a1237cde72aa9664cebf",
+  "bytes": 161028,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/wave.png",
+    "sha256": "a15374f5ec93a79a79edf2324ac6b0259ee6d3f8ddac059ad0742cde4e28a1c5",
+    "bytes": 34589
+  }
+}

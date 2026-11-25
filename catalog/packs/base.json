@@ -1,0 +1,18 @@
+{
+  "id": "base",
+  "author": "open-field",
+  "status": "bundled",
+  "categories": [
+    "library"
+  ],
+  "description": "The shared pack every other pack relies on. Every unit with open-field needs it.",
+  "path": "builder/base.pack",
+  "sha256": "c54a2a140131f2d6150d19c6c63c8ecb7c4ad28a9cd4e0cbcaa72366ae56fe22",
+  "bytes": 340125,
+  "version": 38,
+  "firmware": "1.7.3",
+  "places": 63,
+  "needs": [],
+  "offers_level": 10,
+  "folders": []
+}

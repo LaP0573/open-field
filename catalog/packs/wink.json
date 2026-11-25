@@ -1,0 +1,18 @@
+{
+  "id": "wink",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of level 1: a red dot that blinks on the tempo screen.",
+  "path": "wink.pack",
+  "sha256": "35ff760bd94daf67f20f960d8c3304d3bf533b07c094d6530c942f9df05b5085",
+  "bytes": 2130,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 1,
+  "folders": []
+}

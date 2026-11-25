@@ -1,0 +1,18 @@
+{
+  "id": "yoyo",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of level 2: shift and the metronome key open a page where the blue knob moves a yoyo.",
+  "path": "yoyo.pack",
+  "sha256": "e0b949f11b525a880582617c00c6491e3703dd3d9ce1444fafb47fa4aee7ef54",
+  "bytes": 4381,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 2,
+  "folders": []
+}

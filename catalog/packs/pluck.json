@@ -1,0 +1,18 @@
+{
+  "id": "pluck",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of levels 9 and 10: a plucked string, a synth engine in the unit's own list, with two sounds of its own.",
+  "path": "pluck.pack",
+  "sha256": "baaa8de587624465f969a856cac7dd00ec8de5247d8b22f52e6f191063602645",
+  "bytes": 3688,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

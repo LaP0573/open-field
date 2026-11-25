@@ -1,0 +1,25 @@
+{
+  "id": "plonk",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "Percussion synthesizer with wavefolding, tuned oscillator ratios and short or long spring decay.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
+  "path": "packs/plonk.pack",
+  "sha256": "f2854cf0debae6ea50c42f78953c7e2907533854615fe6058a042b95025ae78e",
+  "bytes": 58638,
+  "version": 7,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/plonk.png",
+    "sha256": "5e23f47339c01c525e3b5c9e1f03c63109acf00ffab49508b544eca2831d4ef4",
+    "bytes": 22926
+  }
+}

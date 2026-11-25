@@ -1,0 +1,23 @@
+{
+  "id": "list",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of level 3: shift and the help key open a page that lists the files of its own folder.",
+  "path": "list.pack",
+  "sha256": "39e1aa2190c646a214d0f95e28de3214372051826104707d7f9555fc24b626d7",
+  "bytes": 7281,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 3,
+  "folders": [
+    {
+      "name": "list",
+      "place": "list"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "tune",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "TUNE: pitch correction for the live input on its own page (shift + help), with harmonies, and a TUNE effect.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/tune.pack",
+  "follow": "main",
+  "version": 28,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/tune/picture.png"
+  }
+}
