@@ -810,6 +810,21 @@
         }
       ],
       "picture": {"path": "thumbs/midiplayer.png", "sha256": "e6578cc3cedac19ff9727b85a39b74c060fd5d96de24837233d9a3723010e839", "bytes": 70702}
+    },
+    {
+      "id": "maestro",
+      "author": "Faust",
+      "status": "listed",
+      "categories": ["sequencing"],
+      "description": "Chords from one key, with the next chords or a melody on the right half of the keyboard.",
+      "repository": "https://github.com/LaP0573/open-field-packs",
+      "follow": "main",
+      "path": "maestro.pack",
+      "version": 8,
+      "firmware": "1.7.3",
+      "needs": [],
+      "folders": [{"name": "maestro", "place": "maestro"}, {"name": "maestro state", "place": "maestro-state"}],
+      "picture": {"path": "maestro/picture.png"}
     }
   ]
 }
