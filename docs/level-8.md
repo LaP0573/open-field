@@ -257,7 +257,7 @@ Three things to keep in mind:
 - **The effect can't tell your place from a sound's** but by `place`. Hand it what the unit would: 64 frames, Q1.31, its values inside their ranges.
 - **Each of your places keeps its own memory for the effect it last ran there.** Put another effect at that place and the base readies it afresh. A memory once taken is kept until the unit is switched off.
 
-**Our `fx train` is such a pack.** With it on the unit, your effect is offered on every wagon of the train too, in the same order as the unit's list. A wagon that holds it is drawn as the effect yours stands on, with your effect's name in the unit's own letters. If your pack is taken off, the wagon stays on the train, silent, keeps the name, and plays again when the pack is back.
+**Our `fx train` is such a pack.** With it on the unit, your effect is offered on the wagons of the train too, in the same order as the unit's list. From version 18 it is not offered on the wagon under the lamp, which holds the sound's own effect, and a tap on a wagon that holds yours opens nothing. A wagon that holds it is drawn as the effect yours stands on, with your effect's name in the unit's own letters. If your pack is taken off, the wagon stays on the train, silent, keeps the name, and plays again when the pack is back.
 
 ## Two packs, and your pack's own places
 
