@@ -1,4 +1,23 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// The door's build 6 (2026-11-24, step R10, piece 14): two read-only commands for the firmware's own log files, the
+// folder logs/ at the top of the volume (door_protocol.md section 15). `0x2B logs` lists them newest first, eight a
+// message from an index; `0x2C logread` gives up to LOG_PIECE bytes of one from an offset, the file opened, placed, read
+// and closed in that one message, as `list` reads a pack's header. Only a name of the log files' rule (log_name, as
+// module/build_r10_logs.cpp's) is read, and its path is made in one place (log_path). Nothing is written. Both are
+// refused as `list` is: 13 before the start's note was looked for and in the start's window, 7 while the unit asks, 10
+// while it restarts, 14 while it applies or could not finish. No line a message: the visit's counts and one line at its
+// end. hello says build 6 (DOOR_BUILD), the protocol stays 3, and every other answer is build 5's byte for byte; the
+// only other change is the room of the answer (`out`, `packets`), now logread's longest.
+//
+// The base's lists (2026-11-24, the same build 6, section 16): the review's S-5 (commit_apply, meets_base) holds the
+// names a base offers and the places its table changes in room of its own, BASE_NAMES_MOST and BASE_SITES_MOST, 256 of
+// each for the kept base and for the one that waits (build 5: 96 and 64; a base of 65 entries did not fit, offers_of
+// answered 0, and every pack sorting before base.pack was then taken to leave the base out). A base whose names, table or
+// strings are more than that room (or than SLICE) is never judged by halves: where a pack that sorts before base.pack
+// would be in user/pk with it, `commit 01` and `02` are refused with status 15, reason 10 and the name base.pack, and
+// line 57 gives its counts. Where none would be, nothing can leave it out and it is taken. The cost: 4,388 bytes of
+// zeroed data more (base_names +1,280, base_sites +3,072, base_counts 24, offers_seen 12). hello still says build 6.
+//
 // The start's window (2026-11-23): from the start until START_SETTLE_MS after the start's first frame was over (the
 // second frame call: the door's call comes first in the cards unit's frame, so by then every pack has had its first
 // frame), every message that reads or writes the disk (list, hash, begin, data, end, remove, commit, and abort 01) is
@@ -193,7 +212,7 @@ enum {
     RING_WORDS = 0x2000,
     RING_KEEP = 512,                    // words left for the firmware's own MIDI
 
-    PROTOCOL = 1, PROTOCOL_2 = 2, PROTOCOL_3 = 3, MARK = 1, DOOR_BUILD = 5,   // build 5 (S4a): the card, T-2, the note's window
+    PROTOCOL = 1, PROTOCOL_2 = 2, PROTOCOL_3 = 3, MARK = 1, DOOR_BUILD = 6,   // build 6 (R10): logs and logread; build 5 (S4a): the card, T-2, the note's window
     START_SETTLE_MS = 4000,             // the start's window: no disk message taken until this long after its first frame was over
     TOTALS_MS = 300000,                 // the totals line's period: five minutes, through the quiet gate
     LONG_VISIT_MS = 60000,              // a visit that has gone on this long says so once
@@ -212,7 +231,10 @@ enum {
     NOTE_MOST = 24 + 40 * REMOVALS_MOST + 76 * WAITING_MOST + 4,  // the note's largest, 3,740 bytes
     NOTE_LEAST = 24 + 4, NOTE_FORMAT = 2,
     NOTE_HEAD = 24,                     // the review's N-3: the head carries the header sums of the base that wrote it and of the one it moves
-    BASE_NAMES_MOST = 96, BASE_SITES_MOST = 64, MEETS_NAMES_MOST = 256, CARD_MARK = 0x44524143, MARKS_MOST = 64,
+    // Build 6 (section 16): a base's names and table entries the S-5 judgement holds (build 5: 96 and 64); offers_of's
+    // answers; status 15's reason for a base larger than that
+    BASE_NAMES_MOST = 256, BASE_SITES_MOST = 256, MEETS_NAMES_MOST = 256, CARD_MARK = 0x44524143, MARKS_MOST = 64,
+    OFFERS_NOT_READ = 0, OFFERS_READ = 1, OFFERS_OVER = 2, TAKE_BASE_LARGE = 10,
     PICTURE_TRIES = 10, PICTURE_RETRY_MS = 500, TUNNEL_SAID = 8,
     STOPPED_SHOWN_MS = 3000,            // `nothing changed` on an apply's page before it closes
     AFTER_CHANGE_MS = 5000,             // after an apply's change, no message within this: the unit restarts all the same
@@ -220,8 +242,14 @@ enum {
     START_NAMES = 32,                   // names taken from the folder at a time by the start's emptying
     SLICE = 16384,                      // a hash slice (build 2: 32,768 held main_task 23 ms on the unit)
     LIST_PAGE = 8, LIST_MOST = 64, RAW_MOST = 96, RAW_NAME = 64, NAME_MOST = 39, NAME_LEAST = 6,
-    PACKET_WORDS = 224,                 // build 5: the longest answer, 653 bytes on the wire, is 218 packets (build 4: 160, 424 bytes)
-    OUT_BYTES = 564,                    // build 5: the longest answer's payload (list with the header: 4 + 8 x 70; build 4's list 4 + 8 x 45)
+    // Build 6 (section 15): logread's most bytes an answer, behind its head of 8 (the size, the offset). 2,056 bytes of
+    // payload are 2,358 on the wire, 786 packets: with RING_KEEP's 512 that is 1,298 of the ring's 8,192 words, so the
+    // answer's own check (answer) still leaves the firmware its share. A log's name is 8 to NAME_MOST characters, and
+    // `logs` counts at most LOGS_COUNTED of them.
+    LOG_PIECE = 2048, LOG_HEAD = 8, LOG_NAME_LEAST = 8, LOGS_COUNTED = 255,
+    OUT_ROOM = LOG_HEAD + LOG_PIECE,    // build 6: the room of `out`, logread's longest answer (every other is at most OUT_BYTES)
+    PACKET_WORDS = (7 + OUT_ROOM + (OUT_ROOM + 6) / 7 + 1 + 2) / 3,   // build 6: 786, logread's longest answer (build 5: 224 for 653 bytes)
+    OUT_BYTES = 564,                    // build 5: the longest answer's payload but logread's (list with the header: 4 + 8 x 70; build 4's list 4 + 8 x 45)
     // Build 5, list with the header (section 14): an entry's most, 6 + 39 + 4 + 4 + 1 + 16 bytes; the header reading a
     // message may take, 8 ms at 400 MHz (a small file's open, read and close is some 0.45 ms on the unit: S3's try, line
     // 35's one-slice reads of 452 and 454 us), after which the answer ends with the entries it has
@@ -229,6 +257,7 @@ enum {
 
     CMD_HELLO = 0x20, CMD_LIST = 0x21, CMD_HASH = 0x22, CMD_BEGIN = 0x23, CMD_DATA = 0x24, CMD_END = 0x25,
     CMD_REMOVE = 0x26, CMD_ABORT = 0x27, CMD_COMMIT = 0x28, CMD_STATUS = 0x29, CMD_SINK = 0x2a,
+    CMD_LOGS = 0x2b, CMD_LOGREAD = 0x2c,                          // build 6: the log files (section 15)
     ANSWER = 0x40,
     DONE = 0, BAD = 1, REFUSED = 2, NO_ROOM = 3, NO_SUCH = 4, ORDER = 5, DIFFERS = 6, ASKING = 7, CANCELLED = 8, MORE = 9,
     RESTARTING = 10, UNREADABLE = 11, TAPE = 12, NOT_READY = 13, BUSY_APPLYING = 14, NOT_TAKEN = 15,
@@ -250,7 +279,8 @@ enum {
     // The kinds of refusal, each with its own eight lines
     R_NAME = 0, R_SIZE, R_COUNT, R_ROOM, R_FREE, R_OPEN, R_TAPE, R_DISK, R_READY, R_ORDER, R_POWER, R_KINDS,
     // Build 4: the kinds of an apply's refusal (line 37), each with its own eight lines
-    Q_POWER = 0, Q_READY, Q_DISK, Q_TAPE, Q_NOTHING, Q_NOT_TAKEN, Q_COUNT, Q_ROOM, Q_FREE, Q_TUNNEL, Q_ENTRIES, Q_BASE_OUT, Q_FOLDER, Q_KINDS,
+    Q_POWER = 0, Q_READY, Q_DISK, Q_TAPE, Q_NOTHING, Q_NOT_TAKEN, Q_COUNT, Q_ROOM, Q_FREE, Q_TUNNEL, Q_ENTRIES, Q_BASE_OUT, Q_FOLDER,
+    Q_BASE_LARGE, Q_KINDS,                                         // build 6: a base larger than the door can judge (line 57)
     // The waiting folder at the start
     F_EMPTYING = 0, F_READY = 1, F_FAILED = 2,
     ENDED_T1 = 1, ENDED_T2 = 2, ENDED_TIME = 3, ENDED_ABORT = 4, ENDED_NO_PAGE = 5, ENDED_NO_MESSAGE = 6, ENDED_NO_RESTART = 7,
@@ -283,6 +313,9 @@ static const char NOTE_BAD_PATH[] = "user/pkin/.apply-bad";
 static const char NOTE_FAILED_PATH[] = "user/pkin/.apply-failed";
 static const char BASE_FILE[] = "base.pack";
 static const char BASE_NAME[] = "base";
+// Build 6: the firmware's log files, at the top of the volume (module/build_r10_logs.cpp's FOLDER and PREFIX), read only.
+static const char LOGS_FOLDER[] = "logs";               // listed without the slash, as the firmware's folder calls take it
+static const char LOGS_PREFIX[] = "logs/";
 
 // The mark of a base with the door (study section 11): no pack needs it today; a page or a pack of later steps can.
 extern "C" const u32 op1f_door_1 OP1F_NAMED("op1f_door_1");
@@ -344,6 +377,7 @@ static struct {
 static struct {
     u32 messages, hello, list, hash, slices, files, sink, sink_bytes, commit, status, abort;
     u32 sent, unsent, longest, slowest_us, slowest_command, dropped, not_f0, refused;
+    u32 logs, logread, log_bytes;                       // build 6: the two commands of the log files, and the bytes logread gave
 } visit;
 
 static volatile u32 keys_taken, turns_taken, t1_not_held;   // door_keys, while the page is up (the input threads)
@@ -362,7 +396,7 @@ static inline u32 microseconds(u32 c) {
 
 static u32 packets[PACKET_WORDS];
 static u32 packet_count, held[3], held_count;
-static u8 out[OUT_BYTES];
+static u8 out[OUT_ROOM];                                // build 6: logread's longest (build 5 OUT_BYTES)
 
 static void put(u32 byte) {
     if (held_count == 3) {
@@ -1322,6 +1356,150 @@ static DOOR_APART u32 sink(u32 buffer, int length, u32* bytes) {
     return status;
 }
 
+// ---------------------------------------------------------------- build 6: logs and logread (door_protocol.md section 15), on main_task
+
+// The characters of a text, counted up to one past `most`.
+static u32 length_of(const char* text, u32 most) {
+    u32 n = 0;
+    while (n <= most && text[n]) ++n;
+    return n;
+}
+
+// Whether `count` characters are a log file's name, as module/build_r10_logs.cpp's log_name takes it (`log_`, `.txt`,
+// plain, no space, no slash, no backslash, no `..`), of LOG_NAME_LEAST to NAME_MOST characters.
+static int log_name(const char* name, u32 count) {
+    if (count < (u32)LOG_NAME_LEAST || count > (u32)NAME_MOST) return 0;
+    if (name[0] != 'l' || name[1] != 'o' || name[2] != 'g' || name[3] != '_') return 0;
+    const char* end = name + count - 4;
+    if (end[0] != '.' || end[1] != 't' || end[2] != 'x' || end[3] != 't') return 0;
+    for (u32 i = 0; i < count; ++i) {
+        u32 c = (u8)name[i];
+        if (c <= 0x20 || c >= 0x7f || c == '/' || c == '\\') return 0;
+        if (c == '.' && i + 1 < count && name[i + 1] == '.') return 0;
+    }
+    return 1;
+}
+
+// The one way to a path of logs/: `logs/` and `count` characters that log_name takes, ended. 1 when the path was made;
+// 0 (and an empty path) for any other name. `path` holds LOG_PATH_BYTES bytes.
+enum { LOG_PATH_BYTES = 8 + NAME_MOST + 1 };
+static int log_path(char* path, const char* name, u32 count) {
+    path[0] = 0;
+    if (!log_name(name, count)) return 0;
+    u32 at = 0;
+    for (; LOGS_PREFIX[at]; ++at) path[at] = LOGS_PREFIX[at];
+    for (u32 i = 0; i < count; ++i) path[at++] = name[i];
+    path[at] = 0;
+    return 1;
+}
+
+// `logs`: the names of logs/ that log_name takes, newest first (the names are dates: the greatest is the newest), from
+// the index `first`, at most LIST_PAGE. The names are held in list's `raw`, newest first through `order`, RAW_MOST at a
+// time: when the page lies past the RAW_MOST newest below the last pass's floor, the folder is read again below the
+// last name passed (three passes at most for an index of 255). The count is that of the first pass, at most
+// LOGS_COUNTED; a folder that cannot be opened counts 0. Each entry: its size now (0xffffffff when it cannot be read),
+// its length, its name.
+static DOOR_APART u32 logs_cmd(const u8* args, int count, u32* bytes) {
+    *bytes = 0;
+    if (count != 1) return BAD;
+    u32 first = args[0], skip = first, total_names = 0, held = 0, passes = 0, below_set = 0;
+    char below[NAME_MOST + 1];
+    below[0] = 0;
+    for (;;) {
+        void* dir = STOCK_DIR_OPEN(LOGS_FOLDER);
+        held = 0;
+        if (dir == 0) break;
+        u32 names = 0;
+        for (;;) {
+            const char* entry = (const char*)STOCK_DIR_NEXT(dir);
+            if (!entry) break;
+            const char* name = entry + DIR_NAME_AT;
+            u32 n = length_of(name, NAME_MOST);
+            if (!log_name(name, n)) continue;
+            ++names;
+            if (below_set && !before(name, below)) continue;    // passed already
+            u32 at = held, slot;
+            if (held == (u32)RAW_MOST) {
+                if (!before(raw[order[held - 1]], name)) continue;   // older than every name held
+                slot = order[held - 1];                         // the oldest held makes room
+                at = held - 1;
+            } else {
+                slot = held++;
+            }
+            copy_name(raw[slot], name);
+            raw_long[slot] = 0;
+            while (at > 0 && before(raw[order[at - 1]], raw[slot])) {
+                order[at] = order[at - 1];
+                --at;
+            }
+            order[at] = slot;
+        }
+        STOCK_DIR_CLOSE(dir);
+        if (passes++ == 0) total_names = names;
+        if (skip + (u32)LIST_PAGE <= held || held < (u32)RAW_MOST) break;
+        u32 passed = skip < held ? skip : held;             // at least 89: the window is full and the page lies past it
+        copy_name(below, raw[order[passed - 1]]);
+        below_set = 1;
+        skip -= passed;
+    }
+    u32 counted = total_names < (u32)LOGS_COUNTED ? total_names : (u32)LOGS_COUNTED;
+    out[0] = (u8)counted;
+    out[1] = (u8)(counted >> 8);
+    out[2] = (u8)first;
+    u32 at = 4, shown = 0;
+    for (u32 i = skip; i < held && shown < (u32)LIST_PAGE; ++i, ++shown) {
+        const char* name = raw[order[i]];
+        u32 n = length_of(name, NAME_MOST);
+        char path[LOG_PATH_BYTES];
+        int size = log_path(path, name, n) ? STOCK_FILE_SIZE(path) : -1;
+        store32(out + at, size < 0 ? 0xffffffffu : (u32)size);
+        out[at + 4] = (u8)n;
+        for (u32 c = 0; c < n; ++c) out[at + 5 + c] = (u8)name[c];
+        at += 5 + n;
+    }
+    out[3] = (u8)shown;
+    *bytes = at;
+    return DONE;
+}
+
+// `logread`: the offset (u32), the bytes wanted (u16, 1 to LOG_PIECE), the name to the payload's end. The answer: the
+// file's size now and the offset, then the bytes from the offset, at most those wanted, fewer at the end, none at or
+// past it (no file call then but the size). A name log_name does not take: 2. A name it takes that is not there (its
+// size cannot be read): 11 with the size 0xffffffff and the offset, as hash says a file that is not there; the file
+// that could not be opened, placed or read: 11 with its size and the offset.
+static DOOR_APART u32 logread_cmd(const u8* args, int count, u32* bytes) {
+    *bytes = 0;
+    if (count < 6) return BAD;
+    u32 offset = load32(args), want = args[4] | (u32)args[5] << 8;
+    if (want == 0 || want > (u32)LOG_PIECE) return BAD;
+    u32 n = (u32)count - 6;
+    if (n > (u32)NAME_MOST) return REFUSED;
+    char name[NAME_MOST + 1];
+    for (u32 i = 0; i < n; ++i) name[i] = (char)args[6 + i];
+    name[n] = 0;
+    char path[LOG_PATH_BYTES];
+    if (!log_path(path, name, n)) return REFUSED;           // a zero inside fails the rule too
+    int size = STOCK_FILE_SIZE(path);
+    store32(out, size < 0 ? 0xffffffffu : (u32)size);
+    store32(out + 4, offset);
+    *bytes = LOG_HEAD;
+    if (size < 0) return UNREADABLE;
+    u32 left = offset < (u32)size ? (u32)size - offset : 0;
+    u32 take = left < want ? left : want;
+    if (take == 0) return DONE;
+    int got = -1;
+    int descriptor = STOCK_FILE_OPEN(path, STOCK_READ_MODE);
+    if (descriptor >= 0) {
+        int at = STOCK_FILE_SEEK(descriptor, offset, 0, 0);
+        if ((u32)at == offset) got = STOCK_FILE_READ(out + LOG_HEAD, 1, (int)take, descriptor);
+        STOCK_FILE_CLOSE(descriptor);
+    }
+    if (got < 0 || (u32)got > take) return UNREADABLE;
+    *bytes = LOG_HEAD + (u32)got;
+    visit.log_bytes += (u32)got;
+    return DONE;
+}
+
 // ---------------------------------------------------------------- hello and status
 
 static u32 status_now() {
@@ -1900,12 +2078,14 @@ static void count_command(u32 command) {
     else if (command == CMD_COMMIT) ++visit.commit;
     else if (command == CMD_STATUS) ++visit.status;
     else if (command == CMD_ABORT) ++visit.abort;
+    else if (command == CMD_LOGS) ++visit.logs;
+    else if (command == CMD_LOGREAD) ++visit.logread;
 }
 
 static int known(u32 command) {
     return command == CMD_HELLO || command == CMD_LIST || command == CMD_HASH || command == CMD_ABORT || command == CMD_COMMIT ||
            command == CMD_STATUS || command == CMD_SINK || command == CMD_BEGIN || command == CMD_DATA || command == CMD_END ||
-           command == CMD_REMOVE;
+           command == CMD_REMOVE || command == CMD_LOGS || command == CMD_LOGREAD;
 }
 
 // An apply's page that closes before T1 (T2, 60 s, abort, no page): nothing changed; the files still wait and the
@@ -2162,6 +2342,8 @@ static void kept_list() {
 // stock the base changes, leaves the base out at the next start (build_m4_loader.cpp judge: WHY_NAME, WHY_CLAIM).
 
 static u32 base_names[2][BASE_NAMES_MOST], base_sites[2][BASE_SITES_MOST][2], base_names_n[2], base_sites_n[2], base_read[2];
+static u32 base_counts[2][3];                           // build 6: each base's names, entries and bytes of strings, for line 57
+static u32 offers_seen[3];                              // the same of the last file offers_of read the counts of
 static u32 other_names[MEETS_NAMES_MOST], other_sites[2 * MEETS_NAMES_MOST][2];
 static u8 offers_buf[640];
 
@@ -2182,20 +2364,31 @@ static u32 span_of_kind(u32 kind) {
 }
 
 // The CRC-32 of each name a pack offers and each site of its table with its span, read from its file (its lists'
-// counts, its exports, its strings into `slice`, its table): 1 when read whole within the room given.
+// counts, its exports, its strings into `slice`, its table): OFFERS_READ when read whole within the room given;
+// build 6: OFFERS_OVER when its counts were read and its names, its entries or its strings are more than that room
+// (nothing else read, the counts in offers_seen); OFFERS_NOT_READ when the file or its lists could not be read.
 static DOOR_APART int offers_of(const char* path, const u32* head, u32* names, u32 names_most, u32* names_n, u32 (*sites)[2], u32 sites_most, u32* sites_n) {
     *names_n = *sites_n = 0;
+    offers_seen[0] = offers_seen[1] = offers_seen[2] = 0;
     if (!crc_made) crc_make();
     u32 body = head[H_BODY];
     int descriptor = STOCK_FILE_OPEN(path, STOCK_READ_MODE);
-    if (descriptor < 0) return 0;
+    if (descriptor < 0) return OFFERS_NOT_READ;
     u8 counts[24];
     int ok = read_at(descriptor, HEADER3 + body, counts, 24);
     u32 works = load32(counts), exports = load32(counts + 4), imports = load32(counts + 8), places = load32(counts + 12);
     u32 marks = load32(counts + 16), strings = load32(counts + 20);
     u32 entries = 0;
     for (u32 at = head[H_TABLE]; at < head[H_TABLE_END]; at += ENTRY_BYTES) ++entries;
-    if (ok && (exports > names_most || strings > (u32)SLICE || entries > sites_most)) ok = 0;
+    if (ok) {
+        offers_seen[0] = exports;
+        offers_seen[1] = entries;
+        offers_seen[2] = strings;
+    }
+    if (ok && (exports > names_most || strings > (u32)SLICE || entries > sites_most)) {
+        STOCK_FILE_CLOSE(descriptor);
+        return OFFERS_OVER;
+    }
     u32 exports_at = HEADER3 + body + 24 + 12 * works;
     u32 strings_at = exports_at + 8 * exports + 8 * imports + 12 * places + 8 * marks;
     if (ok) ok = read_at(descriptor, strings_at, slice, strings);
@@ -2223,13 +2416,14 @@ static DOOR_APART int offers_of(const char* path, const u32* head, u32* names, u
         }
     }
     STOCK_FILE_CLOSE(descriptor);
-    return ok;
+    return ok ? OFFERS_READ : OFFERS_NOT_READ;
 }
 
 // Does a pack (read into other_*) meet the base of slot b: a name both offer, or two sites whose bytes meet? A base or
-// a pack that could not be read is held to meet (the cautious way).
+// a pack that could not be read is held to meet (the cautious way); build 6: so is a base larger than the door holds
+// (base_read OFFERS_OVER), and the refusal then says the base's reason, not the pack's (base_too_large).
 static int meets_base(u32 b, int read, u32 names_n, u32 sites_n) {
-    if (!base_read[b] || !read) return 1;
+    if (base_read[b] != (u32)OFFERS_READ || !read) return 1;
     for (u32 i = 0; i < names_n; ++i)
         for (u32 k = 0; k < base_names_n[b]; ++k)
             if (other_names[i] == base_names[b][k]) return 1;
@@ -2248,7 +2442,7 @@ static const char* const APPLY_REFUSAL_TEXT[Q_KINDS] = {
     "the unit is being switched off", "the waiting folder is not ready", "the disk mode is open", "the tape moves",
     "nothing to apply", "a file the loader would not take", "more than 32 pack files after it", "the room the packs share",
     "too little free space", "the firmware's 0x66 service had a message since the start", "more than 96 entries in user/pk",
-    "a pack ahead of the base", "a folder in the way"
+    "a pack ahead of the base", "a folder in the way", "the base is larger than this door can judge"
 };
 static u32 apply_refusals[Q_KINDS];
 static struct {
@@ -2268,6 +2462,22 @@ static u32 not_taken(u32 reason, const char* name, u32* bytes) {
     u32 n = 0;
     out[0] = (u8)reason;
     for (; name[n] && n < (u32)NAME_MOST; ++n) out[1 + n] = (u8)name[n];
+    *bytes = 1 + n;
+    return NOT_TAKEN;
+}
+
+// Build 6 (section 16): the base of slot b (0 the kept, 1 the one that waits) is larger than the door holds, and a
+// pack that sorts before base.pack would be in user/pk with it: status 15, reason 10 and the name base.pack, and line
+// 57 with the base's counts and the door's room (in place of line 37, under the same eight lines a kind).
+static DOOR_APART u32 base_too_large(u32 b, u32* bytes) {
+    ++applies_total.refused;
+    if (++apply_refusals[Q_BASE_LARGE] <= (u32)FAULTS_SAID)
+        STOCK_LOG(3, LOG_FILE, 57, "door: apply refused: the %s base.pack is larger than this door can judge: %u names, %u places, %u bytes of strings, at most %u, %u, %u (status 15, reason 10); %u such refusal(s)",
+                  b ? "new" : "kept", base_counts[b][0], base_counts[b][1], base_counts[b][2], (u32)BASE_NAMES_MOST, (u32)BASE_SITES_MOST,
+                  (u32)SLICE, apply_refusals[Q_BASE_LARGE]);
+    u32 n = 0;
+    out[0] = (u8)TAKE_BASE_LARGE;
+    for (; BASE_FILE[n]; ++n) out[1 + n] = (u8)BASE_FILE[n];
     *bytes = 1 + n;
     return NOT_TAKEN;
 }
@@ -2397,10 +2607,11 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
             int descriptor = STOCK_FILE_OPEN(path, STOCK_READ_MODE);
             int got = descriptor >= 0 && STOCK_FILE_READ(head, 1, HEADER3, descriptor) == (int)HEADER3;
             if (descriptor >= 0) STOCK_FILE_CLOSE(descriptor);
-            if (got) base_read[0] = offers_of(path, head, base_names[0], BASE_NAMES_MOST, &base_names_n[0], base_sites[0], BASE_SITES_MOST, &base_sites_n[0]);
+            if (got) base_read[0] = (u32)offers_of(path, head, base_names[0], BASE_NAMES_MOST, &base_names_n[0], base_sites[0], BASE_SITES_MOST, &base_sites_n[0]);
         }
         if (b == 1 && base_move != (u32)WAITING_MOST && pkin_path(path, BASE_FILE))
-            base_read[1] = offers_of(path, waiting[move_w[base_move]].head, base_names[1], BASE_NAMES_MOST, &base_names_n[1], base_sites[1], BASE_SITES_MOST, &base_sites_n[1]);
+            base_read[1] = (u32)offers_of(path, waiting[move_w[base_move]].head, base_names[1], BASE_NAMES_MOST, &base_names_n[1], base_sites[1], BASE_SITES_MOST, &base_sites_n[1]);
+        for (u32 c = 0; c < 3; ++c) base_counts[b][c] = base_read[b] == (u32)OFFERS_NOT_READ ? 0u : offers_seen[c];
     }
     for (u32 e = 0; e < kept_count; ++e) {
         kept[e].meets = 0;
@@ -2411,7 +2622,7 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
         int descriptor = STOCK_FILE_OPEN(path, STOCK_READ_MODE);
         int read = descriptor >= 0 && STOCK_FILE_READ(head, 1, HEADER3, descriptor) == (int)HEADER3;
         if (descriptor >= 0) STOCK_FILE_CLOSE(descriptor);
-        if (read) read = offers_of(path, head, other_names, MEETS_NAMES_MOST, &nn, other_sites, 2 * MEETS_NAMES_MOST, &ns);
+        if (read) read = offers_of(path, head, other_names, MEETS_NAMES_MOST, &nn, other_sites, 2 * MEETS_NAMES_MOST, &ns) == OFFERS_READ;
         for (u32 b = 0; b < 2; ++b)
             if (meets_base(b, read, nn, ns)) kept[e].meets |= 1u << b;
     }
@@ -2421,17 +2632,18 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
         if (!before(f->name, BASE_FILE)) continue;
         char path[PATH_BYTES];
         u32 nn = 0, ns = 0;
-        int read = pkin_path(path, f->name) && offers_of(path, f->head, other_names, MEETS_NAMES_MOST, &nn, other_sites, 2 * MEETS_NAMES_MOST, &ns);
+        int read = pkin_path(path, f->name) && offers_of(path, f->head, other_names, MEETS_NAMES_MOST, &nn, other_sites, 2 * MEETS_NAMES_MOST, &ns) == OFFERS_READ;
         for (u32 b = 0; b < 2; ++b)
             if (meets_base(b, read, nn, ns)) move_meets[j] |= 1u << b;
     }
     for (u32 s = 1; s <= r + m; ++s) {
         u32 b = base_move != (u32)WAITING_MOST && s >= move_op[base_move] ? 1u : 0u;
         if (b == 0 && base_kept == (u32)KEPT_MOST) continue;   // no base.pack at that point: nothing to leave out
+        int over = base_read[b] == (u32)OFFERS_OVER;           // build 6: the base's own reason, never the pack's
         for (u32 e = 0; e < kept_count; ++e)
-            if ((kept[e].meets >> b & 1) && e_there(e, s)) return not_taken(8, kept[e].name, bytes);
+            if ((kept[e].meets >> b & 1) && e_there(e, s)) return over ? base_too_large(b, bytes) : not_taken(8, kept[e].name, bytes);
         for (u32 j = 0; j < m; ++j)
-            if ((move_meets[j] >> b & 1) && s >= move_op[j]) return not_taken(8, apply.moves[j].name, bytes);
+            if ((move_meets[j] >> b & 1) && s >= move_op[j]) return over ? base_too_large(b, bytes) : not_taken(8, apply.moves[j].name, bytes);
     }
     // The room at every point the apply can be cut at (the plan's 5.3): each state after one change more, as the
     // loader places it. A state that holds more than 32 pack names (only while removals come first) is the unit's own.
@@ -2535,7 +2747,8 @@ static DOOR_APART void message(u32 buffer, int length) {
     } else if (!note_looked && command != CMD_HELLO && command != CMD_STATUS) {
         status = NOT_READY;                             // the review's S-2: the start has not looked for a note yet
     } else if (!start_settled && (command == CMD_LIST || command == CMD_HASH || command == CMD_BEGIN || command == CMD_DATA ||
-                                  command == CMD_END || command == CMD_REMOVE || command == CMD_COMMIT)) {
+                                  command == CMD_END || command == CMD_REMOVE || command == CMD_COMMIT ||
+                                  command == CMD_LOGS || command == CMD_LOGREAD)) {
         status = NOT_READY;                             // the start's window: no disk message yet, nothing done
         ++window_refused;
     } else if (s == ASKS && command != CMD_HELLO && command != CMD_STATUS && command != CMD_ABORT) {
@@ -2563,6 +2776,10 @@ static DOOR_APART void message(u32 buffer, int length) {
             }
         } else if (command == CMD_LIST) {
             status = list(args_of, count, &bytes);
+        } else if (command == CMD_LOGS) {
+            status = logs_cmd(args_of, count, &bytes);
+        } else if (command == CMD_LOGREAD) {
+            status = logread_cmd(args_of, count, &bytes);
         } else if (command == CMD_HASH) {
             if (count >= 1 && args_of[0] == 0 && tstate != T_NONE) status = ORDER;   // a transfer under way goes on
             else status = hash(args_of, count, &bytes);
@@ -3857,6 +4074,9 @@ static void say_visit_end() {
               visit.messages, visit.hello, visit.list, visit.hash, visit.slices, visit.files, visit.sink, visit.sink_bytes, visit.commit, visit.status, visit.abort, visit.sent, visit.unsent);
     STOCK_LOG(3, LOG_FILE, 5, "door: in that visit the longest message %u bytes, the slowest %u us (command 0x%02x), %u other SysEx dropped (%u not beginning F0), %u answered 1, 2, 4 or 5",
               visit.longest, visit.slowest_us, visit.slowest_command, visit.dropped, visit.not_f0, visit.refused);
+    if (visit.logs || visit.logread)                    // build 6: only after a visit that asked of the log files
+        STOCK_LOG(3, LOG_FILE, 56, "door: in that visit %u logs and %u logread messages, %u bytes of logs/ read",
+                  visit.logs, visit.logread, visit.log_bytes);
 }
 
 // Build 4: the restart asked from the frame: no message within 5 s of an apply's change, its test stop or a start's finishing.

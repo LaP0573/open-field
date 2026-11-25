@@ -49,7 +49,7 @@ If you have not built a pack yet, start with [a first pack](first-pack.md).
 
 The base's own entry says `offers_level` instead of `level`: the highest level it offers. A pack that needs a higher level than the listed base offers is refused.
 
-Some things a card can ask need a newer base, not a higher level. Today there are two: a `places` ask that gives way ([level 6](level-6.md#giving-way-base-31)) needs base 31 or later, and an `options` ask, settings of the pack's own ([level 6](level-6.md#settings-base-32)), needs base 32 or later. An older base of the same level leaves that ask aside and runs the rest of the pack. While the listed base is older than what your card asks for, the check refuses your entry and names the version it needs.
+Some things a card can ask need a newer base, not a higher level. Today there are two: a `places` ask that gives way ([level 6](level-6.md#giving-way-base-31)) needs base 31 or later, and an `options` ask, settings of the pack's own ([level 6](level-6.md#settings-base-32)), needs base 32 or later. An older base of the same level leaves that ask aside and runs the rest of the pack. While the listed base is older than what your card asks for, the check refuses your entry and names the version it needs. The parts that came after level 10 work another way: a pack that uses one names its mark (`op1f_hold_1` from base 33, `op1f_layer_1` from base 35, `op1f_parts_1` from base 36), and an older base leaves the whole pack out, with the loader's line that names the mark ([the base](base.md#after-level-10-parts-with-a-mark-of-their-own)).
 
 Everything from `version` on is what the file says of itself. `python -I tools/pack_build.py check --pack <your file>` prints it: `name`, `version`, `entries` (the places), `works with` (what it needs, marked `needed`), `wants` (the level, as `op1f_level_<n>`) and the card's folders. The listing's check reads the file the same way and refuses an entry that says otherwise.
 
@@ -230,7 +230,7 @@ Each line says `ok` or `REFUSED` with the reason, and the last line sums it up. 
 
 ## What is held, and what is not
 
-The listing holds the names two packs may not share: the id, and each folder's name and place, in small letters or capitals. A folder never takes a name the disk mode already shows: `synth`, `drum`, `tapes`, `mixdown` (the firmware's), `packs` (the loader's), `fx` and `lfo` (the base's).
+The listing holds the names two packs may not share: the id, and each folder's name and place, in small letters or capitals. A folder never takes a name the disk mode already shows: `synth`, `drum`, `tapes`, `mixdown` (the firmware's), `packs` (the loader's), `logs` (the base's).
 
 It does not hold keys. When two packs pick the same keys for their pages, their authors sort it out between them.
 
