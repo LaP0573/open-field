@@ -224,7 +224,7 @@ typedef u32 (*JsonSizeFn)(const void* value);
 typedef const void* (*JsonElementFn)(const void* value, u32 index);
 typedef const char* (*JsonCStringFn)(const void* value);
 typedef int (*JsonReadFileFn)(const char* path, void* value);
-typedef int (*JsonReadRawFn)(void* a, void* path, void* value, int flag);
+typedef int (*JsonReadRawFn)(void* a, void* text, void* value, int flag);
 typedef void* (*TapeRootFn)();
 typedef int (*TapeSetFn)(int db, const char* key, const void* value);
 typedef int (*FileSizeFn)(const char* path);
@@ -1290,9 +1290,9 @@ static void waiting_take(u32 kind, const void* json) {
 }
 
 // Stands in for the synth's preset read, before the firmware keeps only the members it knows.
-extern "C" int op1f_keeps_read_preset(void* a, void* path, void* json, int flag) OP1F_NAMED("op1f_keeps_read_preset");
-extern "C" int op1f_keeps_read_preset(void* a, void* path, void* json, int flag) {
-    int ok = STOCK_JSON_READ_RAW(a, path, json, flag);
+extern "C" int op1f_keeps_read_preset(void* a, void* text, void* json, int flag) OP1F_NAMED("op1f_keeps_read_preset");
+extern "C" int op1f_keeps_read_preset(void* a, void* text, void* json, int flag) {
+    int ok = STOCK_JSON_READ_RAW(a, text, json, flag);
     waiting_take(FROM_SYNTH_PRESET, ok ? json : 0);
     return ok;
 }

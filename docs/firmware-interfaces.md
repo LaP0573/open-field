@@ -74,7 +74,7 @@ The firmware keeps its settings as JSON, and so does our code. A JSON value is a
 | `0x8c083aec` | `void json_from_bool(void* value, int number)` | Makes a value true or false (the kind 5). | As `json_ctor`. |
 | `0x8c084430` | `void json_from_cstr(void* value, const char* text)` | Makes a value a text (the kind 4), copied from a C text. | As `json_ctor`. |
 | `0x8c084748` | `const char* json_cstring(const void* value)` | The characters of a text value (the kind 4): the value's own, not a copy, good while the value lives and is not changed. A value of any other kind stops the unit: ask the kind first. | Not the audio thread. Ours: the display thread, the key thread, the main task, the firmware's background worker. |
-| `0x8c0828e0` | `int json_read_raw(void* a, void* path, void* value, int flag)` | The parse under `json_read_file`: it reads a JSON text that is already in memory into a value. `a` is the firmware's JSON reader, an object on the caller's stack; `path` is not a path but a text object of the firmware that holds the whole text to parse; `value` is the value to fill; the firmware's own callers hand 1 for `flag`. Not 0 when the text was parsed. Our code calls it only in place of the firmware's own call, with the arguments that call came with. | Ours: in place of the firmware's own call in the synth's read of a preset, on the firmware's background worker. |
+| `0x8c0828e0` | `int json_read_raw(void* a, void* text, void* value, int flag)` | Reads a JSON text that is already in memory into a value. `a` is the firmware's JSON reader, an object on the caller's stack; `text` is a text object of the firmware that holds the whole text to parse; `value` is the value to fill; the firmware's own callers hand 1 for `flag`. Not 0 when the text was parsed. Our code calls it only in place of the firmware's own call, with the arguments that call came with. | Ours: in place of the firmware's own call in the synth's read of a preset, on the firmware's background worker. |
 
 ## Texts and memory
 
@@ -86,7 +86,7 @@ Our code has no library of its own: no `malloc`, no `memcpy`, no division by a v
 | `0x8fcc7560` | `void* alloc(u32 bytes)` | A block of the firmware's own heap, the one its screens and pictures come from. It never gives back 0: when the heap has no room, the firmware writes an error into the log and stops. So bound what you ask for (our picture maker asks for a megabyte at most) and give every block back with `free` at `0x8fcc6c30`. | Not the audio thread. Ours: the main thread when a screen is made, and the display thread. |
 | `0x8fcc6c30` | `void free(void* block)` | Gives back a block got with `alloc` at `0x8fcc7560`. | As `alloc`. |
 | `0x8fcc51fc` | `u32 heap_free(int heap_index)` | How many bytes of such a heap are not in use, by the heap's number. | Ours: the display thread. |
-| `0x8d4e63bc` | `void* new(u32 bytes)` | A block of `bytes` from the firmware's heap: the C++ `new` of the firmware, which `alloc` calls. As `alloc`, it never gives back 0: with no room the firmware writes an error into the log and stops. Give the block back with `free` at `0x8d4e63cc`. | Not the audio thread. Ours: the main thread at the start, the disk mode's thread. |
+| `0x8d4e63bc` | `void* new(u32 bytes)` | A block of `bytes` from the firmware's heap: the C++ `new` of the firmware. As `alloc`, it never gives back 0: with no room the firmware writes an error into the log and stops. Give the block back with `free` at `0x8d4e63cc`. | Not the audio thread. Ours: the main thread at the start, the disk mode's thread. |
 | `0x8d4e63cc` | `void free(void* memory)` | Gives back a block of the firmware's heap: one from `new`, or the text of a firmware text object that holds sixteen characters or more. | Ours: the disk mode's thread. |
 
 ## Screens, pictures and texts
@@ -127,7 +127,7 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | `0x8c0d5018` | `void system_red(void* row, u32 line, u32 amount)` | The same for SYSTEM: only its own lines, 0 to 5. | Ours: the key thread. |
 | `0x8c0d49d0` | `void midi_red(void* row, u32 line, u32 amount)` | The same for MIDI: only its own lines, 0 to 4. | Ours: the key thread. |
 
-## Sounds and their LFOs
+## Sounds: their engines, effects and LFOs
 
 The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Each slot has a record, an object of the firmware's at a fixed address, which holds the sound's document: what the unit saves with the sound. A sound's LFO has a kind (a row of the list under shift and T4), eight words of settings and a switch. Our code changes them through the calls below, the way the unit's own keys do, so that what the unit shows, plays and saves agrees.
 
@@ -154,7 +154,7 @@ The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Eac
 | `0x8d50424c` | `u32 master_on(void)` | Whether the master's effect plays: the byte `on_master` sets. | Ours: in place of the firmware's own call when the master is saved. |
 | `0x8c0bb684` | `void master_pick(void* controller, u32 id)` | The mixer's pick of the master's effect: the function in the word +0x28 of the mixer's controller's table (the word at `0x8400f2cc`). `controller` is the mixer's controller, `id` the id of the effect's row in the catalog's list `fx_types`. Our code calls it with the controller as it came. | Ours: the key thread, in place of the firmware's own call. |
 | `0x8f011068` | `void* factory(u32 type, u32 index)` | Makes an effect object of a type, 0 to 10, for an index, 0 or 1, and gives it back; 0, with a line in the log, for any other type or index. Each index has one room: an object made for an index is made in the place of the one made before for it. The object's first word is its table of functions. | Ours: in place of the firmware's own call, on whatever thread that call runs. |
-| `0x8d505390` | `void build(u32 index, u32 type)` | Makes the effect object of `index` anew for a type: it clears the index's word, makes the object with `factory`, starts it and puts it in the word. A type the factory refuses stops the unit. | Ours: the display thread. |
+| `0x8d505390` | `void build(u32 index, u32 type)` | Makes the effect object of `index` anew for a type and puts it in the index's word. A type `factory` refuses stops the unit. | Ours: the display thread. |
 | `0x8d4fee88` | `int user_sounds(void)` | The number of user sounds the unit holds, synth and drum together. It stops the unit when the synth's or the drum's total is 0, as it is before the firmware's first count: our code reads the two totals first and calls it only when both are not 0. | Ours: the display thread, with interrupts masked. |
 | `0x8fca2220` | `u32 classic(void)` | Not 0 when the unit holds the file `content/op1.classic`. The first call looks on the disk; every call after gives back what it found. | Not the audio thread. Ours: the display thread. |
 
@@ -176,7 +176,7 @@ These play on the instrument the unit is on: the synth or the drum, by the firmw
 
 ## The tape's document and its save
 
-The firmware keeps the tape's settings as one JSON document, read from the tape's file at a load and written into it at a save. The save runs on the firmware's background worker, the lowest of its threads, which also loads the sounds picked in the unit's list.
+The firmware keeps the tape's settings as one JSON document, read from the tape's file at a load and written into it at a save. The save runs on the firmware's background worker.
 
 | Address | The call | What the caller hands over and gets back | Called from |
 | --- | --- | --- | --- |
@@ -204,7 +204,7 @@ Calls that reach beyond the firmware's own memory: the keyboard controller, the 
 | --- | --- | --- | --- |
 | `0x8c0567f0` | `u32 kb_request(void* link, u32 type, const void* payload, u32 bytes, void* answer, u32 timeout_ms)` | Sends a request to the keyboard controller and waits for its answer. `link` is the controller's link, at `0x8497d844`; `type` the request; `payload` and `bytes` what goes with it, 0 and 0 for none. The answer is copied whole into `answer`, the type at its byte 2, the length at byte 3 and the payload from byte 4; it may be copied there even after the wait is over, so keep the buffer out of the stack. `timeout_ms` bounds the wait. Not 0 when the answer came in time; 0 when it did not, or when four requests are already waiting. | Ours: the main thread at the start. |
 | `0x8d4e5cb8` | `void midi_out(int index, const void* packets, u32 bytes)` | Hands USB MIDI packets, four bytes each, to the MIDI output: `index` is the port, `packets` the packets, `bytes` their length in bytes. In some states of the USB connection nothing is sent and nothing is said, and it gives nothing back: our code looks at the output's room and at the USB mode first, and sends only in the mode 1. | Ours: the main task when it handles a SysEx message. |
-| `0x8c0df868` | `void restart(int code, int delay_ms)` | Asks for a restart: writes the line `got request to enter DFU mode` into the log, keeps `code` and the time of the call, and comes back. `delay_ms` later the firmware's main loop shuts the unit down and starts it again; the delay is kept in sixteen bits. `code` picks what starts next. Our code hands 20, and the unit comes back into the OS; 20 is also the code the firmware's own automatic power-off writes. The firmware's MIDI request to enter its update mode hands other codes. | Ours: the main task when it handles a SysEx message, the display thread. |
+| `0x8c0df868` | `void restart(int code, int delay_ms)` | Asks for a restart and comes back at once: `delay_ms` later the unit shuts down and starts again; `delay_ms` is taken in sixteen bits. It writes a line into the log. `code` picks what starts next: our code hands 20, and the unit comes back into the OS. | Ours: the main task when it handles a SysEx message, the display thread. |
 
 ## Bound in the sources, not described yet
 

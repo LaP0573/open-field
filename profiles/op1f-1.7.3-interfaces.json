@@ -42,7 +42,7 @@
    "about": ""
   },
   "sounds": {
-   "title": "Sounds and their LFOs",
+   "title": "Sounds: their engines, effects and LFOs",
    "about": "The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Each slot has a record, an object of the firmware's at a fixed address, which holds the sound's document: what the unit saves with the sound. A sound's LFO has a kind (a row of the list under shift and T4), eight words of settings and a switch. Our code changes them through the calls below, the way the unit's own keys do, so that what the unit shows, plays and saves agrees."
   },
   "notes": {
@@ -51,7 +51,7 @@
   },
   "tape": {
    "title": "The tape's document and its save",
-   "about": "The firmware keeps the tape's settings as one JSON document, read from the tape's file at a load and written into it at a save. The save runs on the firmware's background worker, the lowest of its threads, which also loads the sounds picked in the unit's list."
+   "about": "The firmware keeps the tape's settings as one JSON document, read from the tape's file at a load and written into it at a save. The save runs on the firmware's background worker."
   },
   "disk": {
    "title": "The disk mode",
@@ -264,7 +264,7 @@
   "0x8c03dbbe": {
    "name": "apply_matrix",
    "group": "screens",
-   "what": "Gives a part of a picture a transform: nine words, each a number with ten bits behind the point, `[a, b, 0, c, d, 0, e, f, 1024]`, for x' = a·x + c·y + e and y' = b·x + d·y + f. Keep the third, sixth and ninth word at 0, 0 and 1024.",
+   "what": "Gives a part of a picture a transform: nine words, each a number with ten bits behind the point, `[a, b, 0, c, d, 0, e, f, 1024]`, for x' = a\u00b7x + c\u00b7y + e and y' = b\u00b7x + d\u00b7y + f. Keep the third, sixth and ninth word at 0, 0 and 1024.",
    "thread": "Ours: the display thread."
   },
   "0x8fc25abc": {
@@ -480,13 +480,13 @@
   "0x8c0828e0": {
    "name": "json_read_raw",
    "group": "json",
-   "what": "The parse under `json_read_file`: it reads a JSON text that is already in memory into a value. `a` is the firmware's JSON reader, an object on the caller's stack; `path` is not a path but a text object of the firmware that holds the whole text to parse; `value` is the value to fill; the firmware's own callers hand 1 for `flag`. Not 0 when the text was parsed. Our code calls it only in place of the firmware's own call, with the arguments that call came with.",
+   "what": "Reads a JSON text that is already in memory into a value. `a` is the firmware's JSON reader, an object on the caller's stack; `text` is a text object of the firmware that holds the whole text to parse; `value` is the value to fill; the firmware's own callers hand 1 for `flag`. Not 0 when the text was parsed. Our code calls it only in place of the firmware's own call, with the arguments that call came with.",
    "thread": "Ours: in place of the firmware's own call in the synth's read of a preset, on the firmware's background worker."
   },
   "0x8d4e63bc": {
    "name": "new",
    "group": "memory",
-   "what": "A block of `bytes` from the firmware's heap: the C++ `new` of the firmware, which `alloc` calls. As `alloc`, it never gives back 0: with no room the firmware writes an error into the log and stops. Give the block back with `free` at `0x8d4e63cc`.",
+   "what": "A block of `bytes` from the firmware's heap: the C++ `new` of the firmware. As `alloc`, it never gives back 0: with no room the firmware writes an error into the log and stops. Give the block back with `free` at `0x8d4e63cc`.",
    "thread": "Not the audio thread. Ours: the main thread at the start, the disk mode's thread."
   },
   "0x8d4e63cc": {
@@ -600,7 +600,7 @@
   "0x8d505390": {
    "name": "build",
    "group": "sounds",
-   "what": "Makes the effect object of `index` anew for a type: it clears the index's word, makes the object with `factory`, starts it and puts it in the word. A type the factory refuses stops the unit.",
+   "what": "Makes the effect object of `index` anew for a type and puts it in the index's word. A type `factory` refuses stops the unit.",
    "thread": "Ours: the display thread."
   },
   "0x8d4fee88": {
@@ -732,7 +732,7 @@
   "0x8c0df868": {
    "name": "restart",
    "group": "unit",
-   "what": "Asks for a restart: writes the line `got request to enter DFU mode` into the log, keeps `code` and the time of the call, and comes back. `delay_ms` later the firmware's main loop shuts the unit down and starts it again; the delay is kept in sixteen bits. `code` picks what starts next. Our code hands 20, and the unit comes back into the OS; 20 is also the code the firmware's own automatic power-off writes. The firmware's MIDI request to enter its update mode hands other codes.",
+   "what": "Asks for a restart and comes back at once: `delay_ms` later the unit shuts down and starts again; `delay_ms` is taken in sixteen bits. It writes a line into the log. `code` picks what starts next: our code hands 20, and the unit comes back into the OS.",
    "thread": "Ours: the main task when it handles a SysEx message, the display thread."
   }
  }
