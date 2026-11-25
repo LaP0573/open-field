@@ -183,9 +183,9 @@ python -I tools/picture_make.py check --instructions examples/list/list.svg.make
 - Letters are not text: a text that never changes is a row of shapes, and one that changes is set by `op1f_text` ([below](#text)).
 - Colours from the unit's own palette file, `content/display/palette.svg`, so that a page looks like the device's.
 - No picture larger than a megabyte: the base does not use a card whose directory holds one.
-- No `_x` in a part's name (`id`), unless it begins a character written by its code as the unit's own pictures write one: `_x2D_` for a `-`. The reader takes every `_x` in a name for the start of such a code. `knob_x`, `knob_x1` and `my_xml_page` stop the unit at its start, with a message on the screen.
-- No number with more than four digits behind its point.
-- A `matrix` has six numbers. A `translate` or a `scale` has two, with a comma or a space between them: `translate(10)` stops the unit at its start.
+- No `_x` in a part's name (`id`), unless it begins a character written by its code as the unit's own pictures write one: `_x2D_` for a `-` passes. `knob_x`, `knob_x1` and `my_xml_page` stop the unit at its start, with a message on the screen.
+- No number with more than four digits behind its point: `1.23456` stops the unit at its start, `1.2345` passes.
+- A `matrix` has six numbers: with fewer, it stops the unit at its start. A `translate` or a `scale` has two, with a comma or a space between them: `translate(10)` stops the unit at its start.
 
 `tools/picture_make.py check` refuses a picture with one of the last three, and names the part, the number or the transform.
 
@@ -271,7 +271,7 @@ It answers not 0 to take the event: the firmware then never sees it, and no pack
 | --- | --- |
 | The tape key held, with T1 to T4; the mixer key held | `8 tracks` |
 | Shift and the mixer key | `sidechain` |
-| T3 on a synth or drum sound; shift and T3 | `fx train` |
+| T3 and the knobs on the page of a synth or drum sound that rides `fx train`'s row `train` | `fx train` (from version 18; shift and T3 stay the unit's) |
 | T4 and the knobs on the page of a synth or drum sound that rides `lfo`'s row `ufo` | `lfo` (from version 12; shift and T4 stay the unit's) |
 | Shift and the metronome key | the examples `dub`, `sketch` and `yoyo`, the earliest file of them |
 | Shift and the help key | the example `list` |
@@ -446,7 +446,7 @@ A pack that makes the audio thread slower shows in `aud`, a page that draws slow
 
 ## The four packs of open-field-packs
 
-`8 tracks`, `fx train`, `lfo` and `sidechain` are packs with cards like any other, in a repository of their own like any other, [open-field-packs](https://github.com/LaP0573/open-field-packs): read them for how a bigger pack uses what this page describes. They use only what any pack may use: their frame functions, their pictures, their folders (`fx train`'s presets are in its folder `fx`, `lfo`'s in `lfo`), their values in the tapes' and the sounds' files (level 7), and a page that stays with its mode. From version 12, `lfo` is an LFO layer: its row `ufo` in the unit's own list of LFOs, for synth and drum sounds ([layers](layers.md)). `fx train` offers every effect the packs registered on each of its wagons, through level 8's list, as any pack may. The base holds nothing made for one of them and knows none of them by name. What the base does not offer, each still does through its own table of changes, made from the `profile.json` in its folder there.
+`8 tracks`, `fx train`, `lfo` and `sidechain` are packs with cards like any other, in a repository of their own like any other, [open-field-packs](https://github.com/LaP0573/open-field-packs): read them for how a bigger pack uses what this page describes. They use only what any pack may use: their frame functions, their pictures, their folders (`fx train`'s presets are in its folder `fx`, `lfo`'s in `lfo`), their values in the tapes' and the sounds' files (level 7), and a page that stays with its mode. From version 12, `lfo` is an LFO layer: its row `ufo` in the unit's own list of LFOs, for synth and drum sounds ([layers](layers.md)). From version 18, `fx train` is an effect layer: its row `train` in the unit's own lists of effects, for synth and drum sounds. `fx train` offers every effect the packs registered on each of its wagons, through level 8's list, as any pack may. The base holds nothing made for one of them and knows none of them by name. What the base does not offer, each still does through its own table of changes, made from the `profile.json` in its folder there.
 
 ## What the base does not offer yet
 

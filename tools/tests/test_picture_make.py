@@ -1,4 +1,4 @@
-"""tools/picture_make.py: what the unit's reader of pictures stops at, held in `check` and `census`.
+"""tools/picture_make.py: what stops the unit at its start, held in `check` and `census`.
 
   python -I -m unittest discover -s tools/tests -p "test_picture_make.py"
 
@@ -37,19 +37,19 @@ def stops(ours):
 
 
 class APartsName(unittest.TestCase):
-    def test_a_name_the_reader_stops_at(self):
+    def test_a_name_that_stops_the_unit(self):
         for name in ("knob_x", "knob_x1", "knob_xy", "_x", "a_x5F_x4"):
-            self.assertEqual(picture_make.id_stop(name), "no `_` ends it", name)
-        self.assertEqual(picture_make.id_stop("my_xml_page"), "'ml' is no code")
-        self.assertEqual(picture_make.id_stop("row_x2G_a"), "'2G' is no code")
-        self.assertEqual(picture_make.id_stop("a_x5F_xzz_"), "'zz' is no code")       # looked at again behind a code
+            self.assertEqual(picture_make.id_stop(name), "a `_x` has no `_` behind it", name)
+        self.assertEqual(picture_make.id_stop("my_xml_page"), "'ml' behind a `_x` is no code")
+        self.assertEqual(picture_make.id_stop("row_x2G_a"), "'2G' behind a `_x` is no code")
+        self.assertEqual(picture_make.id_stop("a_x5F_xzz_"), "'zz' behind a `_x` is no code")       # held again behind a code
 
-    def test_a_name_it_reads(self):
+    def test_a_name_that_passes(self):
         for name in ("knob", "knob_1", "x_axis", "dot_x5F_white", "a_x2D_b_x2d_c", "knob_X"):
             self.assertIsNone(picture_make.id_stop(name), name)
 
-    def test_a_name_it_leaves_as_it_is(self):
-        for name in ("knob_x_1", "max_xpos_a", "a_x5_b", "a_x005F_b", "a_x_b_x"):   # no code of two characters: it looks no further
+    def test_a_name_that_passes_with_all_behind_its_x(self):
+        for name in ("knob_x_1", "max_xpos_a", "a_x5_b", "a_x005F_b", "a_x_b_x"):   # not two characters before the next `_`: passes
             self.assertIsNone(picture_make.id_stop(name), name)
 
 
@@ -63,7 +63,7 @@ class WhatAPictureHolds(unittest.TestCase):
         said = stops(b'<g id="oud_type_x"><path d="M1,2H3"/></g>\n')
         self.assertEqual(len(said), 1)
         self.assertIn("names a part 'oud_type_x'", said[0])
-        self.assertIn("no `_` ends it", said[0])
+        self.assertIn("a `_x` has no `_` behind it", said[0])
 
     def test_a_number_with_more_digits_than_four(self):
         self.assertEqual(len(stops(b'<path d="M240.12345,31V21"/>\n')), 1)
@@ -77,8 +77,8 @@ class WhatAPictureHolds(unittest.TestCase):
         self.assertIn("writes the number 3.14159, with 5 digits behind the point", said[1])
 
     def test_a_number_that_is_not_held_to_it(self):
-        self.assertEqual(stops(b'<path d="M1.2345,2.0000L3,4"/>\n'), [])                # four is read
-        self.assertEqual(stops(b'<path d="M1.234567e2,2L3,4"/>\n'), [])                 # an exponent: read another way
+        self.assertEqual(stops(b'<path d="M1.2345,2.0000L3,4"/>\n'), [])                # four pass
+        self.assertEqual(stops(b'<path d="M1.234567e2,2L3,4"/>\n'), [])                 # an exponent: not held to the count
         self.assertEqual(stops(b'<path fill="#123456" d="M1,2H3"/>\n'), [])             # a colour is no number
         self.assertEqual(stops(b'<g id="v1.234567"><path d="M1,2H3"/></g>\n'), [])      # nor is a name
 
@@ -87,7 +87,7 @@ class WhatAPictureHolds(unittest.TestCase):
         for transform in (b"translate(10)", b"scale(2)", b"translate(10-20)", b"translate()"):
             said = stops(b'<g transform="' + transform + b'"/>\n')
             self.assertEqual(len(said), 1, transform)
-            self.assertIn("wants two numbers with a comma or a space between them", said[0])
+            self.assertIn("is not two numbers with a comma or a space between them", said[0])
         self.assertEqual(len(stops(b'<g transform="translate(1,2) scale(3)"/>\n')), 1)
 
     def test_only_the_bytes_of_ours_are_judged(self):
@@ -126,7 +126,7 @@ class TheCommands(unittest.TestCase):
         answer, said = self.run_on("census", ours)
         self.assertEqual((answer, STOPS in said), (0, False))
 
-    def test_check_and_census_refuse_what_the_reader_stops_at(self):
+    def test_check_and_census_refuse_what_stops_the_unit(self):
         ours = b'<g id="ours_type_x"><path fill="#010203" d="M1,2H3"/></g>\n'
         for command in ("check", "census"):
             answer, said = self.run_on(command, ours)
@@ -139,7 +139,7 @@ class TheCommands(unittest.TestCase):
         answer, said = self.run_on("census", ours)
         self.assertEqual(answer, 1)
         self.assertEqual(said.count(STOPS), picture_make.STOPS_SAID)
-        self.assertIn("40 thing(s) the unit's reader of pictures stops at in all", said)
+        self.assertIn("40 thing(s) in all that stop the unit at its start", said)
 
 
 if __name__ == "__main__":
