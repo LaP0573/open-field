@@ -1,0 +1,24 @@
+{
+    "id":  "analogbeast",
+    "author":  "dzwerg",
+    "status":  "listed",
+    "categories":  [
+                       "library"
+                   ],
+    "description":  "Two-oscillator analog-style synth for OP-1 Field, three control pages and five factory sounds.",
+    "repository":  "https://github.com/dzwerg/analogBEAST-field",
+    "commit":  "06a58b3fa2e2f61a780a58eb59908e4f05976a62",
+    "path":  "analogbeast.pack",
+    "sha256":  "53b7721014ae0c954dc218afe4d58c78fb8bfdda911d797d9926ffdd88d3019b",
+    "bytes":  18432,
+    "version":  100,
+    "firmware":  "1.7.3",
+    "places":  0,
+    "needs":  [
+
+              ],
+    "level":  10,
+    "folders":  [
+
+                ]
+}
