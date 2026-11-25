@@ -605,10 +605,16 @@ class ThePagesOnAHost(unittest.TestCase):
         for said in ('get("loader.json")', 'get("base-pack.json")', 'new URL("./open-field-helper.ps1", location.href)',
                      'new URL("./open-field-helper.py", location.href)', 'fetch("./" + LISTING_FILE)'):
             self.assertIn(said, page)
-        # the listing of packs, packs.json, is put beside the page by the pages workflow, from catalog/packs.json
+        # the listing of packs, packs.json, is put beside the page by the pages workflow: the files of catalog/, the
+        # folder of one file a pack since 2026-11-25, joined into one by the listing's check
         self.assertIn('export const LISTING_FILE = "packs.json"', text(self.served, "catalog.mjs"))
-        self.assertRegex(text(".github", "workflows", "pages.yml"), r"(?m)^\s*run: cp catalog/packs\.json %s/packs\.json\s*$" % re.escape(self.served))
-        self.assertTrue(os.path.isfile(os.path.join(ROOT, "catalog", "packs.json")))
+        workflow = text(".github", "workflows", "pages.yml")
+        joining = re.search(r"(?m)^\s*run: python -I tools/catalog_check\.py --join %s/packs\.json\s*$" % re.escape(self.served), workflow)
+        self.assertIsNotNone(joining)
+        self.assertLess(workflow.index("- uses: actions/setup-python@v5"), joining.start())
+        self.assertTrue(os.path.isfile(os.path.join(ROOT, "catalog", "listing.json")))
+        self.assertTrue(os.path.isdir(os.path.join(ROOT, "catalog", "packs")))
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "catalog", "packs.json")), "the listing is one file a pack since 2026-11-25")
         self.assertFalse(os.path.isfile(os.path.join(self.folder, "packs.json")), "a copy kept beside the page would go stale: the workflow makes it")
 
     def test_the_page_waits_for_the_windows_checks_and_not_for_the_helper_s(self):
@@ -618,6 +624,8 @@ class ThePagesOnAHost(unittest.TestCase):
         checks, helper = text(".github", "workflows", "checks.yml"), text(".github", "workflows", "helper.yml")
         self.assertEqual(re.findall(r"(?m)^    runs-on:\s*(\S+)", checks), ["windows-latest"])
         self.assertEqual(re.findall(r"(?m)^    runs-on:\s*(\S+)", helper), ["ubuntu-latest", "macos-latest"])
+        # the listing's check on Linux: a pack file named like another but for capitals is checked out beside it, and refused
+        self.assertEqual(re.findall(r"(?m)^    runs-on:\s*(\S+)", text(".github", "workflows", "listing.yml")), ["ubuntu-latest"])
         for said in ("name: helper\n", "  contents: read\n", "  group: helper-"):
             self.assertIn(said, helper)
 

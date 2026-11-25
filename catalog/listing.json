@@ -1,0 +1,14 @@
+{
+  "about": "The listing of packs: every pack an owner can pick on the install page. Each pack has a file of its own, catalog/packs/<id>.json, and this file holds what they share. Each entry names its pack file in its author's own repository, at one commit or on a branch, with the file's SHA-256: nothing of a pack is copied into this repository, but base.pack, which lies beside the install page (builder/base.pack) and goes onto every unit the page installs. Every author's pack is listed and shown alike. A pack gets in by a pull request that adds its own file; tools/catalog_check.py checks it, and the maintainer reviews it. docs/catalog.md says how.",
+  "categories": {
+    "tape": "tape",
+    "effects": "effects",
+    "modulation": "modulation",
+    "sequencing": "sequencing",
+    "mixer": "mixer",
+    "looks": "screens and looks",
+    "tools": "tools",
+    "examples": "examples",
+    "library": "library"
+  }
+}

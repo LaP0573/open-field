@@ -14,7 +14,7 @@ Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
 
 **At your own risk.** Installing it changes the firmware of your unit. That is a risky process: a unit can end up unable to start for good ("bricked"), and installing it will void the warranty of your device. Whether to do it is your decision alone. Read [NOTICE.md](NOTICE.md) first.
 
-**Status: open-field 0.19, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
+**Status: open-field 0.20, for OS 1.7.3.** Read "What is proven and what is not" below before you rely on anything here.
 
 ## What it is
 
@@ -22,7 +22,7 @@ Want to write a pack of your own? Start with [A first pack](docs/first-pack.md).
 - **The base** (`base.pack`). The shared pack every feature relies on: one file that every unit with open-field has. It is also what any pack can build on: a call every frame, pictures, a page with keys and knobs, folders and files.
 - **Packs.** Each feature is one file that you copy onto the unit like a sample. With the file there, the feature is there at the next start. Delete the file and the feature is gone.
 
-With open-field on the unit, the start screen reads `1.7.3 - open-field 0.19`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.19`.
+With open-field on the unit, the start screen reads `1.7.3 - open-field 0.20`: the main version, then open-field and the release of the base. On a unit on `1.7.3+1` it reads `1.7.3+1 - open-field 0.20`.
 
 The install puts two things on the unit: the new firmware file and `base.pack`, from `builder/base.pack` beside the page. Packs come after. They are not kept in this repository: their authors publish them, and once open-field is on your unit, the install page's packs section adds and removes the packs of [the listing](docs/catalog.md), and with its **+** any pack file you have on your computer. You can also copy a pack file onto the unit yourself, in its disk mode ([the guide](docs/guide.md#adding-a-feature)). **A pack is a program that can read and write the files on your unit: take packs only from people you trust.** Holding the help key while you switch on starts the unit with no packs.
 
@@ -67,10 +67,10 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 ## What is proven and what is not
 
 - The install without any key has been made on several units, by their owners, from Windows computers, with bootloader 1000.1.1.
-- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.19 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
+- One install from Linux, with bootloader 1000.1.1 (2026-11-19), and one from a Mac, with 1000.2.0 (2026-11-20), were reported, both on open-field 0.3 with earlier forms of the helper. The base and packs of 0.20 and the helper as it is now have not been tried on 1000.2.0, a Mac or Linux, and the way back has not been tried there either. Windows with 1000.2.0 has not been tried.
 - For 1000.2.0, three numbers of the page's placement are the contributor's reading of that bootloader. The rest of the calculation is 1000.1.1's, assumed for 1000.2.0. The contributor reported that the one write landed. The maintainer has not read that bootloader or tried a unit with it.
 - A write that is interrupted can leave the unit unable to start. The guide says how to keep that risk small and what the way back is. The way back from a unit that does not start has **not** been rehearsed.
-- The loader and the base have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 37, has run on the maintainer's unit beside other packs, with `lfo` 12 riding its LFO layers on a synth sound and a drum sound. What it added after base 32 (a page that holds its picture, its changed parts drawn again, the logs in the disk mode, layers) was each tried on that unit, with test packs of the maintainer's where a pack was needed. Base 32's settings were tried with two test packs that add settings: they showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart.
+- The loader and the base have been used on several units, on the maintainer's for weeks. The example packs have run on the maintainer's unit, `crush`, `ping`, `pluck` and `fold` in their first version, which drew their values as set rather than as the sound plays them. The base of this release, base 38, has run on the maintainer's unit beside other packs and a test pack of the maintainer's that paints over its own page: the install question stayed whole over that page, and an effect switched off for its cost played again after a pick, on a sound and on a wagon of `fx train`. Base 37 before it ran with `lfo` 12 riding its LFO layers on a synth sound and a drum sound. What the bases added after base 32 (a page that holds its picture, its changed parts drawn again, the logs in the disk mode, layers) was each tried on that unit, with test packs of the maintainer's where a pack was needed. Base 32's settings were tried with two test packs that add settings: they showed in KEYBOARD, SYSTEM, MIDI and PACKS, changed with the knobs, and came back after a restart.
 
 ## What is in this repository
 

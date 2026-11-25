@@ -1,0 +1,20 @@
+{
+  "id": "organ",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "Drawbar organ with four generator models, percussion, drive and a rotating stereo cabinet.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/organ.pack",
+  "sha256": "339834573b8e6e52d20706dd74320b19a4cc8b1db8f6f00ebaabe1eff472e173",
+  "bytes": 266206,
+  "version": 5,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

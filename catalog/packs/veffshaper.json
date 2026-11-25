@@ -1,0 +1,25 @@
+{
+  "id": "veffshaper",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A parametric waveshaper with an animated transfer curve, in the unit's lists of effects.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
+  "path": "veffshaper.pack",
+  "sha256": "d6734560fcaf396de653901ca54a560d69714ffb9eff0f3d117ec46dc5ed7c1f",
+  "bytes": 23618,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffshaper.png",
+    "sha256": "89c4dbba0f0ae5664fd6604a53a5cd49fce7b1ca1a7b021d39dd8d63aba6e4c0",
+    "bytes": 19644
+  }
+}

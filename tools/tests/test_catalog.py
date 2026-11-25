@@ -1,13 +1,14 @@
-"""The listing of packs, catalog/packs.json, and its check, tools/catalog_check.py (docs/catalog.md).
+"""The listing of packs, the folder catalog/ (listing.json and one file a pack, packs/<id>.json), and its check,
+tools/catalog_check.py (docs/catalog.md).
 
   python -I -m unittest discover -s tools/tests -p "test_catalog.py"
 
 Everything here needs nothing but this tree: the pack files the check reads are made by tools/pack_build.py's own
-maker, with no compiler, and the downloads are answered from memory. One test needs more and is skipped without it:
+maker, with no compiler, and the downloads are answered from memory. Two tests need more and are skipped without it:
 the entries whose files this repository builds (the base and the examples; a listed pack's file is built in its own
 repository) held to those files (tools/build_all.py, which needs the toolchain: docs/build.md), in
 out/packs/ and out/examples/, or in the folders named by the environment's OPEN_FIELD_PACKS, parted by the system's
-path separator.
+path separator; and two listings merged at once, which needs git 2.38 or later.
 """
 
 import copy
@@ -16,7 +17,12 @@ import importlib.util
 import io
 import json
 import os
+import re
+import shutil
+import stat
 import struct
+import subprocess
+import tarfile
 import tempfile
 import unittest
 import zlib
@@ -74,6 +80,37 @@ def run(the_listing, **options):
     return "\n".join(lines), in_order
 
 
+def reserved(name, folder=None):
+    """A reserved entry, made up: its id held, and with `folder` that folder too, which a reserved entry names with
+    all of its file (a file nobody needs here)."""
+    entry = {"id": name, "author": "someone", "status": "reserved", "categories": ["tools"], "description": "Held for later."}
+    if folder:
+        entry.update(sha256="0" * 64, bytes=1000, version=1, firmware="1.7.3", places=0, needs=[], folders=[{"name": folder, "place": folder}])
+    return entry
+
+
+def files_of(the_listing):
+    """A listing as its folder holds it: {path inside the folder: bytes}, listing.json and one file a pack."""
+    shared = {key: the_listing[key] for key in ("about", "categories")}
+    files = {check.SHARED: check.joined_text(shared).encode("utf-8")}
+    for entry in the_listing["packs"]:
+        files["%s/%s.json" % (check.PACKS, entry["id"])] = check.joined_text(entry).encode("utf-8")
+    return files
+
+
+def write_files(folder, files):
+    for path, data in files.items():
+        full = os.path.join(folder, *path.split("/"))
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "wb") as f:
+            f.write(data)
+
+
+def tree_listing():
+    """This tree's listing, its folder catalog/ joined into one: (listing, the folder's faults)."""
+    return check.read_listing(check.CATALOG)
+
+
 def card_pack(name="tester", version=2, folders=(("notes", "notes"),), card_version=None, folders_at=None):
     """A pack file with a card of level 3 that lists these folders, each (name, place), as the base reads one; the
     list where the pack's body puts it, or at the linked address `folders_at`."""
@@ -107,13 +144,13 @@ def png(width, height, colour=6):
 
 class TheTreesListing(unittest.TestCase):
     def test_the_listing_of_this_tree_is_in_order(self):
-        with open(check.CATALOG, encoding="utf-8") as f:
-            said, in_order = run(json.load(f))
+        the_listing, faults = tree_listing()
+        self.assertEqual(faults, [])
+        said, in_order = run(the_listing)
         self.assertTrue(in_order, said)
 
     def test_every_entry_of_this_tree_names_one_of_its_categories_and_a_firmware_it_has_a_profile_for(self):
-        with open(check.CATALOG, encoding="utf-8") as f:
-            the_listing = json.load(f)
+        the_listing = tree_listing()[0]
         for entry in the_listing["packs"]:
             self.assertTrue(set(entry["categories"]) <= set(the_listing["categories"]), entry["id"])
             self.assertIn(entry.get("firmware", "1.7.3"), FIRMWARES.values(), entry["id"])
@@ -122,8 +159,7 @@ class TheTreesListing(unittest.TestCase):
         """The example packs are for people who write packs: their sources lie in examples/, the build makes their
         files, and the install page offers only listed entries. Their entries stay reserved, so that their names and
         their folders stay held."""
-        with open(check.CATALOG, encoding="utf-8") as f:
-            the_listing = json.load(f)
+        the_listing = tree_listing()[0]
         examples = [entry for entry in the_listing["packs"] if "examples" in entry["categories"]]
         self.assertTrue(examples)
         for entry in examples:
@@ -960,8 +996,7 @@ class EveryAuthorAlike(unittest.TestCase):
         self.assertIn("REFUSED: tester: it was taken out", said)
 
     def test_the_tree_s_listing_gives_fx_and_lfo_to_their_packs_alone(self):
-        with open(check.CATALOG, encoding="utf-8") as f:
-            the_listing = json.load(f)
+        the_listing = tree_listing()[0]
         self.assertEqual(set(the_listing), check.TOP_KEYS)
         for entry in the_listing["packs"]:
             for folder in entry.get("folders") or []:
@@ -1055,6 +1090,133 @@ class AChangeHeldToTheListingBefore(unittest.TestCase):
         self.assertNotIn("tester", check.before_faults(listing(dict(moved, firmware="1.7.3")), listing(dict(old, firmware="1.7.0")), FIRMWARES))
 
 
+class TheFolder(unittest.TestCase):
+    """The listing is a folder: listing.json, what the packs share, and one file a pack, packs/<id>.json, so that a
+    pull request that lists a pack adds a file of its own. The check joins them into one listing (check.join), as the
+    install page reads it. The entries are made up."""
+
+    def test_the_files_are_joined_the_entries_sorted_by_their_ids(self):
+        files = files_of(listing(*[reserved(name) for name in ("beta", "Alpha", "8 tracks", "alpha two", "Bet")]))
+        joined, faults = check.join(files)
+        self.assertEqual(faults, [])
+        self.assertEqual(list(joined), ["about", "categories", "packs"])
+        self.assertEqual((joined["about"], joined["categories"]), (listing()["about"], listing()["categories"]))
+        self.assertEqual([entry["id"] for entry in joined["packs"]], ["8 tracks", "Alpha", "alpha two", "base", "Bet", "beta"])
+        self.assertEqual(check.join(dict(reversed(list(files.items())))), (joined, []))      # whatever order the files come in
+        self.assertEqual(check.joined_text(joined), json.dumps(joined, indent=2, ensure_ascii=False) + "\n")
+
+    def test_a_pack_s_file_is_named_after_its_entry_s_id_exactly(self):
+        files = files_of(listing(reserved("tester")))
+        for name in ("Tester", "tester ", "other"):
+            with self.subTest(name=name):
+                moved = dict(files)
+                moved["packs/%s.json" % name] = moved.pop("packs/tester.json")
+                joined, faults = check.join(moved)
+                self.assertEqual(faults, ['catalog/packs/%s.json holds the entry "tester": a pack\'s file is named after its '
+                                          "entry's id exactly, catalog/packs/tester.json" % name])
+                self.assertEqual([entry["id"] for entry in joined["packs"]], ["base", "tester"])       # its entry is held all the same
+        faults = check.join(dict(files, **{"packs/nobody.json": b'{"author": "someone"}'}))[1]
+        self.assertEqual(faults, ["catalog/packs/nobody.json holds an entry with no id to name its file after"])
+
+    def test_two_files_named_alike_but_for_capitals_are_refused(self):
+        """A Windows or Mac disk keeps one of them: the review of 2026-11-25 found a Windows checkout reading main's
+        wink.json alone where a pull request added Wink.json. The listing's workflow runs on Linux, and the join refuses
+        the pair there, --join included."""
+        files = files_of(listing(reserved("wink"), reserved("Wink")))
+        joined, faults = check.join(files)
+        self.assertEqual(faults, ["catalog/packs/Wink.json and catalog/packs/wink.json are named alike but for small letters "
+                                  "and capitals: a Windows or Mac computer keeps only one of them, so no two ids may differ "
+                                  "in that alone"])
+        self.assertEqual([entry["id"] for entry in joined["packs"]], ["base", "Wink", "wink"])
+        self.assertEqual(check.join(files_of(listing(reserved("wink"), reserved("wink two"))))[1], [])
+
+    def test_a_file_named_after_a_device_windows_keeps_is_refused(self):
+        """Git for Windows cannot put catalog/packs/aux.json on the disk: a checkout of the whole repository would fail
+        there, the host's checks included."""
+        for name in ("aux", "CON", "nul.x", "com1", "LPT9", "conin$", "con "):
+            with self.subTest(name=name):
+                faults = check.join(files_of(listing(reserved(name))))[1]
+                device = name.split(".")[0].rstrip(" ")
+                self.assertEqual(faults, ["catalog/packs/%s.json: Windows keeps the name %s for a device, and git cannot put "
+                                          "that file on a Windows computer: the pack needs another id" % (name, device)])
+        for name in ("auxiliary", "console", "com10", "nullify", "a nul", "lpt"):
+            with self.subTest(name=name):
+                self.assertEqual(check.join(files_of(listing(reserved(name))))[1], [])
+
+    def test_any_other_file_is_refused(self):
+        files = files_of(listing())
+        for stray in ("README.md", "packs/notes.txt", "packs/tester.JSON", "packs/more/tester.json", "listing/listing.json", "packs.json.bak"):
+            with self.subTest(stray=stray):
+                joined, faults = check.join(dict(files, **{stray: b"{}"}))
+                self.assertEqual(faults, ["catalog/%s is no part of the listing, which is catalog/listing.json and one file a pack, "
+                                          "catalog/packs/<id>.json" % stray])
+                self.assertEqual([entry["id"] for entry in joined["packs"]], ["base"])
+
+    def test_listing_json_holds_the_about_and_the_categories_and_nothing_else(self):
+        files = files_of(listing(reserved("tester")))
+        joined, faults = check.join({path: data for path, data in files.items() if path != "listing.json"})
+        self.assertEqual(faults, ["catalog/listing.json is missing: it holds the listing's about and its categories"])
+        self.assertEqual(list(joined), ["packs"])
+        shared = dict(json.loads(files["listing.json"]), packs=[], ours=[])
+        joined, faults = check.join(dict(files, **{"listing.json": check.joined_text(shared).encode("utf-8")}))
+        self.assertEqual(faults, ["catalog/listing.json holds keys other than about and categories: ours, packs"])
+        self.assertEqual([entry["id"] for entry in joined["packs"]], ["base", "tester"])        # the packs are the files' alone
+
+    def test_packs_json_is_refused_with_words_of_its_own(self):
+        files = files_of(listing(reserved("tester")))
+        old = check.joined_text(listing(reserved("tester"), reserved("other"))).encode("utf-8")
+        joined, faults = check.join(dict(files, **{"packs.json": old}))
+        self.assertEqual(faults, ["catalog/packs.json: the listing is one file a pack since 2026-11-25, and each entry goes "
+                                  "into catalog/packs/<id>.json (docs/catalog.md)"])
+        self.assertEqual([entry["id"] for entry in joined["packs"]], ["base", "tester"])        # nothing of it is read
+
+    def test_a_listing_of_one_file_is_taken_only_as_the_one_before_a_change(self):
+        old = listing(reserved("tester"))
+        files = {"packs.json": check.joined_text(old).encode("utf-8")}
+        self.assertEqual(check.join(files, old_form=True), (old, []))
+        joined, faults = check.join(files)
+        self.assertEqual(joined, {"packs": []})
+        self.assertEqual(len(faults), 2, faults)
+        self.assertIn("catalog/packs.json: the listing is one file a pack since 2026-11-25", faults[0])
+        self.assertIn("catalog/listing.json is missing", faults[1])
+        for more in (files_of(old), {"README.md": b"{}"}):                   # beside other files it is refused, before a change too
+            with self.subTest(more=sorted(more)):
+                faults = check.join(dict(files, **more), old_form=True)[1]
+                self.assertIn("one file a pack since 2026-11-25", " ".join(faults))
+        self.assertEqual(check.join(files_of(old), old_form=True), check.join(files_of(old)))      # a folder of today's form, read alike
+
+    def test_a_file_that_cannot_be_read_is_refused_and_left_out(self):
+        files = files_of(listing(reserved("tester")))
+        for data, words in ((b"\xff\xfe{}", "catalog/packs/tester.json is not JSON in UTF-8: "),
+                            (b'{"id": "tester",', "catalog/packs/tester.json is not JSON in UTF-8: "),
+                            (b'["tester"]', "catalog/packs/tester.json is not a JSON object"),
+                            (b'"tester"', "catalog/packs/tester.json is not a JSON object")):
+            with self.subTest(data=data):
+                joined, faults = check.join(dict(files, **{"packs/tester.json": data}))
+                self.assertEqual(len(faults), 1, faults)
+                self.assertTrue(faults[0].startswith(words), faults)
+                self.assertEqual([entry["id"] for entry in joined["packs"]], ["base"])
+        joined, faults = check.join(dict(files, **{"listing.json": b"[]"}))
+        self.assertEqual(faults, ["catalog/listing.json is not a JSON object"])
+        self.assertEqual(list(joined), ["packs"])
+        said, in_order = run(joined, layout=faults)                            # the check refuses it, a fault of the whole
+        self.assertFalse(in_order)
+        self.assertIn("REFUSED: the listing: catalog/listing.json is not a JSON object", said)
+
+    def test_a_folder_is_read_whole_and_a_file_as_a_listing_joined_already(self):
+        files = dict(files_of(listing(reserved("tester"))), **{"packs/deep/stray.json": b"{}"})
+        with tempfile.TemporaryDirectory() as folder:
+            write_files(folder, files)
+            self.assertEqual(check.read_folder(folder), files)
+            joined, faults = check.read_listing(folder)
+            self.assertEqual(faults, ["catalog/packs/deep/stray.json is no part of the listing, which is catalog/listing.json and "
+                                      "one file a pack, catalog/packs/<id>.json"])
+            path = os.path.join(folder, "joined.json")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(check.joined_text(joined))
+            self.assertEqual(check.read_listing(path), (joined, []))
+
+
 class TheCommand(unittest.TestCase):
     def main(self, *argv):
         out = io.StringIO()
@@ -1075,6 +1237,154 @@ class TheCommand(unittest.TestCase):
             self.assertEqual(self.main("--catalog", good, "--before", odd)[0], 1)
             self.assertEqual(self.main("--catalog", os.path.join(folder, "missing.json"))[0], 1)
 
+    def test_a_folder_s_faults_are_refused_beside_every_other_check(self):
+        with tempfile.TemporaryDirectory() as folder:
+            write_files(folder, files_of(listing(reserved("tester"))))
+            answer, said = self.main("--catalog", folder)
+            self.assertEqual(answer, 0, said)
+            self.assertIn("ok: tester (reserved)", said)
+            write_files(folder, {"notes.txt": b"", "packs/other.json": check.joined_text(reserved("misnamed")).encode("utf-8")})
+            answer, said = self.main("--catalog", folder)
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: the listing: catalog/notes.txt is no part of the listing", said)
+            self.assertIn('REFUSED: the listing: catalog/packs/other.json holds the entry "misnamed"', said)
+            self.assertIn("ok: misnamed (reserved)", said)                      # its entry is held all the same
+            self.assertTrue(said.endswith("3 entries, REFUSED\n"), said)
+
+    def test_join_writes_the_listing_joined_into_one_file_and_checks_nothing_else(self):
+        the_listing = listing(reserved("zed"), dict(reserved("tester"), categories=["nowhere"]))      # tester is out of form
+        with tempfile.TemporaryDirectory() as folder:
+            catalog, out = os.path.join(folder, "catalog"), os.path.join(folder, "packs.json")
+            write_files(catalog, files_of(the_listing))
+            answer, said = self.main("--catalog", catalog, "--join", out)
+            self.assertEqual((answer, said), (0, "the listing joined into %s: 3 entries\n" % out))
+            with open(out, encoding="utf-8", newline="") as f:
+                written = f.read()
+            self.assertEqual(written, check.joined_text(dict(the_listing, packs=[the_listing["packs"][n] for n in (0, 2, 1)])))
+            self.assertEqual(json.loads(written), check.join(files_of(the_listing))[0])
+            answer, said = self.main("--catalog", catalog)                       # the check itself refuses tester
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: tester: its categories are not", said)
+
+    def test_join_writes_nothing_when_the_folder_has_a_fault(self):
+        with tempfile.TemporaryDirectory() as folder:
+            catalog, out = os.path.join(folder, "catalog"), os.path.join(folder, "packs.json")
+            write_files(catalog, dict(files_of(listing()), **{"packs.json": check.joined_text(listing()).encode("utf-8")}))
+            answer, said = self.main("--catalog", catalog, "--join", out)
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: the listing: catalog/packs.json: the listing is one file a pack since 2026-11-25", said)
+            self.assertFalse(os.path.exists(out))
+
+    def test_the_listing_before_may_be_a_folder_of_either_form_or_one_file(self):
+        old = listing(reserved("tester"))
+        with tempfile.TemporaryDirectory() as folder:
+            now, then, then_old, joined = (os.path.join(folder, name) for name in ("now", "then", "then-old", "joined.json"))
+            write_files(now, files_of(listing(reserved("tester"), reserved("added"))))
+            write_files(then, files_of(old))
+            write_files(then_old, {"packs.json": check.joined_text(old).encode("utf-8")})
+            with open(joined, "w", encoding="utf-8") as f:
+                f.write(check.joined_text(old))
+            for before in (then, then_old, joined):
+                with self.subTest(before=os.path.basename(before)):
+                    answer, said = self.main("--catalog", now, "--before", before)
+                    self.assertEqual(answer, 0, said)
+            answer, said = self.main("--catalog", then, "--before", now)
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: added: it was taken out", said)
+            answer, said = self.main("--catalog", then_old)                      # the listing of today is never one file
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: the listing: catalog/packs.json: the listing is one file a pack since 2026-11-25", said)
+            write_files(then, {"stray.txt": b""})
+            answer, said = self.main("--catalog", now, "--before", then)
+            self.assertEqual(answer, 1)
+            self.assertIn("REFUSED: the listing before the change: catalog/stray.txt is no part of the listing", said)
+
+
+def removed(folder):
+    """A folder taken away, with the files git makes read-only in it."""
+    for where, _folders, names in os.walk(folder):
+        for name in names:
+            os.chmod(os.path.join(where, name), stat.S_IREAD | stat.S_IWRITE)
+    shutil.rmtree(folder, ignore_errors=True)
+
+
+class TwoListingsAtOnce(unittest.TestCase):
+    """The owner's ask: two pull requests that each list a pack, open at once, merge with no clash. Each adds a file
+    of its own, so git merges them, and the listing they make together holds both and is in order. Beside it, what
+    the listing as one file did: the same two entries, each put at the end of one packs.json, clash. All in one git
+    repository of its own, made in one go by git fast-import, with no network."""
+
+    NAME, EMAIL = "open-field tests", "tests@example.invalid"
+    ONE, TWO = reserved("merge one", "mergeone"), reserved("merge two", "mergetwo")
+
+    @classmethod
+    def git(cls, *words, given=None):
+        return subprocess.run([cls.git_path, "-c", "user.name=" + cls.NAME, "-c", "user.email=" + cls.EMAIL] + list(words),
+                              input=given, capture_output=True, env=cls.env, cwd=cls.folder, timeout=60)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.git_path = shutil.which("git")
+        if not cls.git_path:
+            raise unittest.SkipTest("git is needed")
+        cls.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}    # no repository of a hook's
+        cls.folder = os.getcwd()
+        version = re.search(rb"(\d+)\.(\d+)", cls.git("version").stdout)
+        if not version or (int(version.group(1)), int(version.group(2))) < (2, 38):
+            raise unittest.SkipTest("git merge-tree --write-tree needs git 2.38 or later")
+        cls.folder = tempfile.mkdtemp(prefix="open-field-merge-")
+        cls.addClassCleanup(removed, cls.folder)
+        empty = os.path.join(cls.folder, "config")
+        open(empty, "wb").close()
+        cls.env.update(GIT_CONFIG_GLOBAL=empty, GIT_CONFIG_NOSYSTEM="1")     # none of this computer's settings
+        cls.git("init", "-q", "--bare", "repository")
+        cls.folder = os.path.join(cls.folder, "repository")
+        cls.listing = tree_listing()[0]
+
+        def joined_with(entry):
+            return check.joined_text(dict(cls.listing, packs=cls.listing["packs"] + [entry])).encode("utf-8")
+        base = {"catalog/" + path: data for path, data in check.read_folder(check.CATALOG).items()}
+        base["packs.json"] = check.joined_text(cls.listing).encode("utf-8")
+        branches = (("base", None, base),
+                    ("one", "base", {"catalog/packs/merge one.json": check.joined_text(cls.ONE).encode("utf-8")}),
+                    ("two", "base", {"catalog/packs/merge two.json": check.joined_text(cls.TWO).encode("utf-8")}),
+                    ("joined-one", "base", {"packs.json": joined_with(cls.ONE)}),
+                    ("joined-two", "base", {"packs.json": joined_with(cls.TWO)}))
+        stream = b""
+        for branch, parent, files in branches:
+            stream += b"commit refs/heads/%s\ncommitter %s <%s> 0 +0000\ndata 1\n%s\n" % (
+                branch.encode(), cls.NAME.encode(), cls.EMAIL.encode(), branch[:1].encode())
+            stream += b"from refs/heads/%s\n" % parent.encode() if parent else b""
+            for path, data in files.items():
+                stream += b"M 100644 inline %s\ndata %d\n%s\n" % (json.dumps(path).encode(), len(data), data)
+        made = cls.git("fast-import", "--quiet", given=stream)
+        assert made.returncode == 0, made.stderr
+        cls.merged = cls.git("merge-tree", "--write-tree", "one", "two")
+        cls.clashed = cls.git("merge-tree", "--write-tree", "joined-one", "joined-two")
+
+    def test_two_files_of_their_own_merge_and_the_listing_holds_both(self):
+        self.assertEqual(self.merged.returncode, 0, self.merged.stdout + self.merged.stderr)
+        tree = self.merged.stdout.split()[0].decode()
+        archive = self.git("archive", "--format=tar", tree, "catalog")
+        self.assertEqual(archive.returncode, 0, archive.stderr)
+        files = {}
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
+            for member in tar.getmembers():
+                if member.isfile():
+                    files[member.name[len("catalog/"):]] = tar.extractfile(member).read()
+        joined, faults = check.join(files)
+        self.assertEqual(faults, [])
+        ids = [entry["id"] for entry in joined["packs"]]
+        self.assertEqual(sorted(ids), sorted([entry["id"] for entry in self.listing["packs"]] + ["merge one", "merge two"]))
+        said, in_order = run(joined)
+        self.assertTrue(in_order, said)
+        self.assertIn("ok: merge one (reserved)", said)
+        self.assertIn("ok: merge two (reserved)", said)
+
+    def test_the_same_two_entries_at_the_end_of_one_file_clash(self):
+        self.assertEqual(self.clashed.returncode, 1, self.clashed.stdout + self.clashed.stderr)
+        self.assertIn(b"CONFLICT (content): Merge conflict in packs.json", self.clashed.stdout)
+
 
 def built_folders():
     named = os.environ.get("OPEN_FIELD_PACKS", "")
@@ -1088,8 +1398,7 @@ class ABundledEntry(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        with open(check.CATALOG, encoding="utf-8") as f:
-            cls.listing = json.load(f)
+        cls.listing = tree_listing()[0]
         cls.base = next(entry for entry in cls.listing["packs"] if entry["id"] == "base")
 
     def test_the_tree_s_base_is_bundled_and_held_to_the_file_beside_the_install_page(self):
@@ -1138,8 +1447,7 @@ class ABundledEntry(unittest.TestCase):
 class TheListingHeldToBuiltFiles(unittest.TestCase):
     @unittest.skipUnless(built_folders(), "no built pack files: tools/build_all.py, or OPEN_FIELD_PACKS")
     def test_every_entry_this_repository_builds_is_the_file_a_build_gives(self):
-        with open(check.CATALOG, encoding="utf-8") as f:
-            the_listing = json.load(f)
+        the_listing = tree_listing()[0]
         # a listed pack's file is built in its own repository: .github/workflows/listing.yml downloads and holds it
         the_listing["packs"] = [entry for entry in the_listing["packs"] if entry["status"] != "listed"]
         said, in_order = run(copy.deepcopy(the_listing), folders=built_folders())

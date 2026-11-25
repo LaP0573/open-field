@@ -1,10 +1,23 @@
 #!/usr/bin/env python3
-"""Check the listing of packs, catalog/packs.json: what the install page offers an owner (docs/catalog.md).
+"""Check the listing of packs, the folder catalog/: what the install page offers an owner (docs/catalog.md).
 
   python -I tools/catalog_check.py                                  # the listing's form: every entry, every name held once
   python -I tools/catalog_check.py --files out/packs --files out/examples   # and the entries of each author with a file there held to their files
   python -I tools/catalog_check.py --fetch                          # and every listed entry held to its file, downloaded at its commit or from its branch
-  python -I tools/catalog_check.py --before before.json --fetch     # a pull request: against the listing before it, fetching what changed
+  python -I tools/catalog_check.py --before before/catalog --fetch  # a pull request: against the listing before it, fetching what changed
+  python -I tools/catalog_check.py --join builder/packs.json        # the listing joined into one file, as the install page reads it
+
+The listing is a folder of files. catalog/listing.json holds what the packs share, its about and its categories. Each
+pack has a file of its own, catalog/packs/<id>.json: its one entry, the file named after the entry's id exactly. So a
+pull request that lists a pack adds a file of its own, and two of them never change the same file. The check joins the
+files into one listing, the entries sorted by their ids, and holds that listing. It holds the folder too: a file that
+is not JSON in UTF-8 or not an object, a pack's file not named after its entry's id, a listing.json that is missing or
+holds more than the about and the categories, two pack files named alike but for small letters and capitals, a
+pack file named after a device Windows keeps (con, aux, nul, com1 and the like: git cannot put it on a Windows
+computer), and any other file are refused. The listing was one file,
+catalog/packs.json, before 2026-11-25: that file is refused with words of its own, and only a listing before a change
+(`--before`) may still be one. With `--join`, the joined listing is written into one file when the folder is in order,
+and nothing else is checked: the install page reads that file beside it, as packs.json.
 
 An entry names a pack file that lies in its author's own repository, at one commit, with the file's SHA-256; nothing
 of a pack is copied into this repository, but base.pack. An entry is `reserved` (its id and its folders held, no file
@@ -53,13 +66,14 @@ level of the base above the one the listed base offers; no folder that the entry
 its release and the base's version it needs are held as a pinned file's are (the page does not hold the version: it
 puts the listed base on the unit with every pack).
 
-A listing holds its about, its categories and its packs, and nothing else. Every entry is held by the same rules,
+A listing joined into one holds its about, its categories and its packs, and nothing else. Every entry is held by the same rules,
 whoever its author. The author `open-field` is the base's and the examples', which lie in this repository: an entry
 that names a repository is listed under its maker's own name, never under this project's.
 
-With `--before`, the listing before the change: no entry is taken out, no status moves back, an id is never changed,
-a new file comes with a higher version, and no version goes down (a followed entry's lowest included). Only the
-packs of the listing before are read: a key at its top that a listing no longer holds is passed over. One new file
+With `--before`, the listing before the change, its folder or one file (a listing of before 2026-11-25 included): no
+entry is taken out, no status moves back, an id is never changed, a new file comes with a higher version, and no
+version goes down (a followed entry's lowest included). Only the packs of the listing before are read: a key at its
+top that a listing no longer holds is passed over. One new file
 may keep its version: the same pack built for another firmware, when the entry's `firmware` changed too and this
 repository has a profile for the new one. A pinned entry may come to follow a branch, and back: that is a change like
 any other. With `--fetch`, only the entries that are new or name another file or another branch are downloaded then,
@@ -67,7 +81,7 @@ and a followed entry whose version, firmware, needs or folders changed.
 
 What it does not hold, and the review does: that the source at the commit is what the author says, and that the
 pack does what its description says on a unit. Nobody holds a followed entry's later versions so: each new commit on
-its branch reaches owners unread. It answers 0 when every entry is in order, 1 otherwise.
+its branch reaches owners unread. It answers 0 when the folder and every entry are in order, 1 otherwise.
 """
 
 import argparse
@@ -82,7 +96,14 @@ import urllib.parse
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CATALOG = os.path.join(ROOT, "catalog", "packs.json")
+CATALOG = os.path.join(ROOT, "catalog")                        # the listing: a folder of files, joined into one by `join`
+SHARED = "listing.json"                                         # in it: what the packs share, the about and the categories
+PACKS = "packs"                                                 # in it: one file a pack, packs/<id>.json, its one entry
+OLD = "packs.json"                                              # the listing as one file, before 2026-11-25
+SHARED_KEYS = {"about", "categories"}                           # listing.json's keys, every one, and no other
+SINCE = "2026-11-25"                                            # since when the listing is one file a pack
+WINDOWS_DEVICES = ({"con", "prn", "aux", "nul", "conin$", "conout$"} | {"com%d" % n for n in range(10)}
+                   | {"lpt%d" % n for n in range(10)})        # names Windows keeps for devices: no file of the folder takes one
 PROFILES = os.path.join(ROOT, "profiles")
 
 
@@ -677,10 +698,12 @@ def local_file(entry, folders):
     return None
 
 
-def check(listing, known_firmwares, before=None, folders=(), download=False, get=None):
-    """Every entry with its faults: (lines to print, whether all is in order)."""
+def check(listing, known_firmwares, before=None, folders=(), download=False, get=None, layout=()):
+    """Every entry with its faults: (lines to print, whether all is in order). `layout`: the faults of the folder the
+    listing was joined from (`join`), each refused as one of the whole listing."""
     get = get or fetch
     whole, each = listing_faults(listing, known_firmwares)
+    whole = list(layout) + whole
     lines = ["REFUSED: the listing: %s" % fault for fault in whole]
     packs = listing.get("packs", []) if isinstance(listing, dict) and isinstance(listing.get("packs"), list) else []
     earlier = before_faults(listing, before, known_firmwares) if before is not None else {}
@@ -759,23 +782,147 @@ def read_json(path):
         return json.load(f)
 
 
+def parsed(path, data):
+    """A file of the listing's folder read as JSON in UTF-8: (its object, None), or (None, a fault)."""
+    try:
+        value = json.loads(data.decode("utf-8"))
+    except ValueError as problem:                               # UnicodeDecodeError and JSONDecodeError both
+        return None, "catalog/%s is not JSON in UTF-8: %s" % (path, problem)
+    if not isinstance(value, dict):
+        return None, "catalog/%s is not a JSON object" % path
+    return value, None
+
+
+def device_name(name):
+    """The name Windows keeps for a device that a file's name stands for (aux in aux.json, aux.x.json or "aux .json"),
+    or None. Git for Windows refuses to put such a file on the disk."""
+    stem = name.split(".")[0].rstrip(" ")
+    return stem if stem.casefold() in WINDOWS_DEVICES else None
+
+
+def join(files, old_form=False):
+    """The listing's folder joined into one listing: (listing, faults). `files` maps each file's path inside the folder,
+    parted by /, to its bytes. The listing holds the about and the categories of listing.json and the entries of the
+    files in packs/, sorted by their ids, in small letters first. The faults are those of the folder, as texts: a file
+    that is not JSON in UTF-8 or not an object (left out), a pack's file not named after its entry's id, listing.json
+    missing or with keys other than the about and the categories, two pack files named alike but for small letters and
+    capitals, a pack file named after a device Windows keeps (device_name), and any other file. A packs.json is refused with words
+    of its own. With `old_form`, a folder that holds packs.json alone is a listing before 2026-11-25: that file's
+    listing, with no fault."""
+    if old_form and set(files) == {OLD}:
+        listing, fault = parsed(OLD, files[OLD])
+        return (listing if listing is not None else {}), ([] if fault is None else [fault])
+    listing, faults, packs, alike = {}, [], [], {}
+    for path in sorted(files):
+        parts = path.split("/")
+        if path == OLD:
+            faults.append("catalog/%s: the listing is one file a pack since %s, and each entry goes into "
+                          "catalog/%s/<id>.json (docs/catalog.md)" % (OLD, SINCE, PACKS))
+        elif path == SHARED:
+            shared, fault = parsed(path, files[path])
+            if fault:
+                faults.append(fault)
+                continue
+            other = sorted(set(shared) - SHARED_KEYS)
+            if other:
+                faults.append("catalog/%s holds keys other than about and categories: %s" % (SHARED, ", ".join(other)))
+            listing.update((key, shared[key]) for key in sorted(SHARED_KEYS) if key in shared)
+        elif len(parts) == 2 and parts[0] == PACKS and parts[1].endswith(".json"):
+            alike.setdefault(parts[1].casefold(), []).append(path)
+            device = device_name(parts[1])
+            if device:
+                faults.append("catalog/%s: Windows keeps the name %s for a device, and git cannot put that file on a Windows "
+                              "computer: the pack needs another id" % (path, device))
+            entry, fault = parsed(path, files[path])
+            if fault:
+                faults.append(fault)
+                continue
+            named = entry.get("id")
+            if not isinstance(named, str):
+                faults.append("catalog/%s holds an entry with no id to name its file after" % path)
+            elif parts[1] != named + ".json":
+                faults.append("catalog/%s holds the entry %s: a pack's file is named after its entry's id exactly, "
+                              "catalog/%s/%s.json" % (path, json.dumps(named, ensure_ascii=False), PACKS, named))
+            packs.append((named if isinstance(named, str) else parts[1][:-len(".json")], entry))
+        else:
+            faults.append("catalog/%s is no part of the listing, which is catalog/%s and one file a pack, catalog/%s/<id>.json"
+                          % (path, SHARED, PACKS))
+    for paths in alike.values():
+        if len(paths) > 1:
+            faults.append("%s are named alike but for small letters and capitals: a Windows or Mac computer keeps only one "
+                          "of them, so no two ids may differ in that alone" % " and ".join("catalog/" + path for path in paths))
+    if SHARED not in files:
+        faults.append("catalog/%s is missing: it holds the listing's about and its categories" % SHARED)
+    listing["packs"] = [entry for _key, entry in sorted(packs, key=lambda pair: (pair[0].casefold(), pair[0]))]
+    return listing, faults
+
+
+def read_folder(folder):
+    """Every file under a folder, however deep: {its path inside the folder, parted by /: its bytes}."""
+    files = {}
+    for where, folders, names in os.walk(folder):
+        folders.sort()
+        for name in sorted(names):
+            full = os.path.join(where, name)
+            with open(full, "rb") as f:
+                files[os.path.relpath(full, folder).replace(os.sep, "/")] = f.read()
+    return files
+
+
+def read_listing(path, old_form=False):
+    """A listing: (listing, faults). A folder is joined (`join`); a file is a listing joined into one already, as the
+    install page reads it, and has no fault of a folder."""
+    if os.path.isdir(path):
+        return join(read_folder(path), old_form)
+    return read_json(path), []
+
+
+def joined_text(listing):
+    """A listing joined into one file's text, as --join writes it."""
+    return json.dumps(listing, indent=2, ensure_ascii=False) + "\n"
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Check the listing of packs, catalog/packs.json.")
-    parser.add_argument("--catalog", default=CATALOG, help="the listing (default: catalog/packs.json)")
-    parser.add_argument("--before", help="the listing before the change, to hold the change against")
+    parser = argparse.ArgumentParser(description="Check the listing of packs, the folder catalog/.")
+    parser.add_argument("--catalog", default=CATALOG, help="the listing: its folder, or a listing joined into one file (default: catalog/)")
+    parser.add_argument("--before", help="the listing before the change, to hold the change against: its folder or one file, "
+                                         "a listing of before %s included" % SINCE)
     parser.add_argument("--files", action="append", default=[], help="a folder with pack files to hold the entries to (more than one may be given)")
     parser.add_argument("--fetch", action="store_true", help="download each listed entry's file, at its commit or from the branch it follows, and hold the entry to it")
+    parser.add_argument("--join", metavar="OUT", help="write the listing joined into one file, as the install page reads it, "
+                                                      "when its folder is in order; nothing else is checked")
     args = parser.parse_args(argv)
     try:
-        listing = read_json(args.catalog)
-        before = read_json(args.before) if args.before else None
+        listing, layout = read_listing(args.catalog)
     except (OSError, ValueError) as problem:
         print("REFUSED: the listing cannot be read: %s" % problem)
         return 1
-    if before is not None and not (isinstance(before, dict) and isinstance(before.get("packs"), list)):
+    if args.join:
+        if layout:
+            for fault in layout:
+                print("REFUSED: the listing: %s" % fault)
+            print("REFUSED: nothing written to %s" % args.join)
+            return 1
+        try:
+            with open(args.join, "w", encoding="utf-8", newline="\n") as f:
+                f.write(joined_text(listing))
+        except OSError as problem:
+            print("REFUSED: the listing cannot be written: %s" % problem)
+            return 1
+        packs = listing.get("packs") if isinstance(listing, dict) else None
+        print("the listing joined into %s: %d entries" % (args.join, len(packs) if isinstance(packs, list) else 0))
+        return 0
+    try:
+        before, earlier = read_listing(args.before, old_form=True) if args.before else (None, [])
+    except (OSError, ValueError) as problem:
+        print("REFUSED: the listing before the change cannot be read: %s" % problem)
+        return 1
+    if earlier or (before is not None and not (isinstance(before, dict) and isinstance(before.get("packs"), list))):
+        for fault in earlier:
+            print("REFUSED: the listing before the change: %s" % fault)
         print("REFUSED: the listing before the change is not a listing")
         return 1
-    lines, in_order = check(listing, firmwares(), before=before, folders=args.files, download=args.fetch)
+    lines, in_order = check(listing, firmwares(), before=before, folders=args.files, download=args.fetch, layout=layout)
     for line in lines:
         print(line)
     return 0 if in_order else 1

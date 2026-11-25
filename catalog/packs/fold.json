@@ -1,0 +1,18 @@
+{
+  "id": "fold",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of levels 9 and 10: a wave folder in two channels, a synth engine in the unit's own list, with two sounds.",
+  "path": "fold.pack",
+  "sha256": "fa52ddd3c41fb4d04225e96d5aaf8b767e97368e56ceb0fbf6fc62ffca2722b5",
+  "bytes": 3376,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

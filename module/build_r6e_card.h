@@ -417,7 +417,8 @@ struct Op1fCard;
 //            the mode changes. Level 4: while a page shown with op1f_page_show lies over another, `page` names the one on top.
 //            A page of the base's own (its top page, which asks the owner to confirm something) may lie over a pack's
 //            page for a moment: the pack's page is still the one `page` names, and no key or knob reaches any pack
-//            until it is gone. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
+//            until it is gone; from base 38 `canvas` is 0 from the frame it is asked for until it is gone, so that
+//            nothing a pack paints hides it. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
 //            while the unit is in another mode `page` is 0, and it names the page again once the unit is back in
 //            the page's mode
 //   disk     level 3: not 0 while the disk mode is open (the COM key, the computer connected): the computer owns the
@@ -425,7 +426,8 @@ struct Op1fCard;
 //            changed or deleted files in a shown folder
 //   canvas   level 4: this frame's picture as the display will show it, already drawn, for the op1f_paint_ helpers,
 //            which take it; 0 when the base offers none (base 26 only: also for a frame in which the unit's own
-//            notice lies over a page standing in; see OP1F_SHOWN_COVERED). It lives for the call only: never keep
+//            notice lies over a page standing in; see OP1F_SHOWN_COVERED. From base 38 also while the base's own top
+//            page is asked for or up; see `page`). It lives for the call only: never keep
 //            it, and never write it yourself (its layout is the base's to know). What a pack paints lies over
 //            everything for this frame and is gone at the next: paint again at every frame (base 33: unless the
 //            page holds its picture; see "Base 33" at the end)
@@ -948,11 +950,14 @@ struct Op1fEffectBlock { unsigned bytes, place, frames; int* left; int* right; c
 //                the one nearest in character
 //   cycles       what one call of `process` takes at most, 1 to OP1F_EFFECT_CYCLES_MOST. The base times every call
 //                as it times a stage's (level 6), with the same allowance: an effect that goes over is switched off at
-//                that place until the next start, and the place then passes the sound dry
+//                that place, and the place then passes the sound dry, until an effect is picked there again (base 38;
+//                before, until the next start; inside a pack, until the pack's place picks it again after another)
 //   state_bytes  the working memory one instance needs, 0 to OP1F_EFFECT_STATE_MOST: 0 for none. The base gives up
 //                to two instances for the unit's places (one for the sound that plays, one for the master), and one
 //                for each place a pack runs the effect at, from level 6's memory and inside its limits, each the
-//                first time it is needed, cleared, never given back. A place whose memory is refused passes the sound
+//                first time it is needed, cleared, never given back to the heap (base 38: a pack's place that has not
+//                run it for two frames leaves it to the next place that asks, the same effect first, cleared again over
+//                the frames). A place whose memory is refused passes the sound
 //                dry, with a line, and its page says so
 //   state_align  where the memory begins: on a multiple of it, a power of two from 4 to OP1F_MEMORY_ALIGN_MOST
 //   process      the effect, called once a block on the audio thread (see "The threads" above). Not 0
@@ -1502,18 +1507,23 @@ extern "C" const Op1fRackEntry* op1f_rack_list(const Op1fCard* card, unsigned* c
 // Level 8. An instance of the effect `id` made ready at the pack's own place `which` (0 to OP1F_RACK_PLACES - 1, a
 // place of the pack's own: a wagon, a lane), so that op1f_rack_run can run it there. The first time a place asks for an
 // effect, the effect's working memory is taken (level 6's machinery and limits) and cleared over the frames that
-// follow; it is kept for that place and that effect until the unit is switched off, and taken again when the place
-// asks for it again. When the place held another effect, or none, the effect's `reset` is called for it first (the
+// follow; it is kept for that place and that effect (base 38: until no place of any pack has run it for two frames;
+// then the next place that asks may take it over, the same effect first, its memory cleared again over the frames, and
+// OP1F_NOT_NOW meanwhile; 64 at most for all packs), and taken again when the place asks for it again. When the place
+// held another effect, or none, the effect's `reset` is called for it first (the
 // display thread). Answers 0 when the instance is ready, OP1F_NOT_NOW while its memory is being made ready (ask again
 // at the next frame), OP1F_BAD_NAME (no such effect), OP1F_TOO_LARGE or OP1F_FAILED (its memory was refused: a line
-// says why; the place stays dry), or OP1F_NOT_HERE (the effect was switched off for its cost at that place). From the
+// says why; the place stays dry), or OP1F_NOT_HERE (the effect was switched off for its cost at that place; from base
+// 38 the place gets another go when it asks for another effect and then this one again, or asks for it again after
+// neither asking for it nor running anything there for more than two frames). From the
 // frame function only. Asking again with the same effect each frame costs a few comparisons.
 extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id) OP1F_NAMED("op1f_rack_ready");
 
 // Level 8. The effect `run->id` run once at the pack's place `which`, on the pack's buffers, from the pack's own sound
 // work on the audio thread: the effect's `process` is called with a block whose `place` is OP1F_PLACE_HOSTED + `which`
 // and whose `state` is that place's instance. Timed and held to the effect's declared cost as a place of the unit's
-// is; switched off at that place until the next start when it goes over (a line at the next frame). Answers 0 when it
+// is; switched off at that place when it goes over (a line at the next frame), until it is picked there again after
+// another or after a pause in the place's asks (base 38; before, until the next start). Answers 0 when it
 // ran, or less than 0, the buffers then untouched: OP1F_NOT_HERE (no instance of that effect is ready at that place,
 // or it was switched off), OP1F_BAD_NAME (no such effect, or a run that is not in order). It writes no line and waits
 // for nothing.

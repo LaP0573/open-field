@@ -1,0 +1,20 @@
+{
+  "id": "split",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Stereo crossover drive with independent low-band and high-band gain.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/split.pack",
+  "sha256": "6adc6f5e6ddd438080e1d1850c54a6bf8b825240f1c762429edc247df996d5f8",
+  "bytes": 55777,
+  "version": 4,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

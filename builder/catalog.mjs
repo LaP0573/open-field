@@ -1,6 +1,6 @@
 // open-field: the listing of packs, as the install page reads it, and the download of a ticked pack.
 //
-// The listing is catalog/packs.json of the repository; the host's pages put a copy beside the page as packs.json
+// The listing is the folder catalog/, one file a pack; the host's pages join it into one, packs.json beside the page
 // (.github/workflows/pages.yml). tools/catalog_check.py holds every entry to its file before it is merged; this
 // module reads only what the page needs, and holds every download to its entry once more.
 //

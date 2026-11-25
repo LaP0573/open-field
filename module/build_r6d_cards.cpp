@@ -1,4 +1,18 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 38 (R16), the base pack: base 37's cards (base 36's text: base 37 changed nothing here), edited in place, with
+// one rule for every pack alike, carried from hasis's open-field pull request 39. While the base's own top page is asked
+// for or up (op1f_top_open, to the frame in which top_frame takes it off, that frame included: its picture, drawn
+// before, still shows the top page), a pack's page under 77 lies under it and the
+// frame's `page` still names that pack: a pack that paints over its own page at every frame painted over the door's
+// install question. So in such a frame no frame function is handed a canvas: the frame's `canvas` is 0, and so is
+// op1f_cards_canvas inside the call, and a pack paints nothing, as for any frame that offers none. `picture` is read
+// from the frame's word before the canvas is withheld, and still follows the display's two pictures. `popup` stays as
+// it was, the power popup alone: a pack built before reads any `popup` not 0 as the power popup. The ask's name on a
+// stand-in's blank page is painted with the same canvas and waits too; the page for an engine away and the unit's own
+// popups wait under the top page as before.
+//
+// What base 35 said follows and holds.
+//
 // Base 35 (R11), the base pack: base 33's cards, edited in place, with layers (module/build_r6e_card.h, "Base 35:
 // layers"), for every pack alike. A card of level 8 or later may ask for a layer of a sound's list of LFOs (kind
 // OP1F_ASK_LFO, its table the head of a kind): each such ask is held to its form at the check's lines (lfo_verdict:
@@ -492,7 +506,7 @@
 //   The helpers. op1f_log (module/build_m1_log.s), op1f_ms, op1f_screen, op1f_node, op1f_show, op1f_move as M1's
 //   unit has them, and level 2's op1f_page_open and op1f_page_close. Each wraps a call or a fact our own units have
 //   used on the unit since H2 and I2:
-//     the registry 0x8fc261fc() answers the table of 86 screens by their numbers (0x84c960f4), 0 for a number no
+//     the registry 0x8fc261fc() answers the table of 86 screens by their numbers (0x84c96580), 0 for a number no
 //       screen has; stock's own registration holds a number against no bound, so this unit takes 1 to 85 and
 //       answers 0 for any other. A screen's document is the word at its +4, 0 until stock has loaded it. The
 //       firmware reads that word at every draw, on the display thread.
@@ -3415,6 +3429,7 @@ extern "C" void op1f_cards_frame() {
         op1f_folders_settle();
     }
     op1f_door_frame(state.ms);                              // S1: the door's frame work
+    u32 top_was = top.shown;                                // R16 (base 38): the picture of this frame, drawn before, still shows the top page
     top_frame(op1f_frame_counter, RD32(CURRENT_MODE));      // S1: the base's top page put up, kept, taken off
     op1f_seq_frame();                                       // R3: the sequencer unit's frame work, then the notes unit's
     op1f_notes_frame();
@@ -3466,6 +3481,7 @@ extern "C" void op1f_cards_frame() {
     state.last_screen = now.screen;
     state.started = 2;
     hold_words(&handed, now.frame, (u32)now.canvas);        // R9 (base 33): `held` and `picture`
+    if (top_was || top.wanted || top.shown) now.canvas = 0; // R16 (base 38): no canvas under the base's top page, nor in the frame it is taken off; `picture` read above, from the frame's word
     hold_open(page);                                        // R9: the page this frame's calls may ask to hold
     u32 over = top.shown || now.popup != 0 || (stand.named && stand_on_screen) ? 1u : 0u;   // R9: the base's top page, the power popup, the ask's name below
     pages.canvas = now.canvas;                              // R1: for the paint helpers, while the frame functions are called

@@ -80,7 +80,7 @@ python -I tools/build_all.py --out out-new --update
 | A screen of the base | The instructions in `pictures/`. A pack carries instructions of its own, never a picture made from the device's own |
 | The tools for reading your own firmware file | `tools/`, used as [docs/methods.md](docs/methods.md) says |
 | The install pages | `builder/` |
-| The packs the install page offers | `catalog/packs.json`, checked by `tools/catalog_check.py` ([docs/catalog.md](docs/catalog.md)) |
+| The packs the install page offers | `catalog/listing.json` and one file a pack, `catalog/packs/<id>.json`, checked by `tools/catalog_check.py` ([docs/catalog.md](docs/catalog.md)) |
 | The pages for people | `docs/`, and the files at the top |
 
 ## The pages for those who write code
@@ -90,7 +90,7 @@ python -I tools/build_all.py --out out-new --update
 - [Packs](docs/packs.md): the file, and what the loader does with it. Every line the loader writes into the log is there.
 - [Methods](docs/methods.md): how to find a place in your own firmware, check it and use it, how to read a log, how to try a pack safely.
 - [The firmware's functions our code uses](docs/firmware-interfaces.md).
-- [The listing](docs/catalog.md): how a pack of yours is offered on the install page, by a pull request that changes only `catalog/packs.json`.
+- [The listing](docs/catalog.md): how a pack of yours is offered on the install page, by a pull request that adds one file of its own, `catalog/packs/<your pack's id>.json`.
 - [AGENTS.md](AGENTS.md): the same rules, for a coding assistant.
 
 ## Sending a change

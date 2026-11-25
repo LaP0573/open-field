@@ -1,4 +1,17 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 38 (R16), the base pack: base 37's effects unit (base 35's with R13's list starts), edited in place, with hasis's open-field pull request 38 (made
+// on base 32's unit) and two mends of its review. The runs inside packs: op1f_rack_ready kept a record for every pack's
+// place and effect ever asked, 64 at most, and then answered "no room" (a link of a chain walked through the list used
+// them up); now a record no place has run at the last two frames' looks is taken over before a new one is made, one of
+// the same effect first, its memory with it. That memory is cleared again over the frames, a quarter of a megabyte a
+// frame as a new block is (the review: not in one go inside a pack's frame call); meanwhile op1f_rack_ready answers
+// OP1F_NOT_NOW, op1f_rack_run OP1F_NOT_HERE and no other place takes it, then `reset` and `fresh` come as for a new
+// record. A switch-off for its cost was until the next start; now a place of the unit's gets another go when an effect
+// is picked there again (any row of its list: the review, a layer's row and the row it rides too, which hasis's change
+// left out), a run inside a pack when its place picks it again after another, or when its record is taken over (both as
+// hasis made them), or when its place asks for it again after a pause (fx train's wagon put on one of the
+// unit's own effects, which the base never sees, and back). What base 35's unit said follows and holds, but for "until the next start".
+//
 // Base 35 (R11), the base pack: base 33's effects unit, edited in place, with layers (module/build_r6e_card.h, "Base 35:
 // layers"), for every pack alike. An effect with OP1F_EFFECT_LAYER rides over whichever of the unit's own effects the
 // place holds: its ride follows no type word and ends by a pick of another row, a sound loaded without the base's
@@ -320,7 +333,7 @@ static volatile u32 rows_added;                        // the rows added at the 
 
 struct Budget {                                        // a place's or a run's: the audio thread writes, the display thread reads
     u32 window_start, window_over, window_most;
-    volatile u32 off;                                  // switched off until the next start
+    volatile u32 off;                                  // switched off: a place until an effect is picked there again, a run until it is picked there again (R16)
     volatile u32 off_cycles, off_overs;
     u32 off_said;
 };
@@ -353,7 +366,7 @@ enum { HEARD_TRIES = 4, WAIT_FRAMES = 128 };
 static u32 waiting;
 static u32 wait_type[PLACES], wait_from[PLACES], wait_frames[PLACES];
 
-enum { NONE = 0, CLEARING = 1, READY = 2, REFUSED = 3 };
+enum { NONE = 0, CLEARING = 1, READY = 2, REFUSED = 3, WIPING = 4 };   // R16: WIPING, a run's kept memory cleared again for its new place
 struct Instance { int handle; void* volatile state; volatile u32 status; char whose[64]; };
 static Instance instances[EFFECTS][2];                 // an effect's working memory for the instrument, and for the master
 
@@ -375,11 +388,23 @@ static u32 wrap_next[2];
 static volatile u32 wrap_seq;
 static volatile u32 reset_seq[2];                      // the build whose `reset` was called, an index
 
-// The runs inside a pack: a record a pack's place and an effect.
-struct Rack { u32 slot, which, effect; Instance in; Budget budget; volatile u32 fresh; char whose[48]; };
+// The runs inside a pack: a record a pack's place and an effect. R16 (hasis): a record no place runs any more is taken
+// over by the next place that asks for an effect (rack_take, below); `wiped`, the words of its kept memory cleared again.
+struct Rack { u32 slot, which, effect; Instance in; Budget budget; volatile u32 fresh; char whose[48]; u32 wiped; };
 static Rack racks[RACKS];
 static u32 rack_count;
 static volatile u8 rack_current[CARDS][RACK_PLACES];   // the record + 1 a pack's place runs, 0 for none
+// R16 (base 38): the frame count of each pack's place's last ask (op1f_rack_ready). A pack asks every
+// frame while a place holds one of the packs' effects and stops while it holds something else (fx train: one of the
+// unit's own effects, which it runs itself and which the base never sees); an ask after a pause of more than
+// RACK_PAUSE frames is a new pick of the effect there, as an ask for another effect and then this one is.
+static u32 rack_asked[CARDS][RACK_PLACES];
+// The review: a pause counts only when the place did not try to run anything either (a pack that asks once and then only
+// runs, asking again when op1f_rack_run answers OP1F_NOT_HERE, or one that spreads its asks over frames, must not have a
+// switched-off effect armed again every few frames): the frame count at the place's last op1f_rack_run, the audio
+// thread's.
+static volatile u32 rack_tried[CARDS][RACK_PLACES];
+enum { RACK_PAUSE = 2 };
 
 // What other threads tell the display thread: a bit a place, set and taken under a mask.
 static volatile u32 picked;                            // a ride begun by a pick
@@ -734,6 +759,26 @@ extern "C" void* op1f_fx_make(unsigned type, unsigned index) {
 
 // ---------------------------------------------------------------- W2, W3: the picks
 
+// R16 (hasis, open-field pull request 38): another go after a switch-off, the counters first, `off` last. Called only
+// while `off` is set: the audio thread then leaves that budget alone (a place's three calls of run() come through
+// ready_state, which passes the place dry while `off` is set; op1f_rack_run answers OP1F_NOT_HERE before it), and
+// account(), its only writer, sets `off` last, so nothing counts under the reset.
+static EFFECTS_APART void budget_rearm(Budget* b) {                             // apart: inlined, the compiler walked its stores with an index register in layer_pick and op1f_rack_ready
+    b->window_start = b->window_over = b->window_most = 0;
+    b->off_cycles = b->off_overs = 0;
+    b->off_said = 0;
+    BARRIER();
+    b->off = 0;
+}
+
+// R16: a pick in the unit's list at `place` (any row: a pack's, a layer's, the row it rides, the unit's own) re-arms
+// the place when its effect was switched off there. Called by the key thread inside the pick's own masked section, where
+// the ride changes (the review: not before it, where the audio thread could run one more block of the switched-off
+// effect), so that no frame says the line of a switch-off half undone either.
+static EFFECTS_APART void place_rearm(u32 place) {                             // apart: inlined, it left layer_pick short of registers
+    if (places[place].budget.off) budget_rearm(&places[place].budget);
+}
+
 static void clear_entry(u32 pair) {
     op1f_stand_screens[2u * pair] = 0;                                              // the mode first
     op1f_stand_screens[2u * pair + 1u] = 0;
@@ -776,6 +821,7 @@ static int layer_pick(u32 place, u32 id, u32 record, void* controller) {
     u32 pair = place == (u32)MASTER ? (u32)OP1F_STAND_MASTER : (u32)OP1F_STAND_EFFECT;
     u32 mode = place == (u32)MASTER ? 3u + 1u : (place < (u32)DRUM ? 0u : 1u) + 1u;
     MASK_OFF(mask);
+    place_rearm(place);                                                             // R16 (hasis): a pick is another go, a layer's row's too
     if (!same && was != 0 && !is_layer(riding(place)) && op1f_stand_screens[2u * pair] == mode) clear_entry(pair);
     places[place].ride = r;
     if (!same) picked |= bit;
@@ -853,6 +899,7 @@ extern "C" void op1f_fx_pick_do(unsigned record, unsigned id) {
     if (id >= (u32)ID_FIRST && id < (u32)ID_FIRST + n) {
         const Effect* e = &effects[id - (u32)ID_FIRST];
         MASK_OFF(mask);
+        place_rearm(place);                                                         // R16 (hasis): a pick is another go
         places[place].ride = id - (u32)ID_FIRST + 1u;                               // the mark first: the pick's build finds it
         picked |= 1u << place;
         ended &= ~(1u << place);
@@ -866,6 +913,7 @@ extern "C" void op1f_fx_pick_do(unsigned record, unsigned id) {
     if (places[place].ride != 0) {
         int layer = rides_layer(place);                                             // R11: a layer's switch is the owner's
         MASK_OFF(mask);
+        place_rearm(place);                                                         // R16: the place left as fresh as any pick leaves it
         places[place].ride = 0;
         ended |= 1u << place;
         picked &= ~(1u << place);
@@ -885,6 +933,7 @@ extern "C" void op1f_fx_master_pick(void* controller, unsigned id) {
     if (id >= (u32)ID_FIRST && id < (u32)ID_FIRST + n) {
         const Effect* e = &effects[id - (u32)ID_FIRST];
         MASK_OFF(mask);
+        place_rearm((u32)MASTER);                                                   // R16 (hasis): a pick is another go
         places[MASTER].ride = id - (u32)ID_FIRST + 1u;
         picked |= 1u << (u32)MASTER;
         ended &= ~(1u << (u32)MASTER);
@@ -896,6 +945,7 @@ extern "C" void op1f_fx_master_pick(void* controller, unsigned id) {
     }
     if (places[MASTER].ride != 0) {
         MASK_OFF(mask);
+        place_rearm((u32)MASTER);                                                   // R16: the place left as fresh as any pick leaves it
         places[MASTER].ride = 0;
         ended |= 1u << (u32)MASTER;
         picked &= ~(1u << (u32)MASTER);
@@ -1573,6 +1623,7 @@ static void first_frame() {
 // An instance's working memory asked, or polled while it is cleared. Answers its status.
 static u32 make_ready(Instance* in, const Effect* e, const char* for_what) {
     if (in->status == (u32)READY || in->status == (u32)REFUSED) return in->status;
+    if (in->status == (u32)WIPING) return CLEARING;                                 // R16: a run's kept memory, cleared again at the frames (rack_wipe)
     if (e->state_bytes == 0) {
         in->state = 0;
         BARRIER();
@@ -1611,14 +1662,20 @@ static void call_reset(const Effect* e, u32 place, void* state) {
     op1f_cards_call_out((u32)CALL_SHOWN, &kept);
 }
 
-static void say_off(const Effect* e, const char* where, Budget* b) {
+// R16: until when, by where: a place of the unit's (re-armed by a pick there, place_rearm), a run inside a pack (re-armed
+// by the pack's new pick at its place after another, op1f_rack_ready). The widest line, a run's with
+// line 11's numbers at their widest, is 218 characters: 258 with the logger's 40 before it.
+static const char UNTIL_PLACE[] = "an effect is picked there again";
+static const char UNTIL_RUN[] = "it is picked there again";
+
+static void say_off(const Effect* e, const char* where, const char* until, Budget* b) {
     if (!b->off || b->off_said) return;
     b->off_said = 1;
     if (b->off_overs == 0)
-        op1f_log(1, LOG_FILE, 10, "effect: '%s' at %s is switched off until the next start: %u cycles in one call, %u declared", e->name, where, b->off_cycles, e->cycles);
+        op1f_log(1, LOG_FILE, 10, "effect: '%s' at %s is switched off until %s: %u cycles in one call, %u declared", e->name, where, until, b->off_cycles, e->cycles);
     else
-        op1f_log(1, LOG_FILE, 11, "effect: '%s' at %s is switched off until the next start: %u calls in one second over twice its cost and its allowance, the most %u cycles, %u declared",
-                 e->name, where, b->off_overs, b->off_cycles, e->cycles);
+        op1f_log(1, LOG_FILE, 11, "effect: '%s' at %s is switched off until %s: %u calls in one second over twice its cost and its allowance, the most %u cycles, %u declared",
+                 e->name, where, until, b->off_overs, b->off_cycles, e->cycles);
 }
 
 static void period() {
@@ -1700,6 +1757,102 @@ static void heard_expire() {
     MASK_ON(mask);
 }
 
+// ---------------------------------------------------------------- R16 (hasis, open-field pull request 38): the runs' records kept small
+
+// A record is spare when no place of any pack runs it and none has at the last two frames' looks (the audio thread
+// reads rack_current once a call of op1f_rack_run, and a block is shorter than a frame), and its memory is not being
+// cleared. A record that has just become ready is held for its place two looks more (frame_work), so that no other
+// place takes it before its own asks again. A record switched off may be taken over: its new place gives it another go.
+enum { WIPE_A_FRAME = 256 * 1024 };                    // bytes cleared a frame, as the memory unit clears a new block
+static u8 rack_was[RACKS];                             // 2 at a look that found the record run, one less at each look after
+
+static void rack_look() {
+    u8 now[RACKS];
+    for (u32 i = 0; i < (u32)RACKS; ++i) now[i] = 0;
+    for (u32 c = 0; c < (u32)CARDS; ++c)
+        for (u32 w = 0; w < (u32)RACK_PLACES; ++w) {
+            u32 r = rack_current[c][w];
+            if (r != 0 && r <= rack_count) now[r - 1u] = 1;
+        }
+    for (u32 i = 0; i < rack_count; ++i) {
+        if (now[i]) rack_was[i] = 2;
+        else if (rack_was[i]) --rack_was[i];
+    }
+}
+
+static int rack_idle(u32 i) {
+    for (u32 c = 0; c < (u32)CARDS; ++c)
+        for (u32 w = 0; w < (u32)RACK_PLACES; ++w)
+            if (rack_current[c][w] == i + 1u) return 0;
+    const Rack* k = &racks[i];
+    return rack_was[i] == 0 && k->in.status != (u32)CLEARING && k->in.status != (u32)WIPING;
+}
+
+// A spare record of the same effect (its memory fits as it is), or 0.
+static u32 rack_spare(u32 effect) {
+    for (u32 i = 0; i < rack_count; ++i)
+        if (racks[i].effect == effect && racks[i].in.status == (u32)READY && rack_idle(i)) return i + 1u;
+    return 0;
+}
+
+// At 64 records: any spare record without memory, else a spare one whose memory fits `effect` (as big, on its
+// alignment: it is cleared again and kept, the review: no block left behind, since the heap gives nothing back), or 0,
+// "no room" as before base 38.
+static u32 rack_spare_any(u32 effect) {
+    for (u32 i = 0; i < rack_count; ++i) {
+        u32 status = racks[i].in.status;
+        if (rack_idle(i) && (status == (u32)NONE || status == (u32)REFUSED || effects[racks[i].effect].state_bytes == 0)) return i + 1u;
+    }
+    const Effect* e = &effects[effect];
+    if (e->state_bytes == 0) return 0;
+    for (u32 i = 0; i < rack_count; ++i) {
+        const Rack* k = &racks[i];
+        if (rack_idle(i) && k->in.status == (u32)READY && k->in.state != 0 && effects[k->effect].state_bytes >= e->state_bytes &&
+            ((u32)k->in.state & (e->state_align - 1u)) == 0)
+            return i + 1u;
+    }
+    return 0;
+}
+
+// A spare record handed to (slot, place, effect), a fresh start: its memory (the same effect's, or one that fits,
+// rack_spare_any) kept and cleared again over the frames (rack_wipe; op1f_rack_ready answers OP1F_NOT_NOW meanwhile,
+// op1f_rack_run OP1F_NOT_HERE, and no other place takes it); a record without memory asks its own as a new record does.
+// Its budget re-armed: no place runs it.
+static void rack_take(Rack* k, u32 slot, u32 which, u32 effect) {
+    if (k->in.status == (u32)READY && k->in.state != 0 && effects[effect].state_bytes != 0) {
+        k->wiped = 0;
+        k->in.status = WIPING;
+    } else {
+        k->in.status = NONE;
+        k->in.state = 0;
+        k->in.handle = 0;
+    }
+    budget_rearm(&k->budget);
+    k->slot = slot;
+    k->which = which;
+    k->effect = effect;
+    k->fresh = 0;
+    BARRIER();
+}
+
+// Up to `room` words of record i's kept memory cleared, from where the last frame stopped; ready once its last word is
+// 0, and held for its place (rack_was). Answers the words left for the other records.
+static u32 rack_wipe(u32 i, u32 room) {
+    Rack* k = &racks[i];
+    u32 words = (effects[k->effect].state_bytes + 3u) >> 2;
+    u32 end = k->wiped + room < words ? k->wiped + room : words;
+    volatile u32* block = (volatile u32*)k->in.state;
+    for (u32 w = k->wiped; w < end; ++w) block[w] = 0;
+    room -= end - k->wiped;
+    k->wiped = end;
+    if (end == words) {
+        BARRIER();                                                                  // every word cleared before the word that hands it over
+        k->in.status = READY;
+        rack_was[i] = 2;
+    }
+    return room;
+}
+
 static void frame_work() {
     if (!unit.first_done) {
         unit.first_done = 1;
@@ -1709,6 +1862,7 @@ static void frame_work() {
     u32 n = op1f_effects_registered;
     if (n == 0) return;
     ++unit.frames;
+    rack_look();                                                                    // R16 (hasis): which runs the packs' places still have
     u32 mask;
     MASK_OFF(mask);
     u32 began = picked, stopped = ended, loaded = told, by_load = told_load;         // R6d: by_load
@@ -1787,7 +1941,7 @@ static void frame_work() {
         u32 index = p == (u32)MASTER ? 1u : 0u;
         make_ready(&instances[e->number][index], e, index ? "the master" : "the instrument");
         char words[12];
-        say_off(e, place_words_for_log(p, words), &places[p].budget);
+        say_off(e, place_words_for_log(p, words), UNTIL_PLACE, &places[p].budget);
     }
     for (u32 p = 0; p < (u32)PLACES; ++p)                                           // a member refused with OP1F_NOT_NOW, of a place that rides no more
         if (places[p].member_dirty && riding(p) == 0) write_member(p);
@@ -1803,10 +1957,12 @@ static void frame_work() {
         if (e->table->reset) call_reset(e, place, in->state);
         reset_seq[index] = w->seq;
     }
+    u32 room = (u32)WIPE_A_FRAME >> 2;                                              // R16: words, for every run's memory together
     for (u32 i = 0; i < rack_count; ++i) {
         Rack* k = &racks[i];
-        if (k->in.status == (u32)CLEARING) make_ready(&k->in, &effects[k->effect], k->whose);
-        say_off(&effects[k->effect], k->whose, &k->budget);
+        if (k->in.status == (u32)WIPING) room = rack_wipe(i, room);                  // R16
+        else if (k->in.status == (u32)CLEARING && make_ready(&k->in, &effects[k->effect], k->whose) == (u32)READY) rack_was[i] = 2;   // R16: held for its place
+        say_off(&effects[k->effect], k->whose, UNTIL_RUN, &k->budget);
     }
     heard_expire();                                                                 // R6d
     period();
@@ -2053,6 +2209,50 @@ extern "C" const Op1fRackEntry* op1f_rack_list(const Op1fCard* card, unsigned* c
     return n ? entries : 0;
 }
 
+// A run's name for the log, "place N of 'pack'", written into `whose` (48 bytes).
+static EFFECTS_APART void rack_name(char* whose, const Op1fCard* card, u32 which) {
+    u32 at = 0;
+    for (const char* c = "place "; *c; ++c) whose[at++] = *c;
+    whose[at++] = (char)('0' + which);
+    for (const char* c = " of '"; *c; ++c) whose[at++] = *c;
+    for (u32 c = 0; c < 15u && card->name[c]; ++c) whose[at++] = card->name[c];
+    whose[at++] = '\'';
+    whose[at] = 0;
+}
+
+// The record + 1 of (slot, place, effect): its own, a spare one taken over, or a new one; 0 when there is no room (a line).
+// R16: apart from op1f_rack_ready, whose code it was, so that neither is left short of registers (the listing's rule: no
+// index register stepped outside op1f_effects_catalog_read).
+static EFFECTS_APART u32 rack_record(const Op1fCard* card, u32 slot, u32 which, u32 effect) {
+    for (u32 i = 0; i < rack_count; ++i)
+        if (racks[i].slot == slot && racks[i].which == which && racks[i].effect == effect) return i + 1u;
+    // R16 (hasis): a record no place runs any more is taken over before a new one is made, one of the same effect first
+    // (its memory with it); at 64, a spare one without memory or whose memory fits. Walking a link of a chain through the
+    // list no longer uses the 64 up. Its name is written into it in place (the review's listing: no copy of a local).
+    Rack* k = 0;
+    u32 record = rack_spare(effect);
+    if (record == 0 && rack_count == (u32)RACKS) record = rack_spare_any(effect);
+    if (record != 0) {
+        k = &racks[record - 1u];
+        rack_take(k, slot, which, effect);
+    } else {
+        if (rack_count == (u32)RACKS) {
+            char whose[48];
+            rack_name(whose, card, which);
+            op1f_log(1, LOG_FILE, 9, "effect: '%s' has no room for %s: %s", effects[effect].name, whose, "the base keeps 64 runs inside packs");
+            return 0;
+        }
+        k = &racks[rack_count];
+        k->slot = slot;
+        k->which = which;
+        k->effect = effect;
+        BARRIER();
+        record = ++rack_count;
+    }
+    rack_name(k->whose, card, which);
+    return record;
+}
+
 extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id) {
     int slot = slot_of(card);
     if (slot < 0) return OP1F_BAD_NAME;
@@ -2061,39 +2261,27 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
     if (which >= (u32)RACK_PLACES || id < (u32)ID_FIRST || id >= (u32)ID_FIRST + n) return OP1F_BAD_NAME;
     u32 effect = id - (u32)ID_FIRST;
     if (is_layer(&effects[effect])) return OP1F_BAD_NAME;                           // R11: a layer runs only over a place of the unit's
-    Rack* k = 0;
-    u32 record = 0;
-    for (u32 i = 0; i < rack_count && k == 0; ++i)
-        if (racks[i].slot == (u32)slot && racks[i].which == which && racks[i].effect == effect) {
-            k = &racks[i];
-            record = i + 1u;
-        }
-    if (k == 0) {
-        char whose[48];
-        u32 at = 0;
-        for (const char* c = "place "; *c; ++c) whose[at++] = *c;
-        whose[at++] = (char)('0' + which);
-        for (const char* c = " of '"; *c; ++c) whose[at++] = *c;
-        for (u32 c = 0; c < 15u && card->name[c]; ++c) whose[at++] = card->name[c];
-        whose[at++] = '\'';
-        whose[at] = 0;
-        if (rack_count == (u32)RACKS) {
-            op1f_log(1, LOG_FILE, 9, "effect: '%s' has no room for %s: %s", effects[effect].name, whose, "the base keeps 64 runs inside packs");
-            return OP1F_FAILED;
-        }
-        k = &racks[rack_count];
-        k->slot = (u32)slot;
-        k->which = which;
-        k->effect = effect;
-        for (u32 c = 0; c <= at; ++c) k->whose[c] = whose[c];
-        BARRIER();
-        record = ++rack_count;
-    }
+    u32 record = rack_record(card, (u32)slot, which, effect);
+    if (record == 0) return OP1F_FAILED;
+    Rack* k = &racks[record - 1u];
+    rack_was[record - 1u] = 2;                                                      // R16 (the review): its place asks for it
     const Effect* e = &effects[effect];
     u32 status = make_ready(&k->in, e, k->whose);
     if (status == (u32)CLEARING) return OP1F_NOT_NOW;
     if (status == (u32)REFUSED) return k->in.handle == OP1F_TOO_LARGE ? OP1F_TOO_LARGE : OP1F_FAILED;
-    if (k->budget.off) return OP1F_NOT_HERE;
+    u32 asked = rack_asked[slot][which], tried = rack_tried[slot][which];
+    rack_asked[slot][which] = unit.frames;
+    if (k->budget.off) {                                                            // R16 (hasis): another go on a new pick
+        if (rack_current[slot][which] == record) {
+            if (unit.frames - asked <= (u32)RACK_PAUSE || unit.frames - tried <= (u32)RACK_PAUSE) return OP1F_NOT_HERE;
+            if (e->table->reset) call_reset(e, (u32)OP1F_PLACE_HOSTED + which, k->in.state);   // asked again after a pause: `reset`
+            k->fresh = 1;                                                           // returned while `off` keeps the audio thread out
+            BARRIER();                                                              // (the review), then the go
+            budget_rearm(&k->budget);
+            return 0;
+        }
+        budget_rearm(&k->budget);                                                   // picked again after another: the place names it
+    }                                                                               // only once its `reset` has returned, below
     if (rack_current[slot][which] != record) {                                      // the place held another effect, or none
         if (e->table->reset) call_reset(e, (u32)OP1F_PLACE_HOSTED + which, k->in.state);
         k->fresh = 1;
@@ -2109,6 +2297,7 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
     if (slot < 0 || r == 0 || r->bytes < (u32)RUN_BYTES || which >= (u32)RACK_PLACES || r->frames != (u32)FRAMES || r->left == 0 || r->right == 0 ||
         r->values == 0 || r->form > (u32)OP1F_RACK_VALUES || r->id < (u32)ID_FIRST || r->id >= (u32)ID_FIRST + n)
         return OP1F_BAD_NAME;
+    rack_tried[slot][which] = unit.frames;                                         // R16: the place tried to run (rack_tried)
     u32 record = rack_current[slot][which];
     if (record == 0 || record > rack_count) return OP1F_NOT_HERE;
     Rack* k = &racks[record - 1u];

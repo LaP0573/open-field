@@ -1,0 +1,28 @@
+{
+  "id": "snowtrain",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A light fx train: TE's T3 effect plus three pack effects as wagons on every sound, trains on tape tracks, presets. Not beside fx train.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/snowtrain.pack",
+  "follow": "main",
+  "version": 17,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [
+    {
+      "name": "snowtrain",
+      "place": "snowtrain"
+    },
+    {
+      "name": "snow tracks",
+      "place": "snowtracks"
+    }
+  ],
+  "picture": {
+    "path": "packs/snowtrain/picture.png"
+  }
+}

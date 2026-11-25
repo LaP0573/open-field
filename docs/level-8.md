@@ -124,7 +124,7 @@ if (!on && lines->quiet >= (u32)LINE) return;         // switched off, and the l
 
 `"cycles"` is what one call takes at most, in the processor's cycles, from 1 to 84,000 (`OP1F_EFFECT_CYCLES_MOST`), about what the unit's costliest own effect takes. It isn't counted in level 6's sum for stages: your effect takes the place of one of the unit's, which costs about as much.
 
-The base times every call and holds you to it **at each place**, as it holds a stage. It's **switched off at that place until the next start** when eight calls in one second take more than twice what you declared and more than that plus 20,000, or when one call takes more than 290,000. That place then passes the sound dry, its page says `switched off`, and the log names your effect, the place and the call. Once a period the log gives your effect's calls, the most cycles, the average and the calls over. Read that line on your unit and set `cycles` from it.
+The base times every call and holds you to it **at each place**, as it holds a stage. It's **switched off at that place until an effect is picked there again** when eight calls in one second take more than twice what you declared and more than that plus 20,000, or when one call takes more than 290,000. That place then passes the sound dry, its page says `switched off`, and the log names your effect, the place and the call. Any pick in the unit's list at that place gives it another go, even of the row it already rides. Once a period the log gives your effect's calls, the most cycles, the average and the calls over. Read that line on your unit and set `cycles` from it.
 
 Before you have a unit's reading, count. Both examples worked theirs out from the compiled code: the longest way through one turn of the loop, in instructions, times 64 frames, plus everything outside the loop. Then that count turned into cycles at about two cycles an instruction, which is what `dub`'s stage showed on a unit for a loop that reads and writes lines in the unit's main memory. Then half again on top. That gave `ping` 42,000 and `crush` 31,000. On a unit the period lines then showed `ping` at most 25,299 cycles a call and `crush` 17,427, with no call over.
 
@@ -144,7 +144,7 @@ static inline int add_held(int a, int b) {
 `state_bytes` is the memory one place needs, up to 8 MiB (`OP1F_EFFECT_STATE_MOST`). You don't ask it with a separate ask. The base takes it for you, from level 6's working memory and inside its limits (16 MiB for every pack's asks together, 8 MiB kept free for the unit):
 
 - **One block for the sound that plays** (every synth and drum sound shares it, since only one plays at a time), and **one for the master**, each the first time your effect plays there.
-- **One for each place another pack runs your effect at** (below), the first time it asks.
+- **One for each place another pack runs your effect at** (below), the first time it asks. Once no place runs it any more, the base may hand it on to the next place that asks for your effect, cleared to 0 again first.
 
 Each is cleared to 0 over the frames after it's taken, a quarter of a megabyte a frame, and the place passes the sound dry until it's handed over. It's never given back. **When it's refused**, the log says why, that place passes the sound dry, and your page says `no room`. `state` is 0 when you asked none.
 
@@ -220,7 +220,7 @@ The list `op1f_rack_list` answers is the base's, the same from the first frame t
 
 To run one inside your own sound work:
 
-1. **Make it ready at a place of your own**, from your frame function: `op1f_rack_ready(card, which, id)`, with `which` 0 to 7, your own numbering (a link of a chain, a lane). The first time, the base takes the effect's working memory for that place and calls its `reset`. Meanwhile it answers `OP1F_NOT_NOW`, so ask again at the next frame. It answers 0 when the effect is ready. Asking again every frame with the same effect costs a few comparisons. It answers `OP1F_TOO_LARGE` or `OP1F_FAILED` when the memory was refused (with a line), and `OP1F_NOT_HERE` when the effect was switched off at your place for its cost.
+1. **Make it ready at a place of your own**, from your frame function: `op1f_rack_ready(card, which, id)`, with `which` 0 to 7, your own numbering (a link of a chain, a lane). The first time, the base takes the effect's working memory for that place, or hands it one no place uses any more, and calls its `reset`. Meanwhile it answers `OP1F_NOT_NOW`, so ask again at the next frame. It answers 0 when the effect is ready. Asking again every frame with the same effect costs a few comparisons. It answers `OP1F_TOO_LARGE` or `OP1F_FAILED` when the memory was refused (with a line), and `OP1F_NOT_HERE` when the effect was switched off at your place for its cost. Ask for another effect there and then for this one again, or stop asking for it and running it for a few frames (your place held something else) and ask again, and it gets another go.
 2. **Run it** from your own sound work, a stage's `process` for instance: `op1f_rack_run(card, which, &run)`. The effect's `process` is called on your buffers with `place` `OP1F_PLACE_HOSTED + which` and your place's memory. It answers 0 when it ran, else a code and your buffers untouched. It writes no line and waits for nothing.
 
 An `Op1fRackRun` holds `bytes` (36), `id`, `form`, `frames` (64), `left` and `right`, `values`, `on` and `fresh`:
@@ -253,9 +253,9 @@ extern "C" void lane_process(const Op1fBlock* now) {
 
 Three things to keep in mind:
 
-- **Your own stage is timed with the effect inside it.** Declare your stage's cost with the costliest effect it may run counted in. The effect is also held to its own declared cost at your place. When it goes over, it's switched off there until the next start, and `op1f_rack_run` answers `OP1F_NOT_HERE` from then on.
+- **Your own stage is timed with the effect inside it.** Declare your stage's cost with the costliest effect it may run counted in. The effect is also held to its own declared cost at your place. When it goes over, it's switched off there, and `op1f_rack_run` answers `OP1F_NOT_HERE`, until you pick it at that place again after another effect, or after a few frames of not asking for it.
 - **The effect can't tell your place from a sound's** but by `place`. Hand it what the unit would: 64 frames, Q1.31, its values inside their ranges.
-- **Each of your places keeps its own memory for the effect it last ran there.** Put another effect at that place and the base readies it afresh. A memory once taken is kept until the unit is switched off.
+- **Each of your places keeps its own memory for the effect it last ran there.** Put another effect at that place and the base readies it afresh. Once no place of any pack has run an effect there for two frames, the base hands that run to the next place that asks: one of the same effect first, its memory cleared to 0 again over the frames, a quarter of a megabyte a frame, with `OP1F_NOT_NOW` meanwhile and `reset` after, as for a new one. So walking a place through the list uses nothing up. The base keeps 64 runs at most for all packs together. Once all 64 are made, a new one takes a spare run without memory, or one whose memory is big enough for it; when there is none, `op1f_rack_ready` answers `OP1F_FAILED` with a line.
 
 **Our `fx train` is such a pack.** With it on the unit, your effect is offered on the wagons of the train too, in the same order as the unit's list. From version 18 it is not offered on the wagon under the lamp, which holds the sound's own effect, and a tap on a wagon that holds yours opens nothing. A wagon that holds it is drawn as the effect yours stands on, with your effect's name in the unit's own letters. If your pack is taken off, the wagon stays on the train, silent, keeps the name, and plays again when the pack is back.
 
@@ -279,7 +279,7 @@ Places are said as `synth 1` to `synth 8`, `drum 1` to `drum 8` and `the master`
 | `effect: '<name>' has <bytes> bytes for <place> at ...` | Your working memory for that place |
 | `effect: '<name>' has no room for <place>: ...` | Why not |
 | `effect: '<name>' this period: ...` | Through the base's quiet gate: calls, the most cycles, the average, and calls over what you declared |
-| `effect: '<name>' at <place> is switched off until the next start: ...` | The call that went too far, or how many went over in one second, against what you declared |
+| `effect: '<name>' at <place> is switched off until ...: ...` | The call that went too far, or how many went over in one second, against what you declared. Until `an effect is picked there again` at a sound or the master, `it is picked there again` at another pack's place |
 | `effect: '<name>' value <n> '<value>' stands at <v>: the knob row of <effect> has no span` | A knob of the effect yours stands on doesn't move, so that value stays at its `start` |
 | `effect: <place> waited <n> frames for the loaded sound's <effect>, which did not come: ...` | A warning: a sound was loaded onto a slot and the unit never applied it there (a sound sent over MIDI to a slot that isn't shown, say). The base reads the slot as it stands |
 

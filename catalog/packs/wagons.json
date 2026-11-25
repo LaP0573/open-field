@@ -1,0 +1,19 @@
+{
+  "id": "wagons",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Five effects in the unit's own effect lists: BOOST, GATE, FREEZE, TAPE and JUNEAUX.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/wagons.pack",
+  "follow": "main",
+  "version": 13,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/wagons/picture.png"
+  }
+}

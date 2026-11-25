@@ -1,0 +1,20 @@
+{
+  "id": "squash",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Stereo compressor with adjustable threshold, compression, timing and wet/dry mix.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/squash.pack",
+  "sha256": "a515f95a283114f61f6d24303b4a6331de025efe4840ebb0e9f863bec088064c",
+  "bytes": 58271,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}
