@@ -85,6 +85,7 @@
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--grey)); margin-right: 6px; }
   .dot.ring { background: transparent; box-shadow: inset 0 0 0 1.5px var(--grey); }
   .linkish { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+  #saveLogs:disabled { text-decoration: none; cursor: progress; }
 
   /* 1 your OP-1 */
   .unit { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr); gap: 44px; align-items: start; }
@@ -425,7 +426,7 @@
         <div class="sec-h">
           <span class="n">1</span><h2>your OP-1</h2>
           <span class="aside" data-m="connect"><span><span class="dot ring"></span><span id="linkWords">not connected</span></span></span>
-          <span class="aside" data-m="found other ours update packs asks back"><span><span class="dot" style="--c:var(--blue)"></span>connected over usb</span><button type="button" class="linkish" id="disconnect">disconnect</button></span>
+          <span class="aside" data-m="found other ours update packs asks back"><span><span class="dot" style="--c:var(--blue)"></span>connected over usb</span><button type="button" class="linkish" id="disconnect">disconnect</button><button type="button" class="linkish hidden" id="saveLogs" title="the log files of your OP-1's last three starts, in one .zip">save logs</button></span>
         </div>
 
         <!-- large: when you have to look at your OP-1 -->
@@ -1685,6 +1686,7 @@
     renderBar(live);
     if (live) renderHeader();
     if (!leaving && live && !["asks", "back", "install"].includes(document.body.dataset.moment)) setMoment(momentFor());
+    logsLink();
     $("listingNote").textContent = !listing ? "The listing of packs isn't beside this page, so there's nothing to pick from here." : listing.otherFirmware ? listing.otherFirmware + " pack(s) of the listing are for another OS version and aren't shown." : "";
   }
 
@@ -1864,7 +1866,69 @@
     $("connect").disabled = running;
     $("tryAgain").disabled = running;
     if (resolved) $("send").disabled = running || !(resolved.plan.send.length || resolved.plan.remove.length) || resolved.problems.length > 0;
+    logsLink();
   }
+
+  // ---------- save logs: the unit's log files of its last three starts, in one .zip on this computer ----------
+  // Offered only by a door of build 6 or later, which reads its log files out over MIDI. It is one talk with the unit
+  // like the others (guarded): while another talk runs the link can't be pressed, and while it runs connect and the
+  // change can't either. Its words say how far it is, then "saved" or why not. The files go into the .zip byte for
+  // byte as the unit has them.
+
+  let logsWords = "", logsTimer = null;
+  function logsLink() {
+    const b = $("saveLogs");
+    b.classList.toggle("hidden", !client.canLogs());
+    b.disabled = running;
+    b.textContent = logsWords || "save logs";
+  }
+  function logsSay(words, ms) {
+    logsWords = words;
+    if (logsTimer) { clearTimeout(logsTimer); logsTimer = null; }
+    if (ms) logsTimer = setTimeout(() => { logsWords = ""; logsTimer = null; logsLink(); }, ms);
+    logsLink();
+  }
+  function logsStopWords(e) {
+    if (!output || !(e instanceof D.DoorError)) return !output ? "not saved: your OP-1 went away" : "not saved";
+    switch (e.kind) {
+      case "gone": case "silent": return "not saved: your OP-1 went away";
+      case "name": case "unreadable": case "status": return "not saved: your OP-1 refused";
+      case "not ready": return "not saved: your OP-1 isn't ready yet";
+      case "asking": return "not saved: answer your OP-1 first";
+      case "applying": return "not saved: your OP-1 is changing its packs";
+      case "stopped": return "not saved: stopped";
+      default: return "not saved";
+    }
+  }
+  function saveDownload(name, bytes) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+    const a = el("a");
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  $("saveLogs").addEventListener("click", () => guarded(async () => {
+    if (!client.canLogs()) return;
+    logsSay("saving logs…");
+    try {
+      await midiAccess();
+      if (!takePorts()) throw new D.DoorError("gone", "Your OP-1 isn't on USB any more.");
+      stopFlag = false;
+      const got = await client.collectLogs({ onFile: (i, n) => logsSay("saving logs " + i + " of " + n) });
+      if (!got.files.length) { logsSay("no logs on your OP-1", 6000); return; }
+      const zip = D.logsZip(got.files);
+      saveDownload(zip.name, zip.bytes);
+      say("saved " + got.files.length + (got.files.length === 1 ? " log file" : " log files") + " of your OP-1 as " + zip.name + " (" + kb(zip.bytes.length) + ")", "ok");
+      logsSay("saved", 4000);
+    } catch (e) {
+      if (leaving) return;
+      say("save logs: " + (e && e.message ? e.message : e), "warn");
+      logsSay(logsStopWords(e), 8000);
+    }
+  }));
 
   $("updateBase").addEventListener("click", () => { if (rowsNow && P.updateOffered(rowsNow.base)) choose(() => choices.updates.add(P.BASE)); });
   $("undoAll").addEventListener("click", () => { if (rowsNow) choose(() => { choices = P.initialChoices(rowsNow); picked = []; $("pickSay").textContent = ""; }); });

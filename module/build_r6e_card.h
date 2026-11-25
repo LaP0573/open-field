@@ -142,7 +142,7 @@
 //   Folders: none, one or several. Most packs need none: a pack whose card says no folder gets none, and nothing of
 //   the disk is touched for it. A pack that keeps something (its settings, files the computer brings) lists its
 //   folders in its card, up to eight. Each has
-//     a name     what the computer shows in the disk mode, beside synth, drum, tapes, mixdown and packs;
+//     a name     what the computer shows in the disk mode, beside synth, drum, tapes, mixdown, packs and logs;
 //     a place    where the folder lies on the unit's disk: user/pf/ and the place, a folder of its own;
 //     shown      whether the computer sees it. A folder that is not shown is a pack's private folder (its settings).
 //   tools/pack_build.py writes the list from the recipe and fills what the recipe leaves out: a folder's name is the
@@ -154,7 +154,7 @@
 //   space or a dot; the tool refuses any other and the base does not use it. Where two folders want one thing, the
 //   earlier keeps it, in the order of the packs' file names and then of each pack's list, capitals counted as small
 //   letters (the computer's disk cannot keep two names that differ only in capitals):
-//     a name the firmware's (synth, drum, tapes, mixdown), the loader's (packs) or an earlier
+//     a name the firmware's (synth, drum, tapes, mixdown), the loader's (packs), the base's (logs, since base 34) or an earlier
 //       folder's: the folder is not shown, and its line says so; the pack still has it on the disk;
 //     a place an earlier folder has: the folder is not the pack's, its line says so, and the helpers answer
 //       OP1F_NO_FOLDER for it.
@@ -402,8 +402,8 @@ enum { OP1F_NO_FILE = -1, OP1F_TOO_LARGE = -2, OP1F_NOT_NOW = -3, OP1F_NO_FOLDER
 struct Op1fCard;
 
 // What a card's frame function is handed, the same for every card of a frame.
-//   bytes    the size of what is handed: 28 at level 1, 32 at level 2, 36 at level 3, 40 at level 4. A later base
-//            may hand more; read what you know
+//   bytes    the size of what is handed: 28 at level 1, 32 at level 2, 36 at level 3, 40 at level 4, 48 on base 33
+//            (an Op1fFrameHeld, at the end of this file). A later base may hand more; read what you know
 //   frame    the number of the frame, counted by the base
 //   ms       milliseconds since the base's first frame: what op1f_ms answers. It moves once a frame
 //   mode     the mode the unit is in, by the firmware's own number: 0 synth, 1 drum, 2 tape, 3 mixer. A pack with a
@@ -417,7 +417,8 @@ struct Op1fCard;
 //            the mode changes. Level 4: while a page shown with op1f_page_show lies over another, `page` names the one on top.
 //            A page of the base's own (its top page, which asks the owner to confirm something) may lie over a pack's
 //            page for a moment: the pack's page is still the one `page` names, and no key or knob reaches any pack
-//            until it is gone. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
+//            until it is gone; from base 38 `canvas` is 0 from the frame it is asked for until it is gone, so that
+//            nothing a pack paints hides it. From base 26 on, a page shown with OP1F_PAGE_STAYS is not closed when the mode changes:
 //            while the unit is in another mode `page` is 0, and it names the page again once the unit is back in
 //            the page's mode
 //   disk     level 3: not 0 while the disk mode is open (the COM key, the computer connected): the computer owns the
@@ -425,9 +426,11 @@ struct Op1fCard;
 //            changed or deleted files in a shown folder
 //   canvas   level 4: this frame's picture as the display will show it, already drawn, for the op1f_paint_ helpers,
 //            which take it; 0 when the base offers none (base 26 only: also for a frame in which the unit's own
-//            notice lies over a page standing in; see OP1F_SHOWN_COVERED). It lives for the call only: never keep
+//            notice lies over a page standing in; see OP1F_SHOWN_COVERED. From base 38 also while the base's own top
+//            page is asked for or up; see `page`). It lives for the call only: never keep
 //            it, and never write it yourself (its layout is the base's to know). What a pack paints lies over
-//            everything for this frame and is gone at the next: paint again at every frame
+//            everything for this frame and is gone at the next: paint again at every frame (base 33: unless the
+//            page holds its picture; see "Base 33" at the end)
 struct Op1fFrame { unsigned bytes, frame, ms, mode, screen, shift, popup; const Op1fCard* page; unsigned disk; void* canvas; };   // 40 bytes at level 4
 
 // What happened, for an input function (level 2).
@@ -947,11 +950,14 @@ struct Op1fEffectBlock { unsigned bytes, place, frames; int* left; int* right; c
 //                the one nearest in character
 //   cycles       what one call of `process` takes at most, 1 to OP1F_EFFECT_CYCLES_MOST. The base times every call
 //                as it times a stage's (level 6), with the same allowance: an effect that goes over is switched off at
-//                that place until the next start, and the place then passes the sound dry
+//                that place, and the place then passes the sound dry, until an effect is picked there again (base 38;
+//                before, until the next start; inside a pack, until the pack's place picks it again after another)
 //   state_bytes  the working memory one instance needs, 0 to OP1F_EFFECT_STATE_MOST: 0 for none. The base gives up
 //                to two instances for the unit's places (one for the sound that plays, one for the master), and one
 //                for each place a pack runs the effect at, from level 6's memory and inside its limits, each the
-//                first time it is needed, cleared, never given back. A place whose memory is refused passes the sound
+//                first time it is needed, cleared, never given back to the heap (base 38: a pack's place that has not
+//                run it for two frames leaves it to the next place that asks, the same effect first, cleared again over
+//                the frames). A place whose memory is refused passes the sound
 //                dry, with a line, and its page says so
 //   state_align  where the memory begins: on a multiple of it, a power of two from 4 to OP1F_MEMORY_ALIGN_MOST
 //   process      the effect, called once a block on the audio thread (see "The threads" above). Not 0
@@ -1501,18 +1507,23 @@ extern "C" const Op1fRackEntry* op1f_rack_list(const Op1fCard* card, unsigned* c
 // Level 8. An instance of the effect `id` made ready at the pack's own place `which` (0 to OP1F_RACK_PLACES - 1, a
 // place of the pack's own: a wagon, a lane), so that op1f_rack_run can run it there. The first time a place asks for an
 // effect, the effect's working memory is taken (level 6's machinery and limits) and cleared over the frames that
-// follow; it is kept for that place and that effect until the unit is switched off, and taken again when the place
-// asks for it again. When the place held another effect, or none, the effect's `reset` is called for it first (the
+// follow; it is kept for that place and that effect (base 38: until no place of any pack has run it for two frames;
+// then the next place that asks may take it over, the same effect first, its memory cleared again over the frames, and
+// OP1F_NOT_NOW meanwhile; 64 at most for all packs), and taken again when the place asks for it again. When the place
+// held another effect, or none, the effect's `reset` is called for it first (the
 // display thread). Answers 0 when the instance is ready, OP1F_NOT_NOW while its memory is being made ready (ask again
 // at the next frame), OP1F_BAD_NAME (no such effect), OP1F_TOO_LARGE or OP1F_FAILED (its memory was refused: a line
-// says why; the place stays dry), or OP1F_NOT_HERE (the effect was switched off for its cost at that place). From the
+// says why; the place stays dry), or OP1F_NOT_HERE (the effect was switched off for its cost at that place; from base
+// 38 the place gets another go when it asks for another effect and then this one again, or asks for it again after
+// neither asking for it nor running anything there for more than two frames). From the
 // frame function only. Asking again with the same effect each frame costs a few comparisons.
 extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id) OP1F_NAMED("op1f_rack_ready");
 
 // Level 8. The effect `run->id` run once at the pack's place `which`, on the pack's buffers, from the pack's own sound
 // work on the audio thread: the effect's `process` is called with a block whose `place` is OP1F_PLACE_HOSTED + `which`
 // and whose `state` is that place's instance. Timed and held to the effect's declared cost as a place of the unit's
-// is; switched off at that place until the next start when it goes over (a line at the next frame). Answers 0 when it
+// is; switched off at that place when it goes over (a line at the next frame), until it is picked there again after
+// another or after a pause in the place's asks (base 38; before, until the next start). Answers 0 when it
 // ran, or less than 0, the buffers then untouched: OP1F_NOT_HERE (no instance of that effect is ready at that place,
 // or it was switched off), OP1F_BAD_NAME (no such effect, or a run that is not in order). It writes no line and waits
 // for nothing.
@@ -1645,5 +1656,253 @@ extern "C" int op1f_option_set(const Op1fCard* card, unsigned option, unsigned v
 
 // The mark of a base that carries out an ask of kind OP1F_ASK_OPTIONS (a constant 1).
 extern "C" const unsigned op1f_options_1 OP1F_NAMED("op1f_options_1");
+
+// Base 33: a page that holds its picture. Up to here every word is base 32's; this part only adds behind it, and a pack
+// built for base 32 or earlier is drawn as before. Op1fFrame stays as it was (so that a pack that compares `bytes` with
+// its size keeps its meaning): base 33 hands an Op1fFrameHeld, the frame and two words behind it, and says 48 in
+// `bytes`. Read the two words with op1f_frame_held and op1f_frame_picture, which answer for an older base too.
+//
+// In every frame the firmware clears the picture to black and draws the page's document at 77 into it, and the packs
+// paint over that. A page that changes little from frame to frame (a few numbers, a moving dot) may ask the base to
+// leave that out: then the firmware draws nothing of the page in the frame, and the frame costs the page only what the
+// pack repaints. The display has two pictures and draws into them in turn, so a held picture is two frames old: it is
+// the picture of the last frame with the same `picture`, with everything painted into it then. What a pack painted
+// stays until it is painted over.
+//
+// How a pack holds its picture:
+//   - its frame function calls op1f_page_hold in every frame the hold should go on, while its page is the one shown.
+//     A frame without the ask is followed by a whole picture;
+//   - in each frame it reads `held` (op1f_frame_held, below). 0: the page was drawn whole, so it paints all of its own, as on base 32. 1: it
+//     repaints what changed since the frame with the same `picture` (two frames before): what it painted into the
+//     other picture in the frame between is not in this one;
+//   - the base draws the page whole by itself, for the next three frames, whenever the picture could be other than
+//     the one kept: the page comes on the screen, or another document comes under 77; the base changes the document
+//     (op1f_show and op1f_move where they change a part, op1f_text and op1f_text_set, a picture made with op1f_picture);
+//     one of the unit's popups, the base's notice or its top page lies over the page, or the power popup is up; the
+//     base paints the ask's name on a stand-in's blank page; the pack asks it (`redraw`). The pack needs to know none
+//     of these: it reads `held`;
+//   - a change the base cannot see (anything a pack changes in its picture by other means than those helpers) is said
+//     with `redraw`.
+// Something that moves over a held picture leaves its old place painted: keep what lies under it with op1f_paint_copy
+// before painting it, and paste that back with op1f_paint_block (a `key` of -1) in the frame with the same `picture`.
+
+// What base 33 hands a frame function: the frame, and behind it
+//   held     1 when the firmware drew nothing of the page in this frame (the page asked to hold its picture with
+//            op1f_page_hold): the canvas holds the picture of two frames before, with everything painted into it then;
+//            0 when the page was drawn whole
+//   picture  which of the display's two pictures this frame's canvas is, 0 or 1. It alternates frame by frame: a held
+//            canvas is the one of the last frame with the same `picture`
+struct Op1fFrameHeld { Op1fFrame frame; unsigned held, picture; };   // 48 bytes on base 33
+static_assert(sizeof(Op1fFrameHeld) == 48 && OP1F_PLACE_IN(Op1fFrameHeld, held) == 40 && OP1F_PLACE_IN(Op1fFrameHeld, picture) == 44,
+              "base 33 hands a frame function 48 bytes: level 4's 40 and two words behind them");
+
+// `held` of the frame a frame function is handed: 0 on a base older than 33 (every picture is drawn whole there).
+static inline unsigned op1f_frame_held(const Op1fFrame* now) {
+    return now && now->bytes >= (unsigned)sizeof(Op1fFrameHeld) ? ((const Op1fFrameHeld*)now)->held : 0u;
+}
+
+// `picture` of the frame a frame function is handed: 0 or 1; 0 on a base older than 33.
+static inline unsigned op1f_frame_picture(const Op1fFrame* now) {
+    return now && now->bytes >= (unsigned)sizeof(Op1fFrameHeld) ? ((const Op1fFrameHeld*)now)->picture : 0u;
+}
+
+// Asks the base to keep the page's picture in the next frame: the firmware's clearing and drawing of the page are left
+// out, and that frame's `held` says 1 (unless the base draws whole for a reason above). From the card's frame function,
+// while its page is the one shown (the frame's `page` is `card`); ask it in every frame the hold should go on.
+// `redraw` not 0: the next two frames at the least are drawn whole, for a change the base cannot see. Answers 1 when
+// the ask is taken, 0 when not: another page shown, or a call from elsewhere than the card's frame function.
+extern "C" int op1f_page_hold(const Op1fCard* card, unsigned redraw) OP1F_NAMED("op1f_page_hold");
+
+// Copies `w` by `h` pixels of this frame's picture from its (x, y) into `pixels`, row by row from the top, `stride`
+// pixels from one row's start to the next: the layout op1f_paint_block takes back (with a `key` of -1). The pixels of
+// the block that lie outside the picture are not written. The paint helpers' rules (above): only from the pack's own
+// frame function and with this frame's canvas, else nothing and counted; nothing for a `w` or an `h` of 0 or less or
+// more than 480, or for `pixels` 0. Answers 1 when anything was copied, 0 when not.
+extern "C" int op1f_paint_copy(void* canvas, int x, int y, int w, int h, unsigned short* pixels, int stride) OP1F_NAMED("op1f_paint_copy");
+
+// The mark of a base whose page may hold its picture (a constant 1): a pack that calls op1f_page_hold or op1f_paint_copy
+// names it.
+extern "C" const unsigned op1f_hold_1 OP1F_NAMED("op1f_hold_1");
+
+// Base 35: layers (step R11, 2026-11-24). Up to here every word is the earlier bases'; this part only adds behind it,
+// and a pack built for base 34 or earlier runs as before: an effect without the flag below rides as level 8 says, and
+// nothing here is offered unasked.
+//
+// What base 35 adds. A pack's effect may be a layer (OP1F_EFFECT_LAYER): it shows in the unit's lists of effects as
+// any pack's effect, but where it rides, the unit's own effect stays under it and plays as always, whatever the owner,
+// a pack or MIDI puts there, and the layer's `process` (if it has one) comes after it. A new kind of ask, OP1F_ASK_LFO,
+// is the same for a sound's list of LFOs: a row that rides over the unit's own LFO and never reaches the firmware.
+// Three helpers start and end a layer's ride and choose its page (op1f_layer_start, op1f_layer_end, op1f_layer_page),
+// and the mark op1f_layer_1 says them; no new level (level stays 10). And for every ride, layer or not, the unit's
+// list opens with its cursor on the pack's row.
+//
+// For every ride, from base 35 on: the unit's list of effects (shift and T3, and the mixer's) opens with its cursor on
+// the row of the pack's effect the place rides, where an older base opened it on the row of the unit's effect it stands
+// on. Nothing to ask for: it is the base's.
+//
+// A layer. An effect whose head's `flags` holds OP1F_EFFECT_LAYER does not stand on one of the unit's effects: it lies
+// over whichever the place holds. The owner meets it so:
+//   - the list: its row shows among the unit's own and the packs' effects, by its name, for every sound of the synth and
+//     the drum and for the master, and the list opens with its cursor on it while the place rides it;
+//   - the pick: the unit's list picks as its cursor moves, so a walk to the layer's row passes other rows and puts each
+//     on the place. When the cursor stops on the layer's row, the place rides it, and the base puts back under it the
+//     unit's own effect as the place held it when the list opened: its type, its eight knob words and its switch. A
+//     walk off the row ends the ride; coming back to it starts it again over the effect of the list's opening;
+//   - the sound: the unit's own effect plays as always, switched by the unit's own key, its knobs the unit's, moved by
+//     the unit's LFOs; then the layer's `process`, once a block where the place plays, after the unit's effect when that
+//     is on and where it would have played when it is off (`on` in the block says which). A layer may have no
+//     `process` (0): it is then a row, a ride, a member and a page, and its sound work, if any, is the pack's own (a
+//     stage of level 6, or an effect it runs through op1f_rack_run);
+//   - the unit's effect under it may change while it rides: another of the unit's effects put there by a pack, by the
+//     owner's own pages or by MIDI. The ride goes on over the new one. It ends by a pick of another row in the list, by a
+//     sound loaded onto the place without the base's member naming it (or with another), or by op1f_layer_end;
+//   - the file: the unit's own effect is saved as the owner left it, its switch too (never forced off), and the base's
+//     member op1f_effect names the layer. Without the pack, under an older base, or on the original firmware, the sound
+//     plays the unit's own effect as saved. The master the same, its ride in the base's store;
+//   - the page: T3 on a place that rides a layer shows the unit's own effect's page, as if no layer were there, until
+//     the pack chooses its own (op1f_layer_page): then level 5's page that stands in (op1f_page_stand_in, the ask's
+//     number), or the base's blank page with the layer's name until the pack gives one. The pack may switch between the
+//     two from its frame function, as often as it likes.
+// A layer's table is level 8's Op1fEffect, read so: `rides` all zeros; `count` 0 (the knobs are the unit's effect's: no
+// value of the layer's is on them, the helpers op1f_param_get, op1f_param_set and op1f_param_heard answer OP1F_BAD_NAME
+// for it, and the LFO pages name the unit's effect's knobs); `process` 0 or a function, and `cycles` 0 with no
+// `process`, else as level 8 has it; `reset`, `state_bytes` and `state_align` as level 8 has them. op1f_riding and
+// op1f_rack_at answer for a layer as for any effect; op1f_rack_ready answers OP1F_BAD_NAME for it (a layer runs only
+// over a place of the unit's). Its name follows level 8's rule, and is no LFO's of the unit's nor any pack's LFO's.
+//
+// An effect's flag, beside OP1F_EFFECT_MONO and OP1F_EFFECT_TAILS (a base before 35 leaves aside an effect that has it,
+// with its line for a table not in order, and uses the card).
+//   OP1F_EFFECT_LAYER  the effect lies over the unit's own effect where it rides, as above. OP1F_EFFECT_TAILS means
+//                      nothing for it (its `process` is called every block where the place plays); OP1F_EFFECT_MONO
+//                      holds
+enum { OP1F_EFFECT_LAYER = 4 };
+//
+// For a layer's `process`, the block's `on` is 1 when the unit's own effect under it ran in this block (it is switched
+// on), 0 when it did not; `values` is 0. Everything else of Op1fEffectBlock is as level 8 has it. Its `fresh` is 1 at
+// the first call after a ride began (a pick, a load, op1f_layer_start, a start) and after the unit's effect under it was
+// made anew (another of its effects put there, another sound played).
+//
+// LFOs. A layer of a sound's list of LFOs (shift and T4 on the synth), one ask of kind OP1F_ASK_LFO. Everything said of
+// an effect's layer above holds for it, with the LFO in the place of the effect: the row in the list of LFO kinds, its
+// cursor, the pick that puts back under it the unit's own LFO as the place held it when the list opened (its kind, its
+// eight words, its switch), the unit's own LFO playing under it as always and changing without ending the ride, the
+// three ways it ends, the file (the unit's own LFO saved as left, and the base's member op1f_lfo, beside op1f_effect
+// and op1f_engine, naming the layer), and the page on T4 (the unit's own LFO's page until op1f_layer_page chooses the
+// pack's). An LFO layer has no function on the audio thread: the unit's LFO acts in many places of a voice, and a pack
+// that moves the sound itself does it through level 6's stages. The row never reaches the firmware: no pick, no
+// file, no catalog the unit writes ever holds its name (the unit resets a whole sound whose LFO it does not know).
+// The places: a synth sound's slot, 0 to 7; with OP1F_LFO_DRUM also a drum sound's, OP1F_PLACE_DRUM + slot (8 to 15),
+// from base 37 on. Never the master: the master has no LFO.
+//
+// The kind of ask a base 35 knows beside levels 5 to 9's and OP1F_ASK_OPTIONS, for a card of level 8 or later. A base
+// that does not know it (34 or earlier) leaves the ask aside, with its line for kinds it does not know, and uses the
+// card.
+//   OP1F_ASK_LFO  a layer of a sound's list of LFOs: what `what` points at is an Op1fLfo
+enum { OP1F_ASK_LFO = 11 };   // not 9 (proposed for files per tape) nor 10 (options)
+//
+// An LFO layer's flags, in its head's `flags`.
+//   OP1F_LFO_DRUM  a drum sound may ride the layer too (from base 37 on; bases 35 and 36 let synth sounds alone
+//                  ride and accept the flag). The row shows in the drum's list of LFOs either way (the unit builds the
+//                  drum's list from the same rows as the synth's); without the flag, a pick of it on a drum sound starts
+//                  no ride, hands the unit nothing, and the drum's LFO stays as the list's cursor left it
+// The limits:
+//   OP1F_LFOS_MOST  how many LFO layers the packs may register in all; an ask beyond it is left aside with a line
+enum { OP1F_LFO_DRUM = 1 };
+enum { OP1F_LFOS_MOST = 8 };
+
+// An LFO layer: what its ask points at.
+//   head  level 5's head: `name` is what the list of LFO kinds shows (1 to 15 characters of a-z, 0-9, ' ', '-' and '_':
+//         none of the unit's LFO kinds, "tremolo", "value", "random", "element", "midi", "velocity", nor a name an
+//         earlier pack registered for an LFO; the lists of effects and of LFOs are separate, so an effect's name may be
+//         an LFO's, though the pack tool refuses one name for an effect and an LFO layer of the same card); `bytes` 28 at base 35 (a later base may read more); `flags` OP1F_LFO_...;
+//         `shown(where, how)` is told when the layer's own page comes on the screen and goes, as an effect's: `where`
+//         the place, `how` OP1F_SHOWN_UP, with OP1F_SHOWN_OFF while the unit's LFO under it is switched off, and 0 when
+//         the page leaves the screen. Not told while the unit's own LFO page shows
+// The base leaves the ask aside, with a line, when it is not in order. The layer names no address of the unit's and
+// changes no place of the firmware. It needs op1f_layer_1.
+struct Op1fLfo { Op1fKindHead head; };   // 28 bytes at base 35
+static_assert(sizeof(Op1fLfo) == 28, "an LFO layer's table is the head, 28 bytes at base 35");
+
+// The helpers. Each takes the card, the ask's number in its list (from 0: an ask of kind OP1F_ASK_EFFECT with
+// OP1F_EFFECT_LAYER, or of kind OP1F_ASK_LFO) and a place. op1f_riding, op1f_param_get and the others of level 8 serve
+// an ask of kind OP1F_ASK_LFO too: op1f_riding answers bit n for place n, the value helpers OP1F_BAD_NAME.
+
+// Starts the layer's ride at `place` (0 to 15, or OP1F_PLACE_MASTER for an effect), as a pick of its row would, but over
+// the unit's own effect or LFO as the place holds it now: nothing of the unit's is put back or changed. A ride of
+// another pack's effect or layer there ends first (as a pick of another row would); the base's member is written, and
+// `fresh` says it at the next block. For what a pack brings back of its own (a sound it kept before the layer was
+// there). Answers 0 when the place rides it, also when it rode it already; or less than 0: OP1F_BAD_NAME (no such
+// layer of the card, or a place it cannot ride: the master for an LFO, a drum's place for an LFO without
+// OP1F_LFO_DRUM or under base 35 or 36), OP1F_NOT_NOW (not from the pack's frame function; or a sound loaded onto the place is not told yet: try
+// again at the next frame). From the frame function only. Base 37's LFO layers: a load in the very frame of the call
+// may not be counted yet, so the start answers 0 and the ride ends at the next frame as "a sound without it was
+// loaded"; start an LFO layer's ride a few frames after a load (lfo 12 waits 4).
+extern "C" int op1f_layer_start(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_layer_start");
+
+// Ends the layer's ride at `place`: the base's member taken away, the unit's own effect or LFO left as it is, playing
+// as it plays (its switch, its knobs, its type). Answers 0, OP1F_NOT_HERE (the place does not ride it), OP1F_BAD_NAME,
+// OP1F_NOT_NOW (not from the pack's frame function). From the frame function only.
+extern "C" int op1f_layer_end(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_layer_end");
+
+// Which page T3 (an effect) or T4 (an LFO) shows for a place that rides the layer: OP1F_LAYER_PAGE_UNIT, the unit's own
+// page of the effect or LFO under it, as if no layer were there (where every ride of the layer starts); or
+// OP1F_LAYER_PAGE_OWN, the layer's own: the document op1f_page_stand_in gave for the ask, or the base's blank page with
+// its name. It holds for every place that rides the layer, until it is called again. While one of the two pages is on
+// the screen the other takes its place when the unit next asks which screen to show. While the layer's own page is up,
+// every key and knob is offered to the pack's input function first, as for any page; while the unit's page is up, the
+// pack's input function is offered them as a card's without a page. Answers 1, or 0: no such layer of the card,
+// `which` not one of the two, or a call from elsewhere than the pack's frame function.
+enum { OP1F_LAYER_PAGE_UNIT = 0, OP1F_LAYER_PAGE_OWN = 1 };
+extern "C" int op1f_layer_page(const Op1fCard* card, unsigned ask, unsigned which) OP1F_NAMED("op1f_layer_page");
+
+// The mark of a base that carries out layers (a constant 1): a pack with an effect that has OP1F_EFFECT_LAYER, an ask
+// of kind OP1F_ASK_LFO, or a call of the three helpers above names it, so that a base before 35 leaves it out.
+extern "C" const unsigned op1f_layer_1 OP1F_NAMED("op1f_layer_1");
+
+// Base 36: a held page whose parts the firmware draws again. Up to here every word is the earlier bases' (base 35's
+// layers last); this part only adds behind it, and a pack that does not call it is drawn as before.
+//
+// A page held with op1f_page_hold may not change its document: any change makes the base draw it whole. A page whose
+// parts keep moving asks instead with op1f_page_parts, and names in the same frame each rectangle of its picture that
+// changed and the parts of its document that lie there (op1f_page_redraw). In the next frame, when the base holds the
+// page, the firmware draws, for each rectangle in turn, the page's document cut to that rectangle with only the named
+// parts shown: each named part with everything under it as its own display says, and the groups that hold it; every
+// other part of the document is left out of that drawing. Outside the rectangles the picture stays as it was two
+// frames before (the frame with the same `picture`). When the base draws whole instead (base 33's list), the names are
+// not used. So the page's look is the firmware's own, and a frame costs what the named parts cost to draw (about the
+// same as in a whole picture, part for part: the cut saves little), plus a little a rectangle.
+//   - name what changed since the frame with the same `picture`: where a part was and where it is now;
+//   - name everything that lies in a rectangle, its ground first among them: the base does not clear a rectangle, and a
+//     part not named is missing there for that frame;
+//   - only parts of the page's own document, as op1f_node or op1f_text_node answered them, and not one twice in one
+//     rectangle;
+//   - in a frame where the page asks op1f_page_parts, the changes its card makes from its frame function (op1f_show,
+//     op1f_move, and op1f_text and op1f_text_set on the document under 77) no longer make the base draw whole;
+//     everything else in base 33's list still does, and so does a frame with more rectangles or parts than below, a
+//     rectangle refused, or rectangles named in a frame that then does not ask;
+//   - a page that asks changes its document only from its frame function: around each drawing the base hides and
+//     shows parts itself and puts back what it found.
+
+// The most a frame may name: rectangles, and parts in all its rectangles together.
+enum { OP1F_REDRAWS_MOST = 8, OP1F_REDRAW_PARTS_MOST = 160 };
+
+// Asks the base to hold the page's picture in the next frame and to draw again only the rectangles named in this frame
+// with op1f_page_redraw (none named: the picture is held as it is). In place of op1f_page_hold, from the card's frame
+// function while its page is the one shown, in every frame the asking should go on. Answers 1 when the ask is taken,
+// 0 when not (another page shown, or a call from elsewhere).
+extern "C" int op1f_page_parts(const Op1fCard* card) OP1F_NAMED("op1f_page_parts");
+
+// Names a rectangle to draw again in the next frame: `w` by `h` pixels from (x, y), cut to the picture, and the
+// `count` parts of the page's document drawn in it. From the card's frame function while its page is the one shown,
+// before or after op1f_page_parts in the same frame (named without the ask, the frame is drawn whole). Answers 1 when
+// taken; 0 when not (another page shown, a call from elsewhere, a rectangle of nothing once cut to the picture, no
+// parts, more than OP1F_REDRAWS_MOST rectangles or OP1F_REDRAW_PARTS_MOST parts in this frame, a part that is 0): the
+// next frame is then drawn whole.
+extern "C" int op1f_page_redraw(const Op1fCard* card, int x, int y, int w, int h, void* const* parts, unsigned count) OP1F_NAMED("op1f_page_redraw");
+
+// The mark of a base whose held page's parts the firmware draws again (a constant 1). A pack that must have it names it;
+// a pack that also runs without it asks for op1f_page_parts and op1f_page_redraw weakly and calls them only when their
+// address is not 0.
+extern "C" const unsigned op1f_parts_1 OP1F_NAMED("op1f_parts_1");
 
 #endif

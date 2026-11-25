@@ -1,4 +1,8 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 33 (R9): one helper more for packs, op1f_paint_copy, which copies a block of this frame's picture out in the
+// layout op1f_paint_block takes back, under the helpers' guards, so that a page that holds its picture (module/
+// build_r6e_card.h, "Base 33") can put back what lay under something it moves. The other helpers are as they were.
+//
 // Base 29, its second build (R6b): the paint unit of R1 (which stays as it was for every
 // base before), with one function added for the base itself: op1f_paint_text_base, the text in the base's own font
 // for a page of the base's own, painted by the cards unit from its frame work while no pack's frame function runs (the
@@ -146,6 +150,27 @@ extern "C" void op1f_paint_block(void* canvas, int x, int y, int w, int h, const
             if ((int)p != key) PUT(at + r, p);
         }
     }
+}
+
+// R9 (base 33): a block of this frame's picture copied out, the way op1f_paint_block puts one in: `w` by `h` pixels from
+// (x, y), row by row from the top, `stride` pixels a row, cut as op1f_paint_block's; the block's pixels that lie outside
+// the picture are not written. The guards are the helpers' (may_paint): a refused call copies nothing and is counted.
+// 1 when anything was copied.
+extern "C" int op1f_paint_copy(void* canvas, int x, int y, int w, int h, unsigned short* pixels, int stride) OP1F_NAMED("op1f_paint_copy");
+extern "C" int op1f_paint_copy(void* canvas, int x, int y, int w, int h, unsigned short* pixels, int stride) {
+    if (w <= 0 || h <= 0 || w > (int)BLOCK_MOST || h > (int)BLOCK_MOST || pixels == 0) return 0;
+    const u16* from = may_paint(canvas);
+    if (from == 0) return 0;
+    if (x <= -(int)BLOCK_MOST || y <= -(int)BLOCK_MOST) return 0;  // nothing of it on the canvas
+    int left = x < 0 ? -x : 0, top = y < 0 ? -y : 0;           // the block's first column and row that lie on the canvas
+    int cx = x + left, cy = y + top, cw = w - left, ch = h - top;
+    if (!cut(&cx, &cy, &cw, &ch)) return 0;
+    for (int c = 0; c < cw; ++c) {
+        const u16* at = from + (((u32)(LAST_X - (cx + c))) << 8) + (u32)cy;
+        u16* to = pixels + (left + c) + top * stride;
+        for (int r = 0; r < ch; ++r) to[r * stride] = at[r];
+    }
+    return 1;
 }
 
 // A colour laid over what is there, by a block of cover: each byte says how much of the colour lies over its pixel, 0

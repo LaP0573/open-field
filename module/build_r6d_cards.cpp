@@ -1,4 +1,44 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 38 (R16), the base pack: base 37's cards (base 36's text: base 37 changed nothing here), edited in place, with
+// one rule for every pack alike, carried from hasis's open-field pull request 39. While the base's own top page is asked
+// for or up (op1f_top_open, to the frame in which top_frame takes it off, that frame included: its picture, drawn
+// before, still shows the top page), a pack's page under 77 lies under it and the
+// frame's `page` still names that pack: a pack that paints over its own page at every frame painted over the door's
+// install question. So in such a frame no frame function is handed a canvas: the frame's `canvas` is 0, and so is
+// op1f_cards_canvas inside the call, and a pack paints nothing, as for any frame that offers none. `picture` is read
+// from the frame's word before the canvas is withheld, and still follows the display's two pictures. `popup` stays as
+// it was, the power popup alone: a pack built before reads any `popup` not 0 as the power popup. The ask's name on a
+// stand-in's blank page is painted with the same canvas and waits too; the page for an engine away and the unit's own
+// popups wait under the top page as before.
+//
+// What base 35 said follows and holds.
+//
+// Base 35 (R11), the base pack: base 33's cards, edited in place, with layers (module/build_r6e_card.h, "Base 35:
+// layers"), for every pack alike. A card of level 8 or later may ask for a layer of a sound's list of LFOs (kind
+// OP1F_ASK_LFO, its table the head of a kind): each such ask is held to its form at the check's lines (lfo_verdict:
+// its size, its name, its one flag OP1F_LFO_DRUM, its `shown`, eight at most), kept by its number, or left aside with
+// line 49; the line of the kinds this base does not know passes it by. Its page stands in as an effect's does
+// (op1f_page_stand_in takes its number; else the base's blank page with its name; its `shown` told with the place),
+// where neither the effects unit nor the engines unit says a page stands in and the LFO unit does (op1f_lfos_standing,
+// op1f_lfos_ahead, weak: away, nothing of it), by entry 3 of the table of screens; line 48 when it is placed. A layer
+// of effects (OP1F_EFFECT_LAYER) is the effects unit's to answer: while its pack has not chosen its own page, the
+// effects unit answers that no page stands in, and nothing here puts a page of the base's under 77 for it.
+//
+// What base 33 said follows and holds.
+//
+// Base 33 (R9), the base pack: base 32's cards, edited in place (base 32's text is open-field 0.14's), with one rule added for
+// every pack alike: a page that holds its picture. A pack's frame function, while its page is shown, may ask the base
+// to keep the page's picture in the next frame (op1f_page_hold); the frame call then asks the next render loop to leave
+// out its clearing of the picture and 77's render (op1f_hold_screen: module/build_r6d_popups.s leaves the clearing out,
+// op1f_popups_loop the render), by the rule of module/build_r9_hold.h. What a frame function is handed grows by two
+// words behind base 32's forty bytes: `held` (the loop left both out in this frame) and `picture` (which of the display's
+// two pictures the canvas is). The base marks every change it makes to a document (op1f_show and op1f_move where they
+// change a part, a picture made, op1f_cards_changed for the text unit), and every popup, notice, top page or painting
+// of its own over a page: each asks the next three frames whole. A page that does not ask is drawn as on base 32.
+// Lines 46 and 47: a page begins and ends to hold, for the first sixteen times.
+//
+// What base 32 said follows and holds.
+//
 // Base 32 (R8), the base pack: base 31's cards, edited in place (base 31's text is release 0.13's, in this repository's history), with one kind
 // of ask more for a card of level 6 or later, a pack's options (OP1F_ASK_OPTIONS): the options unit's
 // (module/build_r8_options.cpp), whose frame work this unit calls once a frame behind the values' unit's, a weak name
@@ -489,6 +529,8 @@
 #include "build_r6_card.h"                             // R6: base 28's words, every one, with level 9's
 #include "build_r6_base.h"                             // R6: what the base's units share, base 28's (build_r5_base.h) and level 9's
 #include "build_q_quiet.h"
+#include "build_r9_hold.h"                             // R9 (base 33): the rule of a page that holds its picture
+#include "build_r12_parts.h"                           // R12 (base 36): the parts to hide while a held page's rectangles are drawn again
 
 typedef unsigned int u32;
 typedef unsigned char u8;
@@ -512,6 +554,7 @@ static inline u32 stack_here() { return (u32)_AddressOfReturnAddress(); }   // M
 #define PINNED(pointer) ((void)0)                      // R6: the PC's compiler needs no pinning
 #define MASK_OFF(mask) ((void)(mask = 0))
 #define MASK_ON(mask) ((void)(mask))
+extern "C" { u32 op1f_hold_screen; u32 op1f_fill_left; }    // R9 (base 33): the stub's two words (module/build_r6d_popups.s), which no stub keeps on the PC
 #else
 #define STOCK_LOG ((LogFn)0x8c053a20u)
 #define STOCK_SCREENS ((ScreensFn)0x8fc261fcu)
@@ -704,6 +747,39 @@ extern "C" int op1f_engines_standing(Op1fStanding* out, unsigned* mode, unsigned
 extern "C" int op1f_engines_ahead(Op1fStanding* out, unsigned* mode, unsigned* screen, const char** name) OP1F_NAMED("op1f_engines_ahead") __attribute__((weak));
 #endif
 
+// R11 (base 35): the kind of ask of a layer of a sound's list of LFOs, its one flag, the size of its table and how many
+// the packs may register, as the header of base 35 (module/build_r6e_card.h) names them: this unit reads base 29's
+// header, so it names the same numbers here where that header is not read. The entry of the table of screens an LFO's
+// page takes is the fourth (OP1F_STAND_LFO in the design). The words fx.asked_engine, fx.placed_engine and
+// fx.ahead_engine say from base 35 on which unit answered: the effects unit (0), the engines unit (1), the LFO unit (2).
+#ifndef OP1F_BUILD_R6E_CARD_H
+enum { OP1F_ASK_LFO = 11, OP1F_LFO_DRUM = 1, OP1F_LFOS_MOST = 8 };
+#endif
+enum { LFO_BYTES = 28, STAND_LFO = 3, LFO_KINDS = 6 };
+enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2 };
+
+// R11 (base 35): the LFO unit's (module/build_r11_lfos.cpp): whether an LFO layer's page stands in now, while the screen
+// the current controller asked for is the LFO page of a place that rides one (op1f_lfos_standing), and the same
+// whatever screen is asked (op1f_lfos_ahead), as the effects unit answers for an effect: `out` names the card's ask of
+// kind OP1F_ASK_LFO and the place, `*mode` and `*screen` the mode and the screen. Asked where neither the effects unit
+// nor the engines unit says a page stands in. Weak: away, entry 3 stands for nothing.
+#if defined(OP1F_HOST)
+#ifdef OP1F_R11_HOST_LFOS
+extern "C" int (*mock_lfos_standing)(Op1fStanding* out, unsigned* mode, unsigned* screen);
+#define op1f_lfos_standing (*mock_lfos_standing)
+extern "C" int (*mock_lfos_ahead)(Op1fStanding* out, unsigned* mode, unsigned* screen);
+#define op1f_lfos_ahead (*mock_lfos_ahead)
+#else
+static int (*const r11_none_lfos_standing)(Op1fStanding* out, unsigned* mode, unsigned* screen) = 0;
+#define op1f_lfos_standing (*r11_none_lfos_standing)
+static int (*const r11_none_lfos_ahead)(Op1fStanding* out, unsigned* mode, unsigned* screen) = 0;
+#define op1f_lfos_ahead (*r11_none_lfos_ahead)
+#endif
+#else
+extern "C" int op1f_lfos_standing(Op1fStanding* out, unsigned* mode, unsigned* screen) OP1F_NAMED("op1f_lfos_standing") __attribute__((weak));
+extern "C" int op1f_lfos_ahead(Op1fStanding* out, unsigned* mode, unsigned* screen) OP1F_NAMED("op1f_lfos_ahead") __attribute__((weak));
+#endif
+
 // R4: the memory unit's and the stages unit's frame work (base 24's memory unit, base 24's stages unit),
 // once a frame on the display thread, the memory's first: at its first call each looks through the asks of its kind.
 extern "C" void op1f_memory_frame() OP1F_NAMED("op1f_memory_frame");
@@ -819,6 +895,74 @@ static struct {
     u32 lost;                                           // renders kept by a loop whose frame call never came (none expected)
 } held;
 
+// R9 (base 33): a page that holds its picture (the rule: module/build_r9_hold.h). The two words the render loop's
+// places read and write, the stub's (module/build_r6d_popups.s): op1f_hold_screen, the frame call's ask for the next
+// loop (77's object, or 0); op1f_fill_left, the loop's frame counter + 1 when the stub left the clearing out. On the PC
+// no stub runs, and the words are this unit's own (above, with the PC's stand-ins).
+extern "C" u32 op1f_hold_screen OP1F_NAMED("op1f_hold_screen");
+extern "C" u32 op1f_fill_left OP1F_NAMED("op1f_fill_left");
+enum { HOLD_SAID = 16, HOLD_MOVES = 16, MATRIX_WORDS = 9 };
+struct HoldMove {                                       // a part op1f_move set, and the matrix it set
+    void* part;
+    int matrix[MATRIX_WORDS];
+};
+static struct {
+    Op1fHoldRule rule;                                  // the rule's state, from frame call to frame call
+    u32 page;                                           // the slot + 1 of the pack's page this frame names, while the frame functions are called; else 0
+    u32 asked;                                          // the slot + 1 that called op1f_page_hold in this frame, 0 none
+    u32 redraw;                                         // a redraw asked in this frame
+    u32 changes, changes_seen;                          // a count of the base's changes to a document (any thread), and the count at the last frame call
+    u32 covered;                                        // this frame: one of the unit's popups or the base's notice drawn over the page (held_frame)
+    u32 render_left;                                    // the loop's frame counter + 1 when op1f_popups_loop left 77's render out
+    u32 first;                                          // the first canvas the frame call saw: `picture` 0; the other 1
+    u32 slot;                                           // the slot + 1 of the page in a hold, for its lines
+    u32 began, said;                                    // holds begun since the start, and the lines said of them
+    HoldMove moves[HOLD_MOVES];                         // the parts op1f_move set last, a ring
+    u32 move_next;
+} hold;
+
+// R9: a change the base made to a document (a part shown or hidden, moved, a text set, a picture made): the next three
+// frames are drawn whole. From any thread: a word counted on, which the frame call compares.
+static inline void hold_changed() {
+    hold.changes = hold.changes + 1u;
+}
+
+// R12 (base 36): a held page whose parts the firmware draws again (module/build_r6e_card.h, "Base 36"). The frame's ask
+// (the rectangles and parts op1f_page_redraw named, in the plan's inputs) and, once the frame call has made it, the plan
+// the next loop draws by (module/build_r12_parts.h); static, about 17 KB. Around each drawing op1f_popups_loop sets the
+// rasteriser's clip (its struct, the same address in 1.7.0 and 1.7.3: +0x10 the first row, +0x14 the first column,
+// +0x18 the row past, +0x1c the column past, column = 479 - x) and puts back its normal state 0, 0, 224, 480.
+#if defined(OP1F_HOST)                                 // R12: written as R6's are, so the PC's block above stays the one #ifdef
+static u32 parts_raster[8];                             // R12: the PC's stand-in for the rasteriser's struct
+#define PARTS_RASTER ((u32)parts_raster)
+#else
+#define PARTS_RASTER 0x08011514u
+#endif
+enum { PARTS_SAID = 16, PARTS_SECOND = 1000, PARTS_SAYING = 30000, PARTS_TALL = 224, PARTS_WIDE = 480 };
+static Op1fPlan parts_plan;
+struct PartsDraw {                                      // R12: a rectangle as the loop draws it, laid out by the frame call
+    u32 clip[4];                                        // the clip's +0x10 to +0x1c for it
+    u8* const* hide;                                    // the nodes to hide while it is drawn, and how many
+    u32 hides;
+};
+static struct {
+    u32 asked;                                          // the slot + 1 that called op1f_page_parts in this frame, 0 none
+    u32 refused;                                        // the redraws refused in this frame
+    u32 own;                                            // of the base's changes counted in this frame, those the card of the page this frame names made from its frame function
+    u32 ready, document;                                // the loop's frame counter + 1 the plan is for (0 none), and the document under 77 it was made over
+    u32 screen, time, render, at, before;               // in the loop: 77's object, the time and the render it handed, the rectangle drawn, the cycles at its start
+    u32 raster;                                         // in the loop: the rasteriser's struct, read again after each drawing
+    u32 draws;                                          // the rectangles of the plan made, as the loop draws them
+    PartsDraw draw[OP1F_REDRAWS_MOST];
+    u32 page, start, next, second, saying, runs, said;  // the page asking (slot + 1, 0 none), state.ms when its run began, the next line's ms after it and its second; its lines go on; runs begun, runs said
+    u32 frames, held, drawn, hides, sum, most, refusals, failures;   // this second: frames, frames held, rectangles drawn, parts hidden, their us summed and largest, refusals, plans failed
+    u8 saved[OP1F_PLAN_HIDES_MOST];                     // the display bytes of the parts hidden while a rectangle is drawn
+} parts;
+
+// R12: a change of op1f_show, op1f_move, op1f_text or op1f_text_set: base 33's, and the page's own (parts.own) when the
+// card whose page this frame names makes it from its frame function. Below, behind op1f_cards_calling.
+static inline void hold_changed_by();
+
 // R5: an effect's page standing in, and the entry of the table of screens this unit holds. The display thread's; the
 // table itself (op1f_stand_screens) is written by this unit and by the effects unit's picks, each in masked instants.
 static struct {
@@ -925,6 +1069,13 @@ static struct {
     void* document_of[MOST][ASKS_MOST];                 // what each card set with op1f_page_stand_in, for each of its asks
     u32 set[MOST];                                      // a bit an ask: its card set a document for it (0 too)
 } stand;
+
+// R11 (base 35): the asks of kind OP1F_ASK_LFO of the cards in use, held to their form once, at the check's lines, on
+// the display thread: a bit an ask of each card's for one in order, and how many are.
+static struct {
+    u32 good[MOST];
+    u32 count;
+} lfos;
 
 // R3: the word the sequencer unit reads for the firmware's "sequencer off" notice: OP1F_ASK_SEQUENCER while a
 // sequencer's stand-in is the page on the screen, 0 otherwise. Written each frame on the display thread.
@@ -1151,7 +1302,88 @@ static u32 pictures_of(const Op1fCard* card) {
 // their own lines. The line here counts the asks of the kinds this base does not know, and names the first of them.
 // R4: level 6 knows three kinds more, for a card of level 6: a stage, memory, pictures that take a place.
 // R4b: level 7 knows one kind more, for a card of level 7: values kept in the unit's files.
+// R11 (base 35): the names of the unit's own LFO kinds, which no layer takes.
+static const char LFO_KIND_NAMES[LFO_KINDS][9] = {"tremolo", "value", "random", "element", "midi", "velocity"};
+
+// R11 (base 35): two names of a kind's head the same, up to their end.
+static int same_kind_name(const char* a, const char* b) {
+    for (u32 i = 0; i < (u32)OP1F_KIND_NAME; ++i) {
+        if (a[i] != b[i]) return 0;
+        if (a[i] == 0) return 1;
+    }
+    return 1;
+}
+
+// R11 (base 35): is `name` one of the unit's own LFO kinds? Out of line, as are lfo_named and lfo_taken, so that each
+// walk holds what it reads in plain registers (no index register in any of them).
+static OP1F_APART int lfo_stock(const char* name) {
+    for (u32 k = 0; k < (u32)LFO_KINDS; ++k)
+        if (same_kind_name(name, LFO_KIND_NAMES[k])) return 1;
+    return 0;
+}
+
+// R11 (base 35): is `name` the name of one of the asks of a card in use whose bits are set in `good` (its LFO layers
+// kept)? Its list of asks the check held in order.
+static OP1F_APART int lfo_named(const Op1fCard* card, u32 good, const char* name) {
+    u32 count = 0;
+    const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &count);
+    for (u32 k = 0; k < count; ++k)
+        if (((good >> k) & 1u) != 0 && same_kind_name(((const Op1fKindHead*)asks[k].what)->name, name)) return 1;
+    return 0;
+}
+
+// R11 (base 35): has an LFO layer kept at `slot` or before it `name` already? Only the cards the base uses are read, and
+// of them only those with a layer kept: a slot with no card there, or a card not in order, is passed by unread (its
+// address may be anything, its count of asks too).
+static OP1F_APART int lfo_taken(u32 slot, const char* name) {
+    for (u32 s = 0; s <= slot; ++s) {
+        u32 good = lfos.good[s];
+        if (((state.used >> s) & 1u) != 0 && good != 0 && lfo_named(op1f_cards.slots[s].card, good, name)) return 1;
+    }
+    return 0;
+}
+
+// R11 (base 35): why an ask of kind OP1F_ASK_LFO of the card in use at `slot` (of level 8 or later) is left aside, or 0.
+// Its table (the check held it to lie in its pack on a word with its bytes) at least an Op1fLfo, 28 bytes, its head
+// saying the ask's bytes; its name 1 to 15 characters of a-z, 0-9, ' ', '-' and '_', none of the unit's LFO kinds nor an
+// LFO layer's taken before it; no flag but OP1F_LFO_DRUM; its `shown` 0 or a function of its pack on an even address; and
+// no more than OP1F_LFOS_MOST in all.
+static OP1F_APART const char* lfo_verdict(u32 slot, const Op1fAsk* ask) {
+    const Op1fCardSlot* in = &op1f_cards.slots[slot];
+    const Op1fKindHead* head = (const Op1fKindHead*)ask->what;
+    if (head == 0 || ask->bytes < (u32)LFO_BYTES || head->bytes != ask->bytes) return "its table is not in order";
+    u32 n = 0;
+    for (; n < (u32)OP1F_KIND_NAME && head->name[n] != 0; ++n) {
+        char c = head->name[n];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == ' ' || c == '-' || c == '_')) return "its name is not in order";
+    }
+    if (n == 0 || n == (u32)OP1F_KIND_NAME) return "its name is not in order";
+    if (lfo_stock(head->name)) return "its name is one of the unit's own LFOs";
+    if (lfo_taken(slot, head->name)) return "another LFO layer has its name";
+    if ((head->flags & ~(u32)OP1F_LFO_DRUM) != 0) return "it has a flag this base does not know";
+    u32 shown = (u32)head->shown;
+    if (shown != 0 && (shown < in->first || shown >= in->end || (shown & 1u) != 0)) return "its shown does not lie in its pack on an even address";
+    if (lfos.count >= (u32)OP1F_LFOS_MOST) return "the packs ask for more LFO layers than the base takes";
+    return 0;
+}
+
+// R11 (base 35): an ask of kind OP1F_ASK_LFO held to its form, from the line of the kinds this base knows: kept, a bit
+// of its card's, or left aside with line 49 (no page of it ever stands in).
+static int slot_of(const Op1fCard* card);
+static OP1F_APART void lfo_look(const Op1fCard* card, u32 ask) {
+    int slot = slot_of(card);
+    if (slot < 0) return;
+    const char* why = lfo_verdict((u32)slot, &card->asks[ask]);
+    if (why == 0) {
+        lfos.good[slot] |= 1u << ask;
+        ++lfos.count;
+        return;
+    }
+    STOCK_LOG(2, LOG_FILE, 49, "cards: '%s' asks for an LFO layer (its ask %u) that is left aside: %s", card->name, ask, why);
+}
+
 // R5: level 8 knows one kind more, for a card of level 8: an effect, whose lines the effects unit says.
+// R11 (base 35): and a layer of a sound's list of LFOs, for a card of level 8, held to its form here (lfo_look).
 static OP1F_APART void said_asks(const Op1fCard* card) {
     u32 asked = 0, unknown = 0, first = 0;
     const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
@@ -1164,6 +1396,10 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (six && kind == (u32)OP1F_ASK_OPTIONS) continue;                         // R8 (base 32): the options unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
+        if (kind == (u32)OP1F_ASK_LFO && level_8(card)) {                          // R11 (base 35): held to its form here
+            lfo_look(card, i);
+            continue;
+        }
         if (unknown == 0) first = kind;
         ++unknown;
     }
@@ -1249,6 +1485,7 @@ static int made_by(u32 slot, const void* document) {
 extern "C" void op1f_cards_made(const Op1fCard* card, void* document) OP1F_NAMED("op1f_cards_made");
 extern "C" void op1f_cards_made(const Op1fCard* card, void* document) {
     int slot = slot_of(card);
+    hold_changed();                                         // R9 (base 33): a picture made
     if (slot < 0 || document == 0 || made_by((u32)slot, document)) return;
     for (u32 d = 0; d < (u32)DOCS; ++d) {
         if (made_document[slot][d] == 0) {
@@ -1256,6 +1493,16 @@ extern "C" void op1f_cards_made(const Op1fCard* card, void* document) {
             return;
         }
     }
+}
+
+// R9 (base 33): from the text unit (module/build_r6d_text.cpp), where it lays a text out into a document or makes a
+// part a text: the document under 77 changed, so the next three frames are drawn whole. A document that is not under
+// 77 changes nothing on the screen and is passed by; 0 counts for any.
+extern "C" void op1f_cards_changed(const void* document) OP1F_NAMED("op1f_cards_changed");
+extern "C" void op1f_cards_changed(const void* document) {
+    const u32* screens = held.screens;
+    const u32* s77 = screens != 0 ? (const u32*)screens[PAGE_SCREEN] : 0;
+    if (document == 0 || s77 == 0 || (const void*)s77[SCREEN_DOCUMENT] == document) hold_changed_by();   // R12: or the page's own
 }
 
 // M3: the slot of the card that made this document, or -1: for the text unit.
@@ -1291,6 +1538,13 @@ extern "C" u32 op1f_cards_calling() {
     if (calling == 0) return 0;
     u32 here = stack_here();
     return here <= at && at - here < (u32)CALLING_REACH ? calling : 0u;
+}
+
+// R12 (base 36): above. hold.page is the page this frame names only while the frame functions are called.
+static inline void hold_changed_by() {
+    hold_changed();
+    u32 page = hold.page;
+    if (page != 0 && op1f_cards_calling() == page) parts.own = parts.own + 1u;
 }
 
 // R3: the records of the calls into packs. Around each call: a free place of the table taken, then given back, each in
@@ -1572,7 +1826,9 @@ static inline u32 pair_of(u32 mode) {
 }
 
 // R6: the entry of a page: an engine's its own (OP1F_STAND_ENGINE), an effect's its mode's.
+// R11 (base 35): an LFO layer's its own too (entry 3).
 static inline u32 pair_for(u32 mode, u32 engine) {
+    if (engine == (u32)BY_LFOS) return (u32)STAND_LFO;                              // R11 (base 35)
     return engine ? (u32)OP1F_STAND_ENGINE : pair_of(mode);
 }
 
@@ -2108,6 +2364,8 @@ static const Op1fKindHead* head_of(u32 slot, u32 ask) {
     if (ask < count && asks[ask].kind == (u32)OP1F_ASK_ENGINE && level_9(op1f_cards.slots[slot].card) && asks[ask].what != 0 &&
         asks[ask].bytes >= (u32)sizeof(Op1fKindHead))
         return (const Op1fKindHead*)asks[ask].what;                                 // R6
+    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_LFO && level_8(op1f_cards.slots[slot].card) && ((lfos.good[slot] >> ask) & 1u) != 0)
+        return (const Op1fKindHead*)asks[ask].what;                                 // R11 (base 35): an LFO layer's, held to its form
     if (ask >= count || asks[ask].kind != (u32)OP1F_ASK_SEQUENCER || asks[ask].what == 0 || asks[ask].bytes < (u32)sizeof(Op1fKindHead)) return 0;
     return (const Op1fKindHead*)asks[ask].what;
 }
@@ -2164,14 +2422,40 @@ static OP1F_APART void stand_off_top() {
 
 // ---------------------------------------------------------------- R5: an effect's page standing in
 
+// R11 (base 35): is the LFO unit's answer an ask of kind OP1F_ASK_LFO held to its form (a card of level 8 or later)?
+static inline int lfo_ask(u32 slot, u32 ask) {
+    return slot < (u32)MOST && ask < (u32)ASKS_MOST && ((lfos.good[slot] >> ask) & 1u) != 0;
+}
+
+// R11 (base 35): else an LFO layer's page, of a card: what the LFO unit says of the mode and the screen is kept for
+// stand_frame, as an effect's is, with entry 3 for it.
+static OP1F_APART int lfo_standing(Op1fStanding* s) {
+    u32 mode = 0, screen = 0;
+    if (&op1f_lfos_standing == 0 || !op1f_lfos_standing(s, &mode, &screen) || !lfo_ask(s->slot, s->ask)) return 0;
+    fx.asked_engine = BY_LFOS;
+    fx.asked = 1;
+    fx.asked_mode = mode;
+    fx.asked_screen = screen;
+    return 1;
+}
+
+// R11 (base 35): else an LFO layer's page whatever screen is asked, as ahead_of asks the effects unit.
+static OP1F_APART int lfo_ahead(u32 mode, Op1fStanding* out, u32* screen) {
+    u32 m = 0;
+    if (&op1f_lfos_ahead == 0 || !op1f_lfos_ahead(out, &m, screen) || !lfo_ask(out->slot, out->ask)) return 0;
+    fx.ahead_engine = BY_LFOS;
+    return m == mode ? 1 : 0;
+}
+
 // Does an effect's page stand in now? Asked where the sequencer unit says no page stands in: what the effects unit
 // says of the mode and the screen is kept for stand_frame.
+// R11 (base 35): where neither the effects unit nor the engines unit says so, the LFO unit is asked.
 static OP1F_APART int effect_standing(Op1fStanding* s) {
     u32 mode = 0, screen = 0;
     fx.asked_engine = 0;                                                            // R6
     if (&op1f_effects_standing == 0 || !op1f_effects_standing(s, &mode, &screen)) {
         const char* name = 0;                                                       // R6: else an engine's page, of a card (an engine away has none)
-        if (&op1f_engines_standing == 0 || !op1f_engines_standing(s, &mode, &screen, &name) || s->slot >= (u32)OP1F_CARDS_MOST) return 0;
+        if (&op1f_engines_standing == 0 || !op1f_engines_standing(s, &mode, &screen, &name) || s->slot >= (u32)OP1F_CARDS_MOST) return lfo_standing(s);   // R11 (base 35)
         fx.asked_engine = 1;
     }
     fx.asked = 1;
@@ -2188,7 +2472,7 @@ static OP1F_APART int ahead_of(u32 mode, Op1fStanding* out, u32* screen) {
     fx.ahead_away = 0;                                                              // R6b
     if (&op1f_effects_ahead == 0 || !op1f_effects_ahead(out, &m, screen)) {
         const char* name = 0;                                                       // R6: else an engine's page, of a card
-        if (&op1f_engines_ahead == 0 || !op1f_engines_ahead(out, &m, screen, &name)) return 0;
+        if (&op1f_engines_ahead == 0 || !op1f_engines_ahead(out, &m, screen, &name)) return lfo_ahead(mode, out, screen);   // R11 (base 35): else an LFO layer's
         if (out->slot == OP1F_STAND_NO_CARD && (out->how & (u32)OP1F_STAND_AWAY) != 0 && name != 0) {   // R6b: an engine away: the base's own page
             fx.ahead_engine = 1;
             fx.ahead_away = 1;
@@ -2257,6 +2541,12 @@ static const char PLACES_SAID[(u32)OP1F_PLACE_MASTER + 1u][12] = {"synth 1", "sy
 static OP1F_APART void said_effect(u32 slot, u32 where, const void* document) {
     STOCK_LOG(3, LOG_FILE, 39, "page: '%s' stands in for the effect's page of %s, its document at 0x%08x", op1f_cards.slots[slot].card->name,
               where <= (u32)OP1F_PLACE_MASTER ? PLACES_SAID[where] : "a place", (u32)document);
+}
+
+// R11 (base 35): an LFO layer's page placed, line 48.
+static OP1F_APART void said_lfo(u32 slot, u32 where, const void* document) {
+    STOCK_LOG(3, LOG_FILE, 48, "page: '%s' stands in for the LFO's page of %s, its document at 0x%08x", op1f_cards.slots[slot].card->name,
+              where < (u32)OP1F_PLACE_MASTER ? PLACES_SAID[where] : "a place", (u32)document);
 }
 
 // R6d: the base's own page for an engine away, made once, at the first entry kept ready for one, from the base's own
@@ -2398,6 +2688,10 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
     if (fx.asked) fx.ready = 0;                                                     // R5: an entry kept ready is the stand-in's now
     if (stand.said_up >= (u32)STAND_SAID) return;
     ++stand.said_up;
+    if (fx.placed && fx.placed_engine == (u32)BY_LFOS) {                            // R11 (base 35): an LFO layer's
+        said_lfo(s->slot, s->where, document);
+        return;
+    }
     if (fx.placed && fx.placed_engine) {                                            // R6
         STOCK_LOG(3, LOG_FILE, 40, "page: '%s' stands in for the engine's page of synth %u, its document at 0x%08x", op1f_cards.slots[s->slot].card->name,
                   (s->where & 7u) + 1u, (u32)document);
@@ -2671,7 +2965,65 @@ static OP1F_APART void popup_said(u32 which, u32 on, u32 page) {
 // as the loop would. On the display thread, inside the loop: nothing is said, nothing waits, nothing of a pack's runs.
 // A list that a loop kept and no frame call made (not expected: the frame call follows the loop in every frame) is
 // dropped and counted at the next loop.
+// R12 (base 36): in a held frame whose plan the frame call made for this loop, over the same document: each rectangle
+// drawn by 77's render as the loop handed it, cut to the rectangle by the rasteriser's clip, with the plan's parts
+// hidden; the clip and the display bytes put back right after each drawing, each drawing timed. Inlined, so that the
+// loop's function calls nothing but the render; nothing is kept in a register across a render (the rectangle, the
+// render and its arguments are the unit's state, each rectangle's clip and hides laid out by the frame call in
+// parts_lay, the rasteriser's struct read again after each drawing), so that its frame stays near base 33's.
+static inline __attribute__((always_inline)) u32 parts_before() {
+    u32 at = parts.at;
+    if (at >= parts.draws) return 0;
+    const PartsDraw* d = &parts.draw[at];
+    u8* const* hide = d->hide;
+    u32 hides = d->hides;
+    for (u32 i = 0; i < hides; ++i) {
+        u8* node = hide[i];
+        parts.saved[i] = node[NODE_DISPLAY];
+        node[NODE_DISPLAY] = 0;
+    }
+    volatile u32* clip = (volatile u32*)parts.raster;
+    for (u32 k = 0; k < 4u; ++k) clip[4u + k] = d->clip[k];
+    parts.before = stamp();
+    return 1;
+}
+static inline __attribute__((always_inline)) void parts_after() {
+    u32 took = stamp() - parts.before;
+    volatile u32* clip = (volatile u32*)parts.raster;
+    clip[4] = 0u;
+    clip[5] = 0u;
+    clip[6] = (u32)PARTS_TALL;
+    clip[7] = (u32)PARTS_WIDE;
+    u32 at = parts.at;
+    const PartsDraw* d = &parts.draw[at];
+    u8* const* hide = d->hide;
+    u32 hides = d->hides;
+    for (u32 i = hides; i-- > 0;) hide[i][NODE_DISPLAY] = parts.saved[i];   // the other way: a part twice gets its first byte back
+    if (took > LONGEST) took = LONGEST;
+    took = ((took >> 4) * 41u) >> 10;                   // microseconds, as microseconds() counts them
+    ++parts.drawn;
+    parts.hides += hides;
+    parts.sum += took;
+    if (took > parts.most) parts.most = took;
+    parts.at = at + 1u;
+}
+static inline __attribute__((always_inline)) void parts_loop(void* screen, u32 time, u32 render, u32 frame) {
+    if (parts.ready != frame + 1u || ((const u32*)screen)[SCREEN_DOCUMENT] != parts.document) return;
+    parts.ready = 0;                                    // once
+    parts.screen = (u32)screen;
+    parts.time = time;
+    parts.render = render;
+    parts.raster = PARTS_RASTER;
+    parts.at = 0;
+    while (parts_before()) {
+        ((RenderFn)parts.render)((void*)parts.screen, parts.time);
+        parts_after();
+    }
+}
+
 extern "C" void op1f_popups_loop(void* screen, u32 time, u32 render) OP1F_NAMED("op1f_popups_loop");
+// R9 (base 33): 77's render is left out in a frame whose clearing op1f_fill_place left out (op1f_fill_left = this
+// loop's frame counter + 1): the page holds its picture, and the frame call is told (render_left).
 extern "C" void op1f_popups_loop(void* screen, u32 time, u32 render) {
     u32 frame = op1f_frame_counter;
     if (held.frame != frame) {
@@ -2680,6 +3032,11 @@ extern "C" void op1f_popups_loop(void* screen, u32 time, u32 render) {
         held.frame = frame;
     }
     const u32* screens = held.screens;
+    if (op1f_hold_left(op1f_fill_left, frame + 1u) && screens != 0 && screens[PAGE_SCREEN] == (u32)screen) {
+        hold.render_left = frame + 1u;                      // R9 (base 33): the page holds its picture in this frame
+        parts_loop(screen, time, render, frame);            // R12 (base 36): the rectangles the page named, drawn again
+        return;
+    }
     u32 n = held.count;
     if (screens != 0 && n < (u32)HELD_MOST) {
         for (u32 number = (u32)HELD_FIRST; number <= (u32)LAST_SCREEN; ++number) {
@@ -2726,9 +3083,12 @@ static OP1F_APART u32 held_draw(u32 page) {
 // R6b: the loop's renders kept for after the pages, made (held_draw) and timed: from popups_frame, last, with `counted`
 // not 0 when the notice was drawn in this frame and counted already, or from the frame call's early return with 0. A
 // frame is counted once in the popups' cost; the time of the renders is added to it.
+// R9 (base 33): a popup made or the notice drawn in this frame asks the next three frames whole.
 static OP1F_APART void held_frame(u32 page, u32 counted) {
     u32 start = stamp();
-    if (held_draw(page) == 0) return;
+    u32 made = held_draw(page);
+    if (made != 0 || counted != 0) hold.covered = 1;
+    if (made == 0) return;
     u32 spent = microseconds(stamp() - start);
     popups.sum = popups.sum + spent;
     if (counted != 0) return;
@@ -2829,6 +3189,141 @@ static OP1F_APART void popups_frame(const Op1fFrame* now, u32 page) {
     }
     popup_said(0, drawn & 1u, page);
     held_frame(page, drawn);                                // R6b: the loop's renders kept for after the pages
+}
+
+// ---------------------------------------------------------------- R9 (base 33): a page that holds its picture
+
+// What a frame function is handed on base 33: base 32's forty bytes and two words behind them. A pack reads what its
+// `bytes` covers (module/build_r6e_card.h): `held` 1 when this frame's loop left out both the clearing and 77's
+// render, the canvas then holding the picture of two frames before; `picture` 0 or 1, which of the display's two
+// pictures the canvas is (0 the first the base saw in the frame's word, 1 the other: they alternate frame by frame).
+struct Handed {
+    Op1fFrame now;                                      // +0, base 32's
+    u32 held, picture;                                  // +40, +44
+};
+static_assert(sizeof(Op1fFrame) == 40 && sizeof(Handed) == 48, "base 33 hands a frame function 48 bytes, base 32's forty and two words");
+
+// R9: the words of this frame for its frame functions: `held` from the loop's two marks, `picture` from the canvas
+// (the frame's word, as read for `canvas`).
+static OP1F_APART void hold_words(Handed* h, u32 frame, u32 canvas) {
+    h->held = op1f_hold_held(op1f_fill_left, hold.render_left, frame);
+    h->picture = op1f_hold_picture(&hold.first, canvas);
+}
+
+// R9: from the frame call, before any frame function: what this frame's calls may ask is cleared, and the page they
+// may ask for is known (`page`: the slot + 1 of the pack's page this frame names, 0 none).
+static inline void hold_open(u32 page) {
+    hold.page = page;
+    hold.asked = 0;
+    hold.redraw = 0;
+    parts.asked = 0;                                    // R12 (base 36): and the parts it may name
+    parts.refused = 0;
+    parts.own = 0;
+    parts_plan.rects = 0;
+    parts_plan.parts = 0;
+}
+
+// R12 (base 36): a plan made, laid out as the next loop draws it: each rectangle's clip words and its run of nodes to
+// hide, so that the loop reads nothing of the plan and keeps nothing in a register across a render.
+static OP1F_APART void parts_lay() {
+    u32 n = parts_plan.rects;
+    for (u32 i = 0; i < n; ++i) {
+        const Op1fPlanRect* r = &parts_plan.rect[i];
+        PartsDraw* d = &parts.draw[i];
+        d->clip[0] = r->y0;
+        d->clip[1] = (u32)PARTS_WIDE - r->x1;
+        d->clip[2] = r->y1;
+        d->clip[3] = (u32)PARTS_WIDE - r->x0;
+        d->hide = (u8* const*)&parts_plan.hide[r->hide];
+        d->hides = r->hides;
+    }
+    parts.draws = n;
+}
+
+// R12 (base 36): from hold_frame, behind the rule's decision `out` for the next loop (`page`, `held_now` as there;
+// `asks`: the page asked op1f_page_parts in this frame; `document`: the one under 77). When the rule keeps the picture
+// and the page asked with a rectangle named, the plan for the next loop, made here and never in the loop; a plan that
+// fails holds nothing (op1f_hold_screen 0: the next picture whole), counted. Line 50 once a second while a page asks,
+// for the first 30 seconds of each of the first sixteen runs of asking.
+static OP1F_APART void parts_frame(u32 page, u32 asks, u32 out, u32 document, u32 held_now) {
+    parts.ready = 0;
+    u32 failed = 0;
+    if (asks != 0 && (out & (u32)OP1F_HOLD_KEEP) != 0 && parts_plan.rects != 0) {
+        if (op1f_plan_parts(&parts_plan, (Op1fPlanNode)document) == (unsigned)OP1F_PLAN_MADE) {
+            parts_lay();
+            parts.document = document;
+            parts.ready = op1f_frame_counter + 1u;      // the next loop's counter + 1
+        } else {
+            op1f_hold_screen = 0;
+            failed = 1;
+        }
+    }
+    if (asks == 0) {
+        parts.page = 0;
+        return;
+    }
+    if (page != parts.page) {                           // a run of asking begins
+        parts.page = page;
+        parts.start = state.ms;
+        parts.next = (u32)PARTS_SECOND;
+        parts.second = 1;
+        ++parts.runs;
+        parts.saying = parts.said < (u32)PARTS_SAID ? 1u : 0u;
+        if (parts.saying != 0) ++parts.said;
+        parts.frames = parts.held = parts.drawn = parts.hides = parts.sum = parts.most = parts.refusals = parts.failures = 0;
+    }
+    ++parts.frames;
+    if (held_now != 0) ++parts.held;
+    parts.refusals += parts.refused;
+    parts.failures += failed;
+    if (parts.saying == 0 || state.ms - parts.start < parts.next) return;
+    STOCK_LOG(3, LOG_FILE, 50, "page: '%s' parts, second %u: %u frames, %u held, %u rectangles drawn, %u hidden, %u us in all, %u most; %u refused, %u plans failed",
+              op1f_cards.slots[page - 1u].card->name, parts.second, parts.frames, parts.held, parts.drawn, parts.hides, parts.sum, parts.most,
+              parts.refusals, parts.failures);
+    parts.frames = parts.held = parts.drawn = parts.hides = parts.sum = parts.most = parts.refusals = parts.failures = 0;
+    parts.next += (u32)PARTS_SECOND;
+    ++parts.second;
+    if (parts.next > (u32)PARTS_SAYING) parts.saying = 0;
+}
+
+// R9: the frame call's decision for the next loop, after every frame function, the popups and the notice (`page`: the
+// slot + 1 of the pack's page this frame named, 0 none; `held`: this frame's `held`; `over`: something of the base's
+// own lay over the page in this frame: its top page, the power popup, the ask's name it paints on a stand-in's blank
+// page). 77's object goes into op1f_hold_screen when the rule keeps the picture, else 0. Lines 46 and 47 when a hold
+// begins and ends, for the first sixteen holds.
+static OP1F_APART void hold_frame(u32 page, u32 held_now, u32 over) {
+    const u32* screens = held.screens;
+    u32 s77 = screens != 0 ? screens[PAGE_SCREEN] : 0u;
+    Op1fHoldSeen seen;
+    seen.page = page;
+    seen.document = s77 != 0 ? ((const u32*)s77)[SCREEN_DOCUMENT] : 0u;
+    seen.asked = page != 0 && hold.asked == page ? 1u : 0u;
+    u32 changes = hold.changes;
+    u32 asks = page != 0 && parts.asked == page ? 1u : 0u;                      // R12 (base 36): the page asked its parts
+    u32 other = changes - hold.changes_seen - (asks != 0 ? parts.own : 0u);    // R12: then its own changes are not counted
+    u32 refused = parts.refused + (asks == 0 && parts_plan.rects != 0 ? 1u : 0u);   // R12: rectangles refused, or named with no ask
+    parts.refused = refused;
+    seen.whole = hold.redraw != 0 || hold.covered != 0 || over != 0 || other != 0 || refused != 0 ? 1u : 0u;
+    seen.held = held_now;
+    hold.changes_seen = changes;
+    hold.covered = 0;
+    hold.page = 0;
+    u32 out = op1f_hold_decide(&hold.rule, &seen);
+    op1f_hold_screen = (out & (u32)OP1F_HOLD_KEEP) != 0 ? s77 : 0u;
+    parts_frame(page, asks, out, seen.document, held_now);                     // R12: the plan for the next loop, and line 50
+    if ((out & (u32)OP1F_HOLD_ENDED) != 0 && hold.slot != 0) {
+        STOCK_LOG(3, LOG_FILE, 47, "page: '%s' stopped holding its picture: %u frame(s) held, %u drawn whole since it began",
+                  op1f_cards.slots[hold.slot - 1u].card->name, hold.rule.held, hold.rule.drawn);
+        hold.slot = 0;
+    }
+    if ((out & (u32)OP1F_HOLD_BEGAN) != 0) {
+        ++hold.began;
+        if (hold.said >= (u32)HOLD_SAID) return;
+        ++hold.said;
+        hold.slot = page;
+        STOCK_LOG(3, LOG_FILE, 46, "page: '%s' holds its picture from frame to frame; %u time(s) since the start",
+                  op1f_cards.slots[page - 1u].card->name, hold.began);
+    }
 }
 
 // ---------------------------------------------------------------- the frame call
@@ -2934,6 +3429,7 @@ extern "C" void op1f_cards_frame() {
         op1f_folders_settle();
     }
     op1f_door_frame(state.ms);                              // S1: the door's frame work
+    u32 top_was = top.shown;                                // R16 (base 38): the picture of this frame, drawn before, still shows the top page
     top_frame(op1f_frame_counter, RD32(CURRENT_MODE));      // S1: the base's top page put up, kept, taken off
     op1f_seq_frame();                                       // R3: the sequencer unit's frame work, then the notes unit's
     op1f_notes_frame();
@@ -2954,10 +3450,12 @@ extern "C" void op1f_cards_frame() {
         if (fx.held != 0 || &op1f_effects_ahead != 0 || &op1f_engines_ahead != 0) ready_frame(RD32(CURRENT_MODE), RD32(CURRENT_SCREEN));   // R5: the entry kept ready, in such a frame too (R6: an engine's too)
         away_paint(RD32(CURRENT_SCREEN));                   // R6b: the base's page for an engine away, in such a frame too
         held_frame(0, 0);                                   // R6b: the loop's renders kept for after the pages, in such a frame too
+        hold_frame(0, 0, 0);                                // R9 (base 33): no pack's page, nothing held
         return;                                             // no card asks for a call or for keys: nothing of stock is asked, nothing is said
     }
-    Op1fFrame now;
-    now.bytes = (u32)sizeof(Op1fFrame);
+    static Handed handed;                                   // R9 (base 33): base 32's frame and two words behind it; kept out
+    Op1fFrame& now = handed.now;                            // of the stack (the display thread's only, once a frame), whose depth to a kept render stays within the firmware's own
+    now.bytes = (u32)sizeof(Handed);
     now.frame = op1f_frame_counter;
     now.ms = state.ms;
     now.mode = RD32(CURRENT_MODE);
@@ -2982,9 +3480,13 @@ extern "C" void op1f_cards_frame() {
     }
     state.last_screen = now.screen;
     state.started = 2;
+    hold_words(&handed, now.frame, (u32)now.canvas);        // R9 (base 33): `held` and `picture`
+    if (top_was || top.wanted || top.shown) now.canvas = 0; // R16 (base 38): no canvas under the base's top page, nor in the frame it is taken off; `picture` read above, from the frame's word
+    hold_open(page);                                        // R9: the page this frame's calls may ask to hold
+    u32 over = top.shown || now.popup != 0 || (stand.named && stand_on_screen) ? 1u : 0u;   // R9: the base's top page, the power popup, the ask's name below
     pages.canvas = now.canvas;                              // R1: for the paint helpers, while the frame functions are called
     if (stand.named && stand_on_screen) paint_name(now.canvas);                 // R3: the ask's name on the blank page, while the stand-in is on the screen (R4c: the base's flag)
-    away_paint(now.screen);                                                     // R6b: the base's page for an engine away
+    away_paint(now.screen);                                                   // R6b: the base's page for an engine away
     for (u32 i = 0; i < state.seen; ++i) {
         if (((state.framed >> i) & 1u) == 0) continue;
         const Op1fCard* card = op1f_cards.slots[i].card;
@@ -3002,6 +3504,7 @@ extern "C" void op1f_cards_frame() {
     }
     pages.canvas = 0;                                       // R1
     popups_frame(&now, page);                               // R4c: the unit's own popups over a pack's page, after every frame function
+    hold_frame(page, handed.held, over);                    // R9 (base 33): the next loop's hold, after everything drawn in this frame
     int why = quiet_popup(&state.quiet, now.popup != 0);    // the lines once more before the unit is off
     int period = --state.countdown <= 0;                    // a countdown, not a modulo: nothing is divided
     if (!period && !why) return;
@@ -3507,12 +4010,115 @@ extern "C" void* op1f_node(void* document, const char* name) {
     return STOCK_FIND_NODE(held, name, 1);
 }
 
-// A part shown or hidden, with what is inside it.
+// A part shown or hidden, with what is inside it. R9 (base 33): a part whose display byte changes is a change of its
+// document's.
 extern "C" void op1f_show(void* part, int on) {
-    if (part) ((u8*)part)[NODE_DISPLAY] = (u8)(on ? 1 : 0);
+    if (part == 0) return;
+    u8 want = (u8)(on ? 1 : 0);
+    if (((u8*)part)[NODE_DISPLAY] != want) hold_changed_by();     // R12: or the page's own
+    ((u8*)part)[NODE_DISPLAY] = want;
 }
 
-// A part's matrix set: nine words in 1024ths, [a, b, 0, c, d, 0, e, f, 1024].
-extern "C" void op1f_move(void* part, const int* matrix) {
-    if (part && matrix) STOCK_APPLY_MATRIX(part, matrix);
+// R9 (base 33): whether op1f_move sets a part another matrix than the one it set it last: the last sixteen parts moved
+// are kept with their matrices, a ring. 1 for a part not kept (a change, to be sure). Out of line, nothing inlined.
+static OP1F_APART u32 moved_other(void* part, const int* matrix) {
+    u32 at = (u32)HOLD_MOVES;
+    for (u32 i = 0; i < (u32)HOLD_MOVES; ++i) {
+        if (hold.moves[i].part == part) at = i;
+    }
+    u32 other = 0;
+    if (at == (u32)HOLD_MOVES) {
+        at = hold.move_next;
+        hold.move_next = (at + 1u) & (u32)(HOLD_MOVES - 1);
+        hold.moves[at].part = part;
+        other = 1;
+    }
+    int* kept = hold.moves[at].matrix;
+    for (u32 k = 0; k < (u32)MATRIX_WORDS; ++k) {
+        if (kept[k] != matrix[k]) other = 1;
+        kept[k] = matrix[k];
+    }
+    return other;
 }
+
+// A part's matrix set: nine words in 1024ths, [a, b, 0, c, d, 0, e, f, 1024]. R9 (base 33): another matrix than the
+// one this set the part last is a change of its document's.
+extern "C" void op1f_move(void* part, const int* matrix) {
+    if (part == 0 || matrix == 0) return;
+    if (moved_other(part, matrix)) hold_changed_by();             // R12: or the page's own
+    STOCK_APPLY_MATRIX(part, matrix);
+}
+
+// R9 (base 33): a pack's ask to keep its page's picture in the next frame (module/build_r6e_card.h, "Base 33"). Taken
+// from the card's own frame function while its page is the one this frame names: 1. `redraw` not 0: the next frames
+// are drawn whole (three, by the rule's count). 0 for any other call.
+extern "C" int op1f_page_hold(const Op1fCard* card, unsigned redraw) OP1F_NAMED("op1f_page_hold");
+extern "C" int op1f_page_hold(const Op1fCard* card, unsigned redraw) {
+    int slot = slot_of(card);
+    if (slot < 0 || hold.page != (u32)slot + 1u || state.calling != (u32)slot + 1u) return 0;
+    hold.asked = (u32)slot + 1u;
+    if (redraw != 0) hold.redraw = 1;
+    return 1;
+}
+
+// R9 (base 33): the mark of a base whose page may hold its picture.
+extern "C" const u32 op1f_hold_1 OP1F_NAMED("op1f_hold_1");
+const u32 op1f_hold_1 = 1;
+
+// R12 (base 36): a pack's ask to hold its page's picture and draw again the rectangles it names in this frame
+// (module/build_r6e_card.h, "Base 36"): op1f_page_hold's checks and answer, and the frame marked as asking parts.
+extern "C" int op1f_page_parts(const Op1fCard* card) OP1F_NAMED("op1f_page_parts");
+extern "C" int op1f_page_parts(const Op1fCard* card) {
+    if (op1f_page_hold(card, 0) == 0) return 0;
+    parts.asked = hold.asked;
+    return 1;
+}
+
+// R12: a cut of [at, at + size) to [0, most): 0 when nothing is left. No sum overflows.
+static OP1F_APART u32 parts_cut(int at, int size, u32 most, u32* from, u32* past) {
+    if (size <= 0 || at >= (int)most) return 0;
+    if (at < 0) {
+        size += at;                                     // the signs differ: no overflow
+        at = 0;
+        if (size <= 0) return 0;
+    }
+    *from = (u32)at;
+    *past = (u32)size > most - (u32)at ? most : (u32)at + (u32)size;
+    return 1;
+}
+
+// R12: a rectangle and its parts named for the next frame, into the frame's ask. From the card's own frame function
+// while its page is the one this frame names, before or after op1f_page_parts (a frame that names one and does not ask
+// is drawn whole: hold_frame). A refusal (a rectangle of nothing, no parts, too many, a part 0) is counted and makes
+// the next picture whole; a call from elsewhere answers 0 and changes nothing.
+extern "C" int op1f_page_redraw(const Op1fCard* card, int x, int y, int w, int h, void* const* named, unsigned count) OP1F_NAMED("op1f_page_redraw");
+extern "C" int op1f_page_redraw(const Op1fCard* card, int x, int y, int w, int h, void* const* named, unsigned count) {
+    int slot = slot_of(card);
+    if (slot < 0 || hold.page != (u32)slot + 1u || state.calling != (u32)slot + 1u) return 0;
+    Op1fPlan* p = &parts_plan;
+    u32 x0, x1, y0, y1;
+    u32 ok = parts_cut(x, w, (u32)PARTS_WIDE, &x0, &x1) != 0 && parts_cut(y, h, (u32)PARTS_TALL, &y0, &y1) != 0 && named != 0 && count != 0 &&
+             p->rects < (u32)OP1F_REDRAWS_MOST && count <= (u32)OP1F_REDRAW_PARTS_MOST - p->parts ? 1u : 0u;
+    for (u32 i = 0; ok != 0 && i < count; ++i) {
+        if (named[i] == 0) ok = 0;
+    }
+    if (ok == 0) {
+        ++parts.refused;
+        return 0;
+    }
+    Op1fPlanRect* r = &p->rect[p->rects];
+    r->x0 = x0;
+    r->x1 = x1;
+    r->y0 = y0;
+    r->y1 = y1;
+    r->first = p->parts;
+    r->count = count;
+    for (u32 i = 0; i < count; ++i) p->part[p->parts + i] = named[i];
+    p->parts += count;
+    ++p->rects;
+    return 1;
+}
+
+// R12: the mark of a base whose held page's parts the firmware draws again.
+extern "C" const u32 op1f_parts_1 OP1F_NAMED("op1f_parts_1");
+const u32 op1f_parts_1 = 1;

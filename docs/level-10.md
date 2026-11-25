@@ -89,4 +89,4 @@ Level 10 writes no line of its own. A pack left out for the mark says so in the 
 | From | The frame function and the input function |
 | The card | Level 10, the same 64 bytes and kinds as level 9 |
 
-Level 10 is the newest part of the base. It has been run against the base's own code on a computer, with an LFO's move put in and read back, but nobody has watched it on a unit yet. If your numbers don't move with an LFO on a unit, open an issue.
+Level 10 is the newest level of the base. What came after it, from base 33 on, has marks of its own instead of a level ([the base](base.md#after-level-10-parts-with-a-mark-of-their-own)). Level 10 has been run against the base's own code on a computer, with an LFO's move put in and read back, but nobody has watched it on a unit yet. If your numbers don't move with an LFO on a unit, open an issue.

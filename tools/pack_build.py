@@ -113,7 +113,7 @@ place is where it lies on the disk, inside user/pf/; `shown` says whether the co
 folder leaves out: the name is the pack's own where the pack lists one folder and does not name it; the place is the
 name; a folder is shown. A name and a place are one to fifteen characters of A-Z, a-z, 0-9, space, '_', '-' and '.',
 not beginning with a space, a dot or a dash and not ending with a space or a dot; a shown folder may not take a name
-of the firmware's (synth, drum, tapes, mixdown) or the loader's (packs) (a base before version 21 kept fx and lfo for
+of the firmware's (synth, drum, tapes, mixdown), the loader's (packs) or the base's (logs) (a base before version 21 kept fx and lfo for
 itself as well, and does not show a pack's folder under either); and two folders of a
 pack may not share a name or a place, capitals counted as small letters. `card` writes the card of 56 bytes, the
 list's address and count behind level 2's four addresses, and the list as constant data under the card's name and
@@ -307,7 +307,8 @@ FOLDER = struct.Struct("<16s16sI")              # 36 bytes a folder
 FOLDERS_MOST = 8
 FOLDER_FORM = re.compile(r"[A-Za-z0-9_](?:[A-Za-z0-9 _.-]{0,13}[A-Za-z0-9_-])?")    # one to fifteen characters, as the base takes them
 FOLDER_NAMES_TAKEN = {"synth": "the firmware's", "drum": "the firmware's", "tapes": "the firmware's", "mixdown": "the firmware's",
-                      "packs": "the loader's"}    # fx and lfo were the base's until version 21; since then they are folders of packs, like any
+                      "packs": "the loader's",    # fx and lfo were the base's until version 21; since then they are folders of packs, like any
+                      "logs": "the base's"}       # since version 34: the firmware's log files (module/build_r10_logs.cpp)
 # since R1: a card of level 4 has the address of its list of asks and their count behind
 # level 3's two words; an ask is its kind, its bytes and the address of what it points at. Level 4 defines no kind.
 CARD_4 = struct.Struct("<4I16s4I2I2I")
@@ -425,6 +426,22 @@ OPTION_SWITCH, OPTION_LIST, OPTION_NUMBER = 0, 1, 2             # Op1fOption.kin
 OPTION_WHERE = {"unit": 0, "tape": 1}                           # Op1fOption.where, bits 0 to 3 (1 reserved: kept for the unit)
 OPTION_CATEGORY = {"packs": 0, "keyboard": 1, "system": 2, "midi": 3}     # Op1fOption.where, bits 4 to 7
 OPTION_KEYS = ("name", "choices", "low", "high", "first", "category", "where")
+# since R11 (base 35, module/build_r6e_card.h, "Base 35: layers"): an effect may be a layer (its head's flag
+# OP1F_EFFECT_LAYER, {"kind": "effect", ..., "layer": true}): it lies over whichever of the unit's own effects the place
+# holds, so it stands on none ("rides" left out or ""), has no values ("params" left out or []) and may have no process
+# (then "cycles" is left out or 0). And a card of level 8 or later may ask one kind more, a layer of a sound's list of
+# LFOs ({"kind": "lfo", "name": ..., "drum": false, "shown": a function's symbol or null}; OP1F_ASK_LFO, its table the
+# head, 28 bytes; its flag OP1F_LFO_DRUM). No new level and no new count of kinds a level says (those stay base 32's):
+# a card with either names the mark op1f_layer_1 in a word behind its level's, so that a base before 35 leaves it out.
+EFFECT_LAYER = 4                                                # an effect's third flag
+LFO, LFO_LEVEL_LEAST, LFO_DRUM, LFOS_MOST = 11, 8, 1, 8         # OP1F_ASK_LFO, the level it needs, OP1F_LFO_DRUM, OP1F_LFOS_MOST
+STOCK_LFOS = ("tremolo", "value", "random", "element", "midi", "velocity")   # the unit's own LFO kinds, which no layer's name may be
+LAYER_MARK = "op1f_layer_1"                                     # the mark of a base that carries out layers
+KIND_WORDS_6[LFO] = "lfo"
+TABLE_BYTES_6[LFO] = 28
+ASK_KEYS_6[LFO] = ("kind", "name", "drum", "shown")
+ASK_ADDRESSES_6[LFO] = (("shown", 24),)
+ASK_KEYS_6[7] = ASK_KEYS_6[7] + ("layer",)
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1292,11 +1309,16 @@ def asks_of_card_6(asks, level):
     out = []
     for number, ask in enumerate(asks, 1):
         kind = ask.get("kind") if isinstance(ask, dict) else None
+        if kind == KIND_WORDS_6[LFO] and level >= LFO_LEVEL_LEAST:     # since R11 (base 35): a layer of a sound's list of LFOs
+            out.append(lfo_of_card(number, ask, out))
+            continue
         if not isinstance(kind, str) or kind not in known:
-            later = " ('keeps' is level 7's)" if kind == "keeps" and level == 6 else ""
-            raise ValueError("Ask %d of the card, of the kind %r: level %d knows %s kinds of ask, %s%s, and the base leaves any other aside"
+            later = (" ('keeps' is level 7's)" if kind == "keeps" and level == 6 else
+                     " ('lfo', base 35's, is for a card of level %d or later)" % LFO_LEVEL_LEAST if kind == KIND_WORDS_6[LFO] else "")
+            raise ValueError("Ask %d of the card, of the kind %r: level %d knows %s kinds of ask, %s%s, and the base leaves any other aside%s"
                              % (number, kind, level, KINDS_COUNTED[level],
-                                ", ".join("'%s'" % k for k in list(known)[:-1]) + " and '%s'" % list(known)[-1], later))
+                                ", ".join("'%s'" % k for k in list(known)[:-1]) + " and '%s'" % list(known)[-1], later,
+                                "; from base 35 on, 'lfo' too" if level >= LFO_LEVEL_LEAST else ""))
         what = known[kind]
         out.append(ask_of_card(number, ask, out) if what <= 2 else ask_of_card_6(number, ask, level, out))
     if sum(1 for ask in out if ask[0] == ASK_KINDS_5["notes"]) > NOTES_MOST:
@@ -1332,6 +1354,15 @@ def asks_of_card_6(asks, level):
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
         if len(found) > 1:
             raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
+    layers = [(number, ask) for number, ask in enumerate(out, 1) if ask[0] == LFO]     # since R11 (base 35)
+    if len(layers) > LFOS_MOST:
+        raise ValueError("Ask %d of the card is LFO layer %d: the packs ask for more LFO layers than the base takes (%d in all), and it leaves the later aside"
+                         % (layers[LFOS_MOST][0], LFOS_MOST + 1, LFOS_MOST))
+    for number, ask in layers:
+        effect = [other_number for other_number, other in enumerate(out, 1) if other[0] == 7 and other[1] == ask[1]]
+        if effect:
+            raise ValueError("Ask %d of the card, an LFO layer %r: ask %d of the card registers an effect of that name; an LFO layer's name is no "
+                             "pack's effect's (module/build_r6e_card.h), so give the two their own names" % (number, ask[1], effect[0]))
     return out
 
 
@@ -1528,24 +1559,27 @@ def word_of(value):
 def effect_of_card(number, ask, earlier):
     """Since R5: one ask of an effect, held as a base of level 8 holds it, in the order its check runs, and refused in
     the words of the base's line (`... is left aside: <the reason>`): (7, name, flags, {"process", "reset", "shown"},
-    {"rides", "cycles", "state_bytes", "state_align", "params": [(name, low, high, start)]})."""
+    {"rides", "cycles", "state_bytes", "state_align", "params": [(name, low, high, start)]}). Since R11 (base 35): a
+    layer ("layer": true, the flag OP1F_EFFECT_LAYER), which stands on none ("rides" ""), has no values and may have no
+    process (its cycles then 0)."""
     name = ask.get("name")
     said = "Ask %d of the card, an effect %r" % (number, name)
     aside = "the base leaves it aside"
     if not isinstance(name, str) or not EFFECT_NAME_FORM.fullmatch(name):
         raise ValueError("%s: its name is not one the lists can show: one to fifteen characters of a-z, 0-9, ' ', '-' and '_'; %s" % (said, aside))
     flags = 0
-    for key, bit in (("mono", EFFECT_MONO), ("tails", EFFECT_TAILS)):
+    for key, bit in (("mono", EFFECT_MONO), ("tails", EFFECT_TAILS), ("layer", EFFECT_LAYER)):     # since R11: a layer
         if not isinstance(ask.get(key, False), bool):
             raise ValueError("%s: its %s is true or false, not %r" % (said, key, ask[key]))
         flags |= bit if ask.get(key, False) else 0
+    layer = bool(flags & EFFECT_LAYER)
     for key in ("shown", "reset"):
         if not a_symbol(ask.get(key)):
             raise ValueError("%s: its %s is the symbol of a function of the pack, or null: %r" % (said, key, ask[key]))
-    if ask.get("process") is None:
+    if ask.get("process") is None and not layer:
         raise ValueError("%s has no process: its table is not in order, and %s" % (said, aside))
-    if not a_symbol(ask["process"]):
-        raise ValueError("%s: its process is the symbol of a function of the pack: %r" % (said, ask["process"]))
+    if not a_symbol(ask.get("process")):
+        raise ValueError("%s: its process is the symbol of a function of the pack%s: %r" % (said, ", or null for a layer" if layer else "", ask["process"]))
     state, align = ask.get("state_bytes", 0), ask.get("state_align", EFFECT_ALIGN_LEAST)
     if not whole(state, -0x80000000, 0xffffffff):
         raise ValueError("%s: its working memory is a whole number of bytes from 0 to %d (8 MiB), not %r: its table is not in order, and %s"
@@ -1558,6 +1592,8 @@ def effect_of_card(number, ask, earlier):
     if state and (not EFFECT_ALIGN_LEAST <= align <= MEMORY_ALIGN_MOST or align & (align - 1)):
         raise ValueError("%s: its working memory's alignment is a power of two from %d to %d, not %r: its table is not in order (%d, %d), and %s"
                          % (said, EFFECT_ALIGN_LEAST, MEMORY_ALIGN_MOST, align, align, MEMORY_ALIGN_MOST, aside))
+    if flags & EFFECT_LAYER:                                # since R11 (base 35): the rest of a layer's check
+        return layer_of_card(said, aside, ask, name, flags, state, align, earlier)
     params = ask.get("params")
     if not isinstance(params, list) or not 1 <= len(params) <= EFFECT_VALUES_MOST:
         raise ValueError('%s: its values are a list of one to %d values, each {"name", "low", "high", "start"}: its table is not in order (%d, %d), and %s'
@@ -1579,11 +1615,7 @@ def effect_of_card(number, ask, earlier):
         if not low <= start <= high:
             raise ValueError("%s: its value %d, %r, starts at %d, outside %d to %d: %s" % (said, place, param["name"], start, low, high, order))
         held.append((param["name"], low, high, start))
-    if name in STOCK_EFFECTS:
-        raise ValueError("%s: its name is a stock effect's or an earlier pack's (the unit's own effect %s); %s" % (said, name, aside))
-    for other_number, other in enumerate(earlier, 1):
-        if other[0] == 7 and other[1] == name:
-            raise ValueError("%s: its name is a stock effect's or an earlier pack's (ask %d of the card registers it first); %s" % (said, other_number, aside))
+    effect_name_taken(said, aside, name, earlier)
     rides = ask.get("rides")
     if rides not in EFFECTS_RIDDEN:
         shown_as = rides if isinstance(rides, str) and EFFECT_NAME_FORM.fullmatch(rides) else "?"
@@ -1595,6 +1627,74 @@ def effect_of_card(number, ask, earlier):
     functions = {"process": ask["process"], "reset": ask.get("reset"), "shown": ask.get("shown")}
     extra = {"rides": rides, "cycles": cycles, "state_bytes": state, "state_align": align, "params": held}
     return 7, name, flags, functions, extra
+
+
+def effect_name_taken(said, aside, name, earlier):
+    """Since R5: an effect's name that a base takes elsewhere is refused: the unit's own effects', an earlier effect's of
+    the card. (The unit's LFO kinds' names are another list: an effect may have one, a layer too.)"""
+    if name in STOCK_EFFECTS:
+        raise ValueError("%s: its name is a stock effect's or an earlier pack's (the unit's own effect %s); %s" % (said, name, aside))
+    for other_number, other in enumerate(earlier, 1):
+        if other[0] == 7 and other[1] == name:
+            raise ValueError("%s: its name is a stock effect's or an earlier pack's (ask %d of the card registers it first); %s" % (said, other_number, aside))
+
+
+def layer_of_card(said, aside, ask, name, flags, state, align, earlier):
+    """Since R11 (base 35): the rest of an effect layer's check, in the order of the base's (module/build_r6d_effects.cpp,
+    check): no values (count 0), a taken name, no effect it stands on, then its cost (0 with no process, else 1 to
+    84000). Answers it as effect_of_card does, its rides "" and its values none."""
+    params = ask.get("params", [])
+    if params != []:
+        count = len(params) if isinstance(params, list) else 0
+        raise ValueError("%s: it is a layer, and a layer has no values of its own (its knobs are the unit's effect's under it): its params are "
+                         "left out or [], and with %r its table is not in order (%d, 0); %s" % (said, params, count, aside))
+    effect_name_taken(said, aside, name, earlier)
+    rides = ask.get("rides", "")
+    if rides not in ("", None):
+        shown_as = rides if isinstance(rides, str) and EFFECT_NAME_FORM.fullmatch(rides) else "?"
+        raise ValueError("%s: it is a layer, which lies over whichever of the unit's effects the place holds and stands on none: its rides is "
+                         "left out or \"\", not %r (the base's line: it stands on %s, which is not one an effect can stand on); %s"
+                         % (said, rides, shown_as, aside))
+    cycles = ask.get("cycles", 0 if ask.get("process") is None else None)
+    if ask.get("process") is None and not whole(cycles, 0, 0):
+        raise ValueError("%s: it is a layer with no process, so its cost is 0 cycles (left out), not %r; %s" % (said, cycles, aside))
+    if ask.get("process") is not None and not whole(cycles, 1, EFFECT_CYCLES_MOST):
+        raise ValueError("%s: its cost is not between 1 and %d cycles a call, %r; %s" % (said, EFFECT_CYCLES_MOST, cycles, aside))
+    functions = {"process": ask.get("process"), "reset": ask.get("reset"), "shown": ask.get("shown")}
+    extra = {"rides": "", "cycles": cycles, "state_bytes": state, "state_align": align, "params": []}
+    return 7, name, flags, functions, extra
+
+
+def lfo_of_card(number, ask, earlier):
+    """Since R11 (base 35): one ask of a layer of a sound's list of LFOs (kind OP1F_ASK_LFO), held as the cards unit holds
+    it (module/build_r6d_cards.cpp, lfo_verdict) and refused in the words of its line (`... that is left aside: <the
+    reason>`): (11, name, flags, {"shown"}, {}). The count in all and a name an effect of the card has are held by
+    asks_of_card_6."""
+    name = ask.get("name")
+    said = "Ask %d of the card, an LFO layer %r" % (number, name)
+    aside = "the base leaves it aside"
+    unknown = sorted(set(ask) - set(ASK_KEYS_6[LFO]))
+    if unknown:
+        raise ValueError("%s, has %s, which such an ask has not: it is {%s}"
+                         % (said, ", ".join("'%s'" % key for key in unknown), ", ".join('"%s"' % key for key in ASK_KEYS_6[LFO])))
+    if not isinstance(name, str) or not EFFECT_NAME_FORM.fullmatch(name):
+        raise ValueError("%s: its name is not in order: one to fifteen characters of a-z, 0-9, ' ', '-' and '_'; %s" % (said, aside))
+    if name in STOCK_LFOS:
+        raise ValueError("%s: its name is one of the unit's own LFOs (%s); %s" % (said, ", ".join(STOCK_LFOS), aside))
+    for other_number, other in enumerate(earlier, 1):
+        if other[0] == LFO and other[1] == name:
+            raise ValueError("%s: another LFO layer has its name (ask %d of the card); %s" % (said, other_number, aside))
+    if not isinstance(ask.get("drum", False), bool):
+        raise ValueError("%s: its drum is true or false, not %r (a flag this base does not know is left aside)" % (said, ask["drum"]))
+    if not a_symbol(ask.get("shown")):
+        raise ValueError("%s: its shown is the symbol of a function of the pack, or null: %r" % (said, ask["shown"]))
+    return LFO, name, LFO_DRUM if ask.get("drum", False) else 0, {"shown": ask.get("shown")}, {}
+
+
+def has_layer(asks):
+    """Since R11 (base 35): whether a card's asks (as card_asks or ask_tables answer them) hold an effect layer or an LFO
+    layer, for which the card names the mark op1f_layer_1."""
+    return any(ask is not None and (ask[0] == LFO or (ask[0] == 7 and ask[2] & EFFECT_LAYER)) for ask in asks)
 
 
 def sound_fault(text, name):
@@ -1766,6 +1866,16 @@ def ask_words(what, name, flags, functions, extra=None):
         said += ", %d value(s): %s" % (len(extra["params"]), "; ".join("%s %d..%d from %d" % p for p in extra["params"]))
         said += ", %d sound(s)" % len(extra["sounds"]) + (": " + " ".join(n for n, _t in extra["sounds"]) if extra["sounds"] else "")
         return said + "".join(", " + key for key in ("reset", "shown") if functions.get(key))
+    if what == LFO:                                         # since R11 (base 35): "lfo layer 'ufo', the synth's and the drum's, shown"
+        return "lfo layer '%s', the synth's%s" % (name, " and the drum's" if flags & LFO_DRUM else "") + (", shown" if functions.get("shown") else "")
+    if what == 7 and flags & EFFECT_LAYER:                  # since R11 (base 35): "effect 'train', a layer, 2000 cycles a call, mono, reset"
+        said = "effect '%s', a layer, %s" % (name, "%d cycles a call" % extra["cycles"] if functions.get("process") else "no process")
+        said += "".join(", " + word for bit, word in ((EFFECT_MONO, "mono"), (EFFECT_TAILS, "tails")) if flags & bit)
+        if extra["state_bytes"]:
+            said += ", %d bytes of memory on %d" % (extra["state_bytes"], extra["state_align"])
+        if extra["params"]:                                 # only in a table read back that is not in order
+            said += ", %d value(s)" % len(extra["params"])
+        return said + "".join(", " + key for key in ("reset", "shown") if functions.get(key))
     if what == 7:
         said = "effect '%s' on %s, %d cycles a call" % (name, extra["rides"], extra["cycles"])
         said += "".join(", " + word for bit, word in ((EFFECT_MONO, "mono"), (EFFECT_TAILS, "tails")) if flags & bit)
@@ -1849,6 +1959,8 @@ def ask_table_words(ask, address_of=None):
         if symbol is None:
             return "0" if address_of is None else 0
         return symbol if address_of is None else address_of(symbol)
+    if what == LFO:                                         # since R11 (base 35): an LFO layer's table is its head alone
+        return []
     if what == 3:
         return [extra["point"], extra["cycles"], extra["memory"], address(functions["process"])]
     if what == 4:
@@ -2064,6 +2176,12 @@ def render_card(recipe, recipe_name):
         text = text.replace("0x%08x, %d, " % (CARD_MARK, CARD_3_BYTES), "0x%08x, %d, " % (CARD_MARK, CARD_4_BYTES), 1)    # 64 bytes, as at level 4
         text = text.replace(count_line, "    .long " + str(len(folders)) + "\n    .long " + (label + "_asks" if asks else "0") + "\n    .long " + str(len(asks)) + "\n"
                             + size_line, 1)
+        if has_layer(asks):                                 # since R11 (base 35): a word behind the level's names op1f_layer_1
+            text = text.replace(" */\n.section", " * Base 35 (module/build_r6e_card.h, \"Base 35: layers\"): the card asks for a layer, so a second word in front\n"
+                                " * of it names the mark %s, and a base before 35 leaves the pack out. Nothing reads that word either.\n */\n.section"
+                                % LAYER_MARK, 1)
+            level_end = ".size %s_level, .-%s_level\n" % (label, label)
+            text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_layer", "    .long %s\n" % LAYER_MARK, "OBJECT"), 1)
         text += asks_source(label, asks) if asks else ""
     return text
 
@@ -2161,7 +2279,7 @@ def ask_table_5(fields, body, kind, size, what):
     return (kind, size, what, (kind, text, flags, functions), wrong)
 
 
-def ask_tables_6(data, level):
+def ask_tables_6(data, level, layered=None):
     """Since R4: each ask of a card of level 6 or 7 read from its table as linked, as ask_tables answers it; a stage,
     memory, places and keeps as (kind, name, flags, {function's word: its address}, {what else the table holds}), the
     list of names of places read from the pack. What is not in order is said as a base of that level would leave it
@@ -2171,6 +2289,12 @@ def ask_tables_6(data, level):
     one."""
     fields, body, _extra = parse3(data)
     known = set(ASK_KINDS_OF_LEVEL[min(level, max(ASK_KINDS_OF_LEVEL))].values())     # a later level's card: the kinds this tool knows
+    # since R11: a pack that needs op1f_layer_1 runs only on base 35 or later, and is read as base 35 reads it (an
+    # effect's flag OP1F_EFFECT_LAYER, LFO layers for a card of level 8 or later); any other is read as before.
+    if layered is None:                                      # `layered` True: read as base 35 would, whatever the pack needs
+        layered = (LAYER_MARK, True) in fields["lists"]["imports"]
+    if layered and level >= LFO_LEVEL_LEAST:
+        known.add(LFO)
     out = []
     for kind, size, what in asks_in(data):
         if kind not in known:
@@ -2179,8 +2303,11 @@ def ask_tables_6(data, level):
         if kind <= 2:
             out.append(ask_table_5(fields, body, kind, size, what))
             continue
+        if kind == LFO:                                      # since R11 (base 35): an LFO layer, read as the cards unit reads it
+            out.append(lfo_table(fields, body, size, what, out))
+            continue
         if kind == 7:                                        # since R5: an effect, read as a base of level 8 reads it
-            out.append(effect_table(fields, body, size, what, out))
+            out.append(effect_table(fields, body, size, what, out, layered))
             continue
         if kind == 8:                                        # since R6: an engine, read as a base of level 9 reads it
             out.append(engine_table(fields, body, size, what, out))
@@ -2288,7 +2415,44 @@ def ask_tables_6(data, level):
             else:
                 said = "a second ask of places, where the base takes one a card"
             out[number] = item[:4] + (said,)
+    layers = 0                                               # since R11 (base 35): eight LFO layers at most, none of an effect's name
+    for number, item in enumerate(out):
+        if item[0] != LFO or item[3] is None or item[4]:
+            continue
+        layers += 1
+        if layers > LFOS_MOST:
+            out[number] = item[:4] + ("the packs ask for more LFO layers than the base takes",)
+        elif any(o[0] == 7 and o[3] is not None and o[3][1] == item[3][1] for o in out):
+            out[number] = item[:4] + ("its name is an effect's of its card",)
     return out
+
+
+def lfo_table(fields, body, size, what, earlier):
+    """Since R11 (base 35): one table of an LFO layer read from a pack file as linked, held as the cards unit holds it
+    (lfo_verdict) and said in the words of its line 49. Answers (11, size, what, the ask as lfo_of_card answers it, its
+    shown linked, or None, what is not in order or None)."""
+    first, span = linked_at(fields, 0), fields["body_bytes"] + fields["bss_bytes"]
+    table = TABLE_BYTES_6[LFO]
+    if not what or size < table or size > ASK_BYTES_MOST or what % 4 or not (first <= what and what + table <= first + span):
+        return (LFO, size, what, None, "its table is not in order")
+    raw = bytes(body[what - first:what - first + table]).ljust(table, b"\0")
+    head_bytes, name_raw, flags, shown = KIND_HEAD.unpack_from(raw, 0)
+    name = effect_name(name_raw)
+    ask = (LFO, name if name is not None else name_raw.split(b"\0")[0].decode("latin-1"), flags, {"shown": shown}, {})
+    wrong = None
+    if head_bytes != size:
+        wrong = "its table is not in order"
+    elif name is None:
+        wrong = "its name is not in order"
+    elif name in STOCK_LFOS:
+        wrong = "its name is one of the unit's own LFOs"
+    elif any(o[0] == LFO and o[3] is not None and o[4] is None and o[3][1] == name for o in earlier):
+        wrong = "another LFO layer has its name"
+    elif flags & ~LFO_DRUM:
+        wrong = "it has a flag this base does not know"
+    elif shown and (not first <= shown < first + span or shown & 1):
+        wrong = "its shown does not lie in its pack on an even address"
+    return (LFO, size, what, ask, wrong)
 
 
 def effect_name(raw):
@@ -2300,7 +2464,7 @@ def effect_name(raw):
     return text.decode("ascii") if EFFECT_NAME_FORM.fullmatch(text.decode("ascii")) else None
 
 
-def effect_table(fields, body, size, what, earlier):
+def effect_table(fields, body, size, what, earlier, layered=False):
     """Since R5: one table of an effect read from a pack file as linked, held as a base of level 8 holds it, in the order
     of its check and in the words of its line (`is left aside: <the reason>`), its numbers (a, b) as the line says them:
     an address as its place from the pack's first byte, the pack's bytes its body and its zeroed data. `earlier` is the
@@ -2329,15 +2493,17 @@ def effect_table(fields, body, size, what, earlier):
            {"rides": rides, "cycles": cycles, "state_bytes": state, "state_align": align,
             "params": [(p[0].split(b"\0")[0].decode("latin-1"), p[1], p[2], p[3]) for p in params]})
     wrong = None
+    known = EFFECT_MONO | EFFECT_TAILS | (EFFECT_LAYER if layered else 0)     # since R11: and a layer, in a pack for base 35
+    layer = flags & EFFECT_LAYER if layered else 0
     if name is None:
         wrong = "its name is not one the lists can show"
     elif head_bytes != size:
         wrong = order(head_bytes, size)
-    elif flags & ~(EFFECT_MONO | EFFECT_TAILS):
-        wrong = order(flags, EFFECT_MONO | EFFECT_TAILS)
+    elif flags & ~known:
+        wrong = order(flags, known)
     elif shown and (not inside(shown, 2) or shown & 1):
         wrong = order(shown - first, span)
-    elif not inside(process, 2) or process & 1:
+    elif (process or not layer) and (not inside(process, 2) or process & 1):     # since R11: a layer's may be 0
         wrong = order(process - first, span)
     elif reset and (not inside(reset, 2) or reset & 1):
         wrong = order(reset - first, span)
@@ -2345,7 +2511,9 @@ def effect_table(fields, body, size, what, earlier):
         wrong = order(state, EFFECT_STATE_MOST)
     elif state and (not EFFECT_ALIGN_LEAST <= align <= MEMORY_ALIGN_MOST or align & (align - 1)):
         wrong = order(align, MEMORY_ALIGN_MOST)
-    elif not 1 <= count <= EFFECT_VALUES_MOST:
+    elif layer and count != 0:                               # since R11: a layer has no values
+        wrong = order(count, 0)
+    elif not layer and not 1 <= count <= EFFECT_VALUES_MOST:
         wrong = order(count, EFFECT_VALUES_MOST)
     else:
         for n, (value_name, low, high, start) in enumerate(params):
@@ -2354,10 +2522,12 @@ def effect_table(fields, body, size, what, earlier):
                 break
     if wrong is None and (name in STOCK_EFFECTS or any(o[0] == 7 and o[3] is not None and o[4] is None and o[3][1] == name for o in earlier)):
         wrong = "its name is a stock effect's or an earlier pack's"
-    elif wrong is None and rides not in EFFECTS_RIDDEN:
+    elif wrong is None and layer and raw[28:44].strip(b"\0"):
         wrong = "it stands on %s, which is not one an effect can stand on" % (effect_name(raw[28:44]) or "?")
-    elif wrong is None and not 1 <= cycles <= EFFECT_CYCLES_MOST:
-        wrong = "its cost is not between 1 and %d" % EFFECT_CYCLES_MOST
+    elif wrong is None and not layer and rides not in EFFECTS_RIDDEN:
+        wrong = "it stands on %s, which is not one an effect can stand on" % (effect_name(raw[28:44]) or "?")
+    elif wrong is None and (cycles != 0 if layer and not process else not 1 <= cycles <= EFFECT_CYCLES_MOST):
+        wrong = "its cost is not between 1 and %d" % EFFECT_CYCLES_MOST if process or not layer else "its cost is not 0, with no process"
     return (7, size, what, ask, wrong)
 
 
@@ -2497,7 +2667,13 @@ def card_faults(data):
                                                      for _kind, size, what in listed):
             faults.append("its list of asks does not lie in its pack on a word")
         elif card["level"] >= 5:                            # since R3: each table in order for its kind, its functions the pack's own places
-            for number, (_kind, _size, what, ask, wrong) in enumerate(ask_tables(data), 1):
+            tables = ask_tables(data)
+            # since R11 (base 35): a pack that does not need op1f_layer_1 is read as before; a layer base 35 would take
+            # in it is said too (a table of before with the flag is no layer in order, and gets only its verdict of before)
+            if (LAYER_MARK, True) not in lists["imports"] and card["level"] >= 6 and has_layer(
+                    [t[3] for t in ask_tables_6(data, card["level"], True) if not t[4]]):
+                faults.append("it asks for a layer and the pack does not need %s, so a base before 35 would not leave it out" % LAYER_MARK)
+            for number, (_kind, _size, what, ask, wrong) in enumerate(tables, 1):
                 if wrong:
                     faults.append("its ask %d is not in order: %s" % (number, wrong))
                     continue
@@ -2782,6 +2958,10 @@ def build3(recipe, target_os, out_dir=None, objects=None, log=print, serve=None)
             linked = linked[:4] + struct.pack("<I", CARD_4_BYTES) + linked[8:] + struct.pack("<2I", list_at, len(asks))
             if asks and (card_place + CARD_3_BYTES, KIND_WORD, None, list_at) not in places:
                 raise ValueError("The card's list of asks is no address of the pack's own, which would move with the pack")
+            if has_layer(asks) != has(label + "_layer"):    # since R11 (base 35): the word that names op1f_layer_1
+                raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % LAYER_MARK)
+            if has_layer(asks) and (LAYER_MARK not in needed or (values[label + "_layer"] - origin, KIND_WORD, needed.index(LAYER_MARK), 0) not in places):
+                raise ValueError("The card asks for a layer and the pack does not need %s: a base before 35 would not leave it out" % LAYER_MARK)
         if bytes(body[card_place:card_place + len(linked)]) != linked or level_place not in places:
             raise ValueError("The card in the sources is not the recipe's: write it again with `card`")
         if not card_place:

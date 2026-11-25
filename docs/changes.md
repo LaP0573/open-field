@@ -4,7 +4,7 @@ Every place where the loader and the base of open-field change OS 1.7.3+0 of the
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 63 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 61 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
+There are 68 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 66 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
 
 ## In the firmware file, by the builder
 
@@ -27,7 +27,7 @@ The loader's own three changes: the loader is our small piece inside the firmwar
 | `0x8fcafc0a` | a call | `op1f_base_populate_stub` | In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it. | A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own. |
 | `0x8c0b43e4` | a call | `op1f_base_text_stub` | In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address. | A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock. |
 
-### The base, `base.pack` (58)
+### The base, `base.pack` (63)
 
 The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).
 
@@ -91,6 +91,11 @@ The pack `base`, the file base.pack: the shared pack every other pack relies on.
 | `0x840134bc` | a word of data | `op1f_settings_red_system` | A word in the table of the settings row SYSTEM: its function for a turn of the red knob on a line. | Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours. |
 | `0x840134fc` | a word of data | `op1f_settings_chosen_midi` | A word in the table of the settings row MIDI: its function for the row being chosen, which fills the lines on the right. | Ours calls the firmware's function first, then puts the packs' settings for MIDI on lines behind the unit's own and lets the ochre knob reach them. |
 | `0x84013504` | a word of data | `op1f_settings_red_midi` | A word in the table of the settings row MIDI: its function for a turn of the red knob on a line. | Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours. |
+| `0x8fc26744` | a call | `op1f_fill_place` | In the render loop, in its part for the frame's first screen that draws: the call that fills the whole frame buffer black before the screens are drawn. | A call to ours, part of a page that keeps its picture (base 33): in a frame where the page at 77 asked to be kept, it leaves the black fill out; otherwise it makes the firmware's call. |
+| `0x8c0ba6d6` | a call | `op1f_layer_c3_stub` | In the function that opens the master's list of effects: the call that looks the master's effect up in the unit's catalog, whose answer is the row the list opens on. | A call to our stub, which makes the firmware's call and, while the master rides a pack's effect, has the list open on the pack's row. |
+| `0x8d4f3a54` | a jump, with a trampoline of 8 bytes | `op1f_layer_lg_stub` | The entry of the function that puts an LFO picked in the unit's list on a sound. | A jump to ours, which puts a pack's LFO on the sound or takes it off, and lets the firmware's function run (through a trampoline). |
+| `0x8d4f7a34` | a jump, with a trampoline of 8 bytes | `op1f_layer_eh_stub` | The entry of the function that gives the row a sound's list of effects opens on. The lists of synth and drum sounds both call it, and nothing else does. | A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. |
+| `0x8d4f7ad0` | a jump, with a trampoline of 8 bytes | `op1f_layer_lh_stub` | The entry of the function that gives the row a sound's list of LFOs opens on. The lists of synth and drum sounds both call it, and nothing else does. | A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. |
 
 ## Words
 

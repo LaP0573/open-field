@@ -1,4 +1,9 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 33 (R9), the base pack: base 30's text unit, edited in place (base 30's text, base 32's too, is open-field
+// 0.14's), with one call added for a page that holds its picture: where a part is made a text and where a text
+// is laid out, the cards unit is told that the document changed (op1f_cards_changed), so that a page under 77 that
+// holds its picture is drawn whole again. What base 30 said follows and holds.
+//
 // Base 30 (R6d), the base pack: the text unit of base 19 (which stays as it was for every
 // base since) with one entry more, for the base itself and offered to no pack:
 //
@@ -90,6 +95,15 @@ extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 extern "C" int op1f_cards_document(const void* document) OP1F_NAMED("op1f_cards_document");
 
+// R9 (base 33): the cards unit's mark of a change to a document (module/build_r6d_cards.cpp): a part made a text and a
+// text laid out change what the document draws, so a page that holds its picture is drawn whole again. On the PC the
+// unit is built beside an elder cards unit, which has no such word: a stand-in passes it by.
+#ifdef OP1F_HOST
+static void op1f_cards_changed(const void*) {}
+#else
+extern "C" void op1f_cards_changed(const void* document) OP1F_NAMED("op1f_cards_changed");
+#endif
+
 struct Text {
     void* document;
     char part[PART_KEPT];                              // the part's name, whole: a name of more than 23 characters takes no text
@@ -167,6 +181,7 @@ static Text* made(void* document, const char* part, const char* pack, u32 slot, 
         return 0;
     }
     void* label = STOCK_LABEL_FROM_NODE(held, node, (int)align);                  // at the part's left, its middle or its right, for good
+    op1f_cards_changed(document);                                                 // R9 (base 33): the part replaced in the document, whatever the maker answers
     if (label == 0) return 0;
     Text* t = &texts[text_count++];
     ++held_by[slot];
@@ -193,6 +208,7 @@ static int lay(Text* t, const char* text, int width) {
     small[n] = 0;
     if (t->laid && same(small, t->text)) return 1;                                // the same text: nothing laid out again
     STOCK_LABEL_TEXT(t->label, small, width > 0 ? width : (int)SCREEN_WIDTH);
+    op1f_cards_changed(t->document);                                              // R9 (base 33): the document draws another text
     for (u32 i = 0; i <= n; ++i) t->text[i] = small[i];
     t->laid = 1;
     return 1;
