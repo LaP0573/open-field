@@ -1,4 +1,9 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Step R10, the base pack (base.pack 34): the firmware's own log files shown as a folder `logs` at the top
+// (module/build_r10_logs.cpp). The root's child maker asks the logs unit first (op1f_logs_child), then the folders
+// unit, then the firmware; the population has the logs unit make its folder (op1f_logs_populate) before the folders
+// unit makes the packs' folders. The rest holds as it is described below.
+//
 // Step R2, the base pack (base.pack 21): the disk mode's folders of a base that knows no pack by name. A sibling of
 // M3's disk unit, which stays as it was for the bases before. Only the loader's two hand-overs remain, under
 // the names it looks them up by: the root's child maker asks the folders unit (base 19's folders unit and its
@@ -38,10 +43,17 @@ typedef void* (*RootChildFn)(void* behaviour, const char* name);             // 
 extern "C" void* op1f_folders_child(const char* name) asm("op1f_folders_child");
 extern "C" void op1f_folders_populate(void* root) asm("op1f_folders_populate");
 
+// R10: the firmware's log files (module/build_r10_logs.cpp): the folder `logs`'s behaviour by its name, or 0; and the
+// folder made in the tree with its files.
+extern "C" void* op1f_logs_child(const char* name) asm("op1f_logs_child");
+extern "C" void op1f_logs_populate(void* root) asm("op1f_logs_populate");
+
 // The root behaviour's +0x10, which the loader hands every name that is not its own folder "packs": a folder a card
 // asked to be shown, else the firmware's own.
 extern "C" void* op1f_mtp_root_child(void* behaviour, const char* name) asm("op1f_mtp_root_child");
 extern "C" void* op1f_mtp_root_child(void* behaviour, const char* name) {
+    void* logs_folder = op1f_logs_child(name);                             // R10: the firmware's log files, first
+    if (logs_folder) return logs_folder;
     void* card_folder = op1f_folders_child(name);                          // M3: a folder a card asked to be shown
     if (card_folder) return card_folder;
     return STOCK_ROOT_CHILD(behaviour, name);
@@ -51,5 +63,6 @@ extern "C" void* op1f_mtp_root_child(void* behaviour, const char* name) {
 // shown.
 extern "C" void op1f_mtp_populate_fx(void* root) asm("op1f_mtp_populate_fx");
 extern "C" void op1f_mtp_populate_fx(void* root) {
+    op1f_logs_populate(root);                                              // R10: the folder logs, before the packs'
     op1f_folders_populate(root);                                           // M3: the cards' folders
 }

@@ -190,6 +190,28 @@ extern "C" void __attribute__((weak)) op1f_effects_catalog_read(void* document) 
 extern "C" int __attribute__((weak)) op1f_effects_row_is(const void* row) OP1F_NAMED("op1f_effects_row_is");
 extern "C" volatile unsigned op1f_effects_registered OP1F_NAMED("op1f_effects_registered") __attribute__((weak));
 
+// R11: the LFOs unit's two names at the catalog (module/build_r11_lfos.cpp), weak: away, nothing of LFOs is done.
+// op1f_lfos_catalog_read(document): given the same document the effects unit's is (the firmware's catalog object, as
+// read, `void*`); adds the packs' rows to `lfo_types`. op1f_lfos_row_is(row): given one element of a list (`const void*`);
+// answers non-zero for a row the LFOs unit added.
+#if defined(OP1F_HOST)
+#ifdef OP1F_R11_HOST_LFOS
+extern "C" void (*mock_lfos_catalog_read)(void* document);
+#define op1f_lfos_catalog_read (*mock_lfos_catalog_read)
+extern "C" int (*mock_lfos_row_is)(const void* row);
+#define op1f_lfos_row_is (*mock_lfos_row_is)
+#else
+static void (*const r11_none_lfos_catalog_read)(void* document) = 0;
+#define op1f_lfos_catalog_read (*r11_none_lfos_catalog_read)
+static int (*const r11_none_lfos_row_is)(const void* row) = 0;
+#define op1f_lfos_row_is (*r11_none_lfos_row_is)
+#endif
+#else
+extern "C" void op1f_lfos_catalog_read(void* document) OP1F_NAMED("op1f_lfos_catalog_read") __attribute__((weak));
+extern "C" int op1f_lfos_row_is(const void* row) OP1F_NAMED("op1f_lfos_row_is") __attribute__((weak));
+#endif
+static const char KEY_LFO_LIST[] = "lfo_types";            // R11: the LFOs' list, whose rows the LFOs unit adds
+
 // R6: the engines unit's three names at the catalog (module/build_r6_base.h), weak: away, nothing of engines is done.
 #if defined(OP1F_HOST)
 #ifdef OP1F_R6_HOST_ENGINES
@@ -519,6 +541,7 @@ extern "C" int op1f_seq_catalog_read(const char* path, void* document) {
     if (op1f_seq_registered != 0) sequencers_read(answer, document);
     if (&op1f_effects_catalog_read != 0) op1f_effects_catalog_read(document);   // R5: after the sequencers' rows
     if (&op1f_engines_catalog_read != 0) op1f_engines_catalog_read(document);   // R6: after the effects' rows
+    if (&op1f_lfos_catalog_read != 0) op1f_lfos_catalog_read(document);         // R11: after the effects' rows
     return answer;
 }
 
@@ -543,6 +566,14 @@ static SEQ_APART int has_engine_row(const void* list) {
     return 0;
 }
 
+// R11: 1 when `lfo_types` holds a row the LFOs unit added.
+static SEQ_APART int has_lfo_row(const void* list) {
+    u32 count = STOCK_JSON_SIZE(list);
+    for (u32 i = 0; i < count; ++i)
+        if (op1f_lfos_row_is(STOCK_JSON_ELEMENT(list, i))) return 1;
+    return 0;
+}
+
 // R5: one list of the copy written without the packs' rows: the sequencers' (`effects` 0, the rows row_named knows)
 // or the effects' (`effects` 1, the rows the effects unit knows). Answers how many rows were left out. Base 20's loop,
 // its calls in its order.
@@ -554,7 +585,7 @@ static SEQ_APART u32 without_rows(void* copy, const char* key, u32 effects) {
     u32 count = kind(list) == (u32)KIND_ARRAY ? STOCK_JSON_SIZE(list) : 0u, left = 0;
     for (u32 i = 0; i < count; ++i) {
         const void* row = STOCK_JSON_ELEMENT(list, i);
-        if (effects == 2u ? op1f_engines_row_is(row) != 0 : effects ? op1f_effects_row_is(row) != 0 : row_named(row, 0) != 0) ++left;   // R6: the engines' too
+        if (effects == 3u ? op1f_lfos_row_is(row) != 0 : effects == 2u ? op1f_engines_row_is(row) != 0 : effects ? op1f_effects_row_is(row) != 0 : row_named(row, 0) != 0) ++left;   // R6: the engines' too
         else STOCK_JSON_APPEND(keep, row);
     }
     STOCK_JSON_ASSIGN(STOCK_JSON_PLACE(copy, key), keep);
@@ -569,8 +600,9 @@ extern "C" int op1f_seq_catalog_write(void* path, void* document) OP1F_NAMED("op
 extern "C" int op1f_seq_catalog_write(void* path, void* document) {
     u32 effects = effects_registered();
     u32 engines = ENGINES_REGISTERED();                                             // R6
-    if ((op1f_seq_registered == 0 && effects == 0 && engines == 0) || kind(document) != (u32)KIND_OBJECT) return STOCK_JSON_WRITE(path, document);
-    u32 sequencers = 0, rows = 0, synth_rows = 0;
+    u32 lfos = &op1f_lfos_row_is != 0 ? 1u : 0u;                                    // R11: the LFOs unit linked
+    if ((op1f_seq_registered == 0 && effects == 0 && engines == 0 && lfos == 0) || kind(document) != (u32)KIND_OBJECT) return STOCK_JSON_WRITE(path, document);
+    u32 sequencers = 0, rows = 0, synth_rows = 0, lfo_rows = 0;
     if (op1f_seq_registered != 0) {
         const void* list = STOCK_JSON_MEMBER(document, KEY_LIST);
         sequencers = kind(list) == (u32)KIND_ARRAY && has_row(list, 0) ? 1u : 0u;
@@ -583,7 +615,11 @@ extern "C" int op1f_seq_catalog_write(void* path, void* document) {
         const void* list = STOCK_JSON_MEMBER(document, KEY_SYNTH_LIST);
         synth_rows = kind(list) == (u32)KIND_ARRAY && has_engine_row(list) ? 1u : 0u;
     }
-    if (sequencers == 0 && rows == 0 && synth_rows == 0) return STOCK_JSON_WRITE(path, document);
+    if (lfos != 0) {                                                                // R11
+        const void* list = STOCK_JSON_MEMBER(document, KEY_LFO_LIST);
+        lfo_rows = kind(list) == (u32)KIND_ARRAY && has_lfo_row(list) ? 1u : 0u;
+    }
+    if (sequencers == 0 && rows == 0 && synth_rows == 0 && lfo_rows == 0) return STOCK_JSON_WRITE(path, document);
     u32 copy[3];
     STOCK_JSON_MAKE(copy, 0);
     STOCK_JSON_ASSIGN(copy, document);
@@ -596,6 +632,7 @@ extern "C" int op1f_seq_catalog_write(void* path, void* document) {
     if (sequencers) left += without_rows(copy, KEY_LIST, 0);
     if (rows) left += without_rows(copy, KEY_FX_LIST, 1);
     if (synth_rows) left += without_rows(copy, KEY_SYNTH_LIST, 2);                 // R6
+    if (lfo_rows) left += without_rows(copy, KEY_LFO_LIST, 3);                      // R11
     int answer = STOCK_JSON_WRITE(path, copy);
     STOCK_JSON_DESTROY(copy);
     rows_left = left;

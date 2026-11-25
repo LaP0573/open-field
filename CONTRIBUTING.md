@@ -86,7 +86,7 @@ python -I tools/build_all.py --out out-new --update
 ## The pages for those who write code
 
 - [A first pack](docs/first-pack.md): an example, step by step.
-- [The base](docs/base.md): what it offers a pack, level by level: the card, a call every frame, pictures, a page with keys and knobs, folders, files and text, then [level 4](docs/level-4.md) (painting, pages that stack), [level 5](docs/level-5.md) (a sequencer, the notes heard), [level 6](docs/level-6.md) (a place in the sound, working memory), [level 7](docs/level-7.md) (values kept in tapes and sounds), [level 8](docs/level-8.md) (an effect), [level 9](docs/level-9.md) (a synth engine) and [level 10](docs/level-10.md) (the value as the sound plays it).
+- [The base](docs/base.md): what it offers a pack, level by level: the card, a call every frame, pictures, a page with keys and knobs, folders, files and text, then [level 4](docs/level-4.md) (painting, pages that stack), [level 5](docs/level-5.md) (a sequencer, the notes heard), [level 6](docs/level-6.md) (a place in the sound, working memory), [level 7](docs/level-7.md) (values kept in tapes and sounds), [level 8](docs/level-8.md) (an effect), [level 9](docs/level-9.md) (a synth engine) and [level 10](docs/level-10.md) (the value as the sound plays it); beyond the levels, [a page that holds its picture](docs/held-page.md) and [layers](docs/layers.md) (a pack's effect or LFO in the unit's own lists).
 - [Packs](docs/packs.md): the file, and what the loader does with it. Every line the loader writes into the log is there.
 - [Methods](docs/methods.md): how to find a place in your own firmware, check it and use it, how to read a log, how to try a pack safely.
 - [The firmware's functions our code uses](docs/firmware-interfaces.md).
