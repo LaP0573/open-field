@@ -1,0 +1,25 @@
+{
+  "id": "veffgraindelay",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A grain delay: pitched grains from a stereo delay line, with spray, feedback and reverse, an animated page, in the unit's lists of effects.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "73aa0a4356808b869e81db166f57c494b175f33c",
+  "path": "veffgraindelay.pack",
+  "sha256": "1268405830192fefab5cd09b3cf168763d291a086e9f0132ba80771926978770",
+  "bytes": 20686,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffgraindelay.png",
+    "sha256": "58fa0e1c6e06ac0da43f69da7c0962cc1d5746ed16087e2123ca4dd6e02527bd",
+    "bytes": 11226
+  }
+}

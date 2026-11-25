@@ -1,0 +1,25 @@
+{
+  "id": "veffbode",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A Bode frequency shifter in a delay's feedback loop, with an animated page, in the unit's lists of effects and on fx train's wagons.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
+  "path": "veffbode.pack",
+  "sha256": "8f303080059ca6e54aa1f45b1f773309eeacf26ba1889820af20e5b21918c250",
+  "bytes": 28902,
+  "version": 13,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffbode.png",
+    "sha256": "125265388fc71f281d68a4e8d630e943b2485cac134edb05bef6bcbe26f8060e",
+    "bytes": 22248
+  }
+}

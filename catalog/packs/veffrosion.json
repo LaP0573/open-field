@@ -1,0 +1,25 @@
+{
+  "id": "veffrosion",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A degrader after Erosion: a tiny delay wobbled by a sine or band-passed noise, with an animated page, in the unit's lists of effects.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
+  "path": "veffrosion.pack",
+  "sha256": "054017034fb2379084aed7f1866312883c9f1d99586790639f59e54a84baf824",
+  "bytes": 49186,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffrosion.png",
+    "sha256": "80800ac50fab5d4152d3789b314225d89f61422931f6571c944f1fcce79339b2",
+    "bytes": 12046
+  }
+}

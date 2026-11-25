@@ -1,12 +1,14 @@
 # The listing: offering your pack to every owner
 
-The install page offers owners the packs of one listing, [`catalog/packs.json`](../catalog/packs.json), sorted by category, each with a tick. A pack gets into it by a pull request that changes only that file. Nothing of a pack is copied into this repository, but `base.pack`, which comes with the install page: your pack file stays in your own repository, and the listing names it there, at one commit, with the file's SHA-256. The page downloads the file from there and holds it to that SHA-256 before it goes anywhere near a unit ([on the install page](#on-the-install-page)).
+The install page offers owners the packs of one listing, the folder [`catalog/`](../catalog/), sorted by category, each with a tick. Each pack has a file of its own there, `catalog/packs/<id>.json`, and `catalog/listing.json` holds what they all share. A pack gets into the listing by a pull request that adds its own file. Nothing of a pack is copied into this repository, but `base.pack`, which comes with the install page: your pack file stays in your own repository, and the listing names it there, at one commit, with the file's SHA-256. The page downloads the file from there and holds it to that SHA-256 before it goes anywhere near a unit ([on the install page](#on-the-install-page)).
 
 An entry may instead follow a branch of your repository. The page then takes your file as it stands on that branch, and you put out a new version with a commit, with no pull request here ([following a branch](#following-a-branch)).
 
 If you have not built a pack yet, start with [a first pack](first-pack.md).
 
 ## An entry
+
+Each entry is a file of its own, named after its `id` exactly, with `.json` after it. The entry below lies in `catalog/packs/notes.json`, and that file holds this one object and nothing else:
 
 ```json
 {
@@ -53,7 +55,7 @@ Some things a card can ask need a newer base, not a higher level. Today there ar
 
 Everything from `version` on is what the file says of itself. `python -I tools/pack_build.py check --pack <your file>` prints it: `name`, `version`, `entries` (the places), `works with` (what it needs, marked `needed`), `wants` (the level, as `op1f_level_<n>`) and the card's folders. The listing's check reads the file the same way and refuses an entry that says otherwise.
 
-The same pack, following the branch `main` instead of one commit:
+The same pack, following the branch `main` instead of one commit, in the same file:
 
 ```json
 {
@@ -121,7 +123,7 @@ The list is the maintainer's to change. To ask for a word it lacks, say so in yo
 - **`listed`**: offered on the install page. Every field above is there, or, in a followed entry, every field of the second example.
 - **`retired`**: no longer offered. Its id and its folders stay held for good, so that no other pack takes them from owners who still have the file.
 
-An entry only moves that way, and is never taken out.
+An entry only moves that way, and is never taken out: its file stays.
 
 ## Every author alike
 
@@ -131,7 +133,7 @@ The examples under `examples/` are for people who write packs, not for owners: t
 
 ## On the install page
 
-The install page reads the listing beside it, as `packs.json`: the workflow that publishes the page (`.github/workflows/pages.yml`) copies `catalog/packs.json` there from `main`. In its step 5 it shows:
+The install page reads the listing beside it, as `packs.json`: the workflow that publishes the page (`.github/workflows/pages.yml`) joins the files of `catalog/` on `main` into that one file. In its step 5 it shows:
 
 - `base.pack`, which goes on every unit and has no tick;
 - every `listed` entry for the unit's firmware, under its first category, with its description, author, version, what it needs and its size, and a tick;
@@ -152,12 +154,21 @@ A pack goes on from the page's packs section, once open-field is on the unit: th
 
 1. **Build it and try it on your unit.** The listing's check cannot run a pack; the review asks what you tried and what the unit did.
 2. **Commit the pack file into your own public repository on GitHub**, at the path the entry names. A file in the repository, not only a release's download: the install page runs in the owner's browser, and a browser may read a file of a repository at a commit, but not a release's download from another site.
-3. **Write the entry** into `catalog/packs.json`, behind the others, with the full id of the commit that holds the file, or with the branch it follows.
+3. **Write your entry as its own file**, `catalog/packs/<your pack's id>.json`, with the full id of the commit that holds the file, or with the branch it follows. The file holds your one entry, and its name is your entry's `id` exactly, capitals and spaces included. Pick an id no other entry has even in other capitals, and not a name Windows keeps for a device (`con`, `aux`, `nul`, `com1` and the like): a Windows computer cannot hold such a file beside the others, so the check refuses it.
 4. **Run the check**, with your file in a folder of its own: `python -I tools/catalog_check.py --files <that folder>`. It holds every entry's form, and yours to your file. Where the file's size or SHA-256 differs from the entry, it prints the file's own. The other authors' entries, whose files are not in your folder, pass on their form, and their lines say `its file not held`. If you list more than one pack, put all their files in the folder: once one of your files is there, each of your entries is held to its file, and a missing one is refused. The next section shows it on this repository's own packs.
-5. **Open a pull request that changes only `catalog/packs.json`.** Say what the pack does, how you tried it, and where its source is. The checks on the pull request (`.github/workflows/listing.yml`) hold the listing to the one before your change, download your file from the commit, or from the head of the branch, and hold your entry to it, as step 4 did.
+5. **Open a pull request that adds only that file**, or, for a new version, changes only that file. Since every pack has its own file, your pull request never clashes with another author's. Say what the pack does, how you tried it, and where its source is. The checks on the pull request (`.github/workflows/listing.yml`) hold the listing to the one before your change, download your file from the commit, or from the head of the branch, and hold your entry to it, as step 4 did.
 6. **The review.** The maintainer reads your source at that commit, or on the branch as it stands then, tries the file on a unit, and merges or says what stands in the way. Once merged, the pack is on the install page: the next publication of the page carries the listing with your entry.
 
-For a pinned entry, a new version is the same pull request again: a new commit, the file's new SHA-256 and size, and a higher `version`. The check refuses a new file whose version did not grow. For a followed entry, a new version is a commit on its branch and no pull request ([following a branch](#following-a-branch)). A pinned entry may come to follow a branch, and a followed one may go back to one commit: each is a pull request, reviewed like any other.
+For a pinned entry, a new version is a pull request that changes your entry's file: a new commit, the file's new SHA-256 and size, and a higher `version`. The check refuses a new file whose version did not grow. For a followed entry, a new version is a commit on its branch and no pull request ([following a branch](#following-a-branch)). A pinned entry may come to follow a branch, and a followed one may go back to one commit: each is a pull request, reviewed like any other.
+
+## A pull request that still changes catalog/packs.json
+
+Before 2026-11-25 the listing was one file, `catalog/packs.json`, and every pull request put its entry into it. Two of them often clashed, because each added its entry at the end of the same file. That file is gone now, and the check refuses it.
+
+If you opened a pull request that changes `catalog/packs.json` before then, it no longer merges as it stands. You have two ways out:
+
+- **Move your entry into its own file.** Bring your branch up to date with `main`. Git stops at `catalog/packs.json`, which you changed and `main` deleted: delete it on your side too. Then put your entry alone into `catalog/packs/<your pack's id>.json`, as in [getting your pack listed](#getting-your-pack-listed), and push. Your pull request then adds that one file.
+- **Leave it as it is**, and say so in the pull request. The maintainer moves your entry into its own file when merging.
 
 ## Following a branch
 
@@ -211,6 +222,8 @@ The listing's form, and every name held once:
 ```bash
 python -I tools/catalog_check.py
 ```
+
+It reads the folder `catalog/` and joins its files into one listing, the entries sorted by their ids. It refuses a pack's file that is not named after its entry's `id`, two files named alike but for capitals, a file named after a device Windows keeps, a file that is not JSON, and any file but `listing.json` and the files in `packs/`.
 
 After a build ([docs/build.md](build.md)), the base's and the examples' entries held to their files in `out/packs/` and `out/examples/`, and the entries of open-field-packs to a checkout of it:
 

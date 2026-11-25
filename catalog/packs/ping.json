@@ -1,0 +1,18 @@
+{
+  "id": "ping",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of levels 8 and 10: an echo in time with the tempo in the unit's own lists of effects, riding on delay.",
+  "path": "ping.pack",
+  "sha256": "3b20570aa78c4d3f3d8de1d9846cc8d723eaeccec3169c26b2ef3baecb63c3c0",
+  "bytes": 3232,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

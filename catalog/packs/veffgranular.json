@@ -1,0 +1,30 @@
+{
+  "id": "veffgranular",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "A granular sample synth in the unit's list of engines: grains of a file, or of the synth sampler's sample, in classic, loop and cloud modes.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "73aa0a4356808b869e81db166f57c494b175f33c",
+  "path": "veffgranular.pack",
+  "sha256": "f80e80b4e33b2c8524923517611c8f6436b62196ed1fb8d28316b41eaf3de0f8",
+  "bytes": 41360,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [
+    {
+      "name": "veffgranular",
+      "place": "veffgranular"
+    }
+  ],
+  "picture": {
+    "path": "thumbs/veffgranular.png",
+    "sha256": "80dbd8d52816a12effaae6178b18cb3ba04c57faa6f8224b59bcb88e40742884",
+    "bytes": 13384
+  }
+}

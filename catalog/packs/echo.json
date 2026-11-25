@@ -1,0 +1,23 @@
+{
+  "id": "echo",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of level 5: a sequencer of its own in the unit's list, each note repeated in time, each repeat softer.",
+  "path": "echo.pack",
+  "sha256": "6903736446c110246b78d9de9dfaec79d662470fe55b0d930d494ef102b29118",
+  "bytes": 9344,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 5,
+  "folders": [
+    {
+      "name": "echo",
+      "place": "echo"
+    }
+  ]
+}

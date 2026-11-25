@@ -1,0 +1,24 @@
+{
+  "id": "cherd",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "CHERD: a chord sequencer in the synth's sequencer list. Keys play chords, with flavors, strum, comp, arp and a FEEL page.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/cherd.pack",
+  "follow": "main",
+  "version": 37,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [
+    {
+      "name": "cherd",
+      "place": "cherd"
+    }
+  ],
+  "picture": {
+    "path": "packs/cherd/picture.png"
+  }
+}

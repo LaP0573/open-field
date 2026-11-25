@@ -1,0 +1,25 @@
+{
+  "id": "veffurator",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A saturator with six curves, colour, soft clip and 2x oversampling, with an animated page, in the unit's lists of effects.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
+  "path": "veffurator.pack",
+  "sha256": "ae7de55843b1fa3e26400407bfbde083b46b9055528ab614054b0e78fdc8625f",
+  "bytes": 45814,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffurator.png",
+    "sha256": "8098cecb840edb3255037f63b300caedb32a3caf6a739434aa02becfcbca3420",
+    "bytes": 17234
+  }
+}

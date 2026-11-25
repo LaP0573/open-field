@@ -1,0 +1,20 @@
+{
+  "id": "bark",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "Electric piano with Rhodes, Wurli, Pianet and CP-70 models and adjustable strike.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/bark.pack",
+  "sha256": "773267239b7070c23a1b5f4158524afc6fef1d6717e0eed46aac2893bd5c1add",
+  "bytes": 82223,
+  "version": 10,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

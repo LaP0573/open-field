@@ -1,11 +1,14 @@
-# A pull request that changes the listing of packs, catalog/packs.json (docs/catalog.md): the listing held to the one
-# before the change, and every entry that changed held to its file, downloaded from its author's repository at the
-# entry's commit. The review still reads the pack's source and tries the file on a unit: a green run says neither.
+# A pull request that changes the listing of packs, the folder catalog/ (docs/catalog.md): most often one that adds a
+# pack's own file, catalog/packs/<id>.json. The listing held to the one before the change, the folder as main had it
+# (one file, catalog/packs.json, before 2026-11-25), and every entry that changed held to its file, downloaded from its
+# author's repository at the entry's commit. The review still reads the pack's source and tries the file on a unit: a
+# green run says neither. It runs on Linux, whose disk keeps two names alike but for small letters and capitals apart,
+# so the check sees every file a pull request adds.
 name: listing
 
 on:
   pull_request:
-    paths: ["catalog/packs.json"]
+    paths: ["catalog/**"]
 
 permissions:
   contents: read
@@ -16,7 +19,7 @@ defaults:
 
 jobs:
   listing:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +33,7 @@ jobs:
       - name: The listing before the change
         env:
           BEFORE: ${{ github.event.pull_request.base.sha }}
-        run: git show "$BEFORE:catalog/packs.json" > "$RUNNER_TEMP/before.json"
+        run: git worktree add --detach "$RUNNER_TEMP/before" "$BEFORE"
 
       - name: The listing, held to the one before and to the files that changed
-        run: python -I tools/catalog_check.py --before "$RUNNER_TEMP/before.json" --fetch
+        run: python -I tools/catalog_check.py --before "$RUNNER_TEMP/before/catalog" --fetch

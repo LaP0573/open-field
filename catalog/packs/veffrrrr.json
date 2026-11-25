@@ -1,0 +1,25 @@
+{
+  "id": "veffrrrr",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A two-stage distortion with filters and a feedback loop, with an animated page, in the unit's lists of effects.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "5c8e0875e685e8e803a5d69d24ea0b4e82a1b153",
+  "path": "veffrrrr.pack",
+  "sha256": "e8c14658041e76270e58c94cab733b4a8dae8381889fd7452e945217e20f1517",
+  "bytes": 48382,
+  "version": 6,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/veffrrrr.png",
+    "sha256": "fa027d8bd0c1d6a9992fb1ff533e4fa0828564fb316c896a7e4ed438f002f6c3",
+    "bytes": 15015
+  }
+}

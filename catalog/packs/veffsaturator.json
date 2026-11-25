@@ -1,0 +1,10 @@
+{
+  "id": "veffsaturator",
+  "author": "galfaroth",
+  "status": "retired",
+  "categories": [
+    "effects"
+  ],
+  "description": "A saturator with six curves, colour, soft clip and 2x oversampling, in the unit's lists of effects. Renamed veffurator.",
+  "level": 10
+}
