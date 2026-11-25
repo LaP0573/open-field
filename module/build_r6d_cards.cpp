@@ -492,7 +492,7 @@
 //   The helpers. op1f_log (module/build_m1_log.s), op1f_ms, op1f_screen, op1f_node, op1f_show, op1f_move as M1's
 //   unit has them, and level 2's op1f_page_open and op1f_page_close. Each wraps a call or a fact our own units have
 //   used on the unit since H2 and I2:
-//     the registry 0x8fc261fc() answers the table of 86 screens by their numbers (0x84c960f4), 0 for a number no
+//     the registry 0x8fc261fc() answers the table of 86 screens by their numbers (0x84c96580), 0 for a number no
 //       screen has; stock's own registration holds a number against no bound, so this unit takes 1 to 85 and
 //       answers 0 for any other. A screen's document is the word at its +4, 0 until stock has loaded it. The
 //       firmware reads that word at every draw, on the display thread.

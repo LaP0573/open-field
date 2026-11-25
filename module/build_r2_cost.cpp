@@ -71,7 +71,7 @@ typedef unsigned char u8;
 #include "build_q_quiet.h"
 
 typedef void (*LogFn)(int level, const char* file, int line, const char* format, ...);
-typedef u32 (*Call3)(u32, u32, u32);
+typedef u32 (*Call3)(u32, u32, u32);                   // the two stock calls take one argument and give nothing back: the wrappers below take three and hand R0 back, so the registers go on as they came
 static const char LOG_FILE[] = "../src/main/op1f_cost.cpp";
 
 #ifdef OP1F_HOST
