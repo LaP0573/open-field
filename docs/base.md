@@ -183,6 +183,11 @@ python -I tools/picture_make.py check --instructions examples/list/list.svg.make
 - Letters are not text: a text that never changes is a row of shapes, and one that changes is set by `op1f_text` ([below](#text)).
 - Colours from the unit's own palette file, `content/display/palette.svg`, so that a page looks like the device's.
 - No picture larger than a megabyte: the base does not use a card whose directory holds one.
+- No `_x` in a part's name (`id`), unless it begins a character written by its code as the unit's own pictures write one: `_x2D_` for a `-`. The reader takes every `_x` in a name for the start of such a code. `knob_x`, `knob_x1` and `my_xml_page` stop the unit at its start, with a message on the screen.
+- No number with more than four digits behind its point.
+- A `matrix` has six numbers. A `translate` or a `scale` has two, with a comma or a space between them: `translate(10)` stops the unit at its start.
+
+`tools/picture_make.py check` refuses a picture with one of the last three, and names the part, the number or the transform.
 
 The build makes a pack's directory of pictures from the `pictures` of its recipe, as a source of the pack (`examples/wink/wink_pictures.s`), into a new file:
 
