@@ -1,0 +1,30 @@
+{
+  "id": "garden",
+  "author": "seajaysec",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "Chord player in the sequencer list: strum, arp and phrase on the clock, synth and drum.",
+  "repository": "https://github.com/seajaysec/garden-op1f",
+  "commit": "b3a2e508e8c9df11b6d7791c0df114430b857d15",
+  "path": "garden.pack",
+  "sha256": "18c2229f0e16f2eb505a63983b508510653c5d2b2d533d98b2daa653d6f7c7fd",
+  "bytes": 379061,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 6,
+  "folders": [
+    {
+      "name": "garden",
+      "place": "garden"
+    }
+  ],
+  "picture": {
+    "path": "thumbs/garden.png",
+    "sha256": "5aa3bd397f2536ec8c0fb77a967df637ae68f86cfe2a54c7363dac93d96ce602",
+    "bytes": 1242
+  }
+}
