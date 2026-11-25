@@ -42,8 +42,8 @@
    "about": ""
   },
   "sounds": {
-   "title": "Sounds, effects and engines",
-   "about": "The synth and the drum each keep eight slots. A slot has a record of 52 bytes whose document, the sound as its file holds it, is the JSON value at the record's +8; the synth's eight records start at `0x080235dc`, the drum's at `0x0802377c`. An effect has a type, 0 to 10 for the firmware's own (delay, grid, punch, phone, spring, mother, nitro, cwo, vocoder, terminal, fazer). The firmware keeps two effect objects at a time: index 0 for the instrument that plays, index 1 for the master."
+   "title": "Sounds and their LFOs",
+   "about": "The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Each slot has a record, an object of the firmware's at a fixed address, which holds the sound's document: what the unit saves with the sound. A sound's LFO has a kind (a row of the list under shift and T4), eight words of settings and a switch. Our code changes them through the calls below, the way the unit's own keys do, so that what the unit shows, plays and saves agrees."
   },
   "notes": {
    "title": "Notes and sequencers",
@@ -264,7 +264,7 @@
   "0x8c03dbbe": {
    "name": "apply_matrix",
    "group": "screens",
-   "what": "Gives a part of a picture a transform: nine words, each a number with ten bits behind the point, `[a, b, 0, c, d, 0, e, f, 1024]`, for x' = a\u00b7x + c\u00b7y + e and y' = b\u00b7x + d\u00b7y + f. Keep the third, sixth and ninth word at 0, 0 and 1024.",
+   "what": "Gives a part of a picture a transform: nine words, each a number with ten bits behind the point, `[a, b, 0, c, d, 0, e, f, 1024]`, for x' = a·x + c·y + e and y' = b·x + d·y + f. Keep the third, sixth and ninth word at 0, 0 and 1024.",
    "thread": "Ours: the display thread."
   },
   "0x8fc25abc": {
@@ -361,6 +361,66 @@
    "name": "midi_red",
    "group": "keys",
    "what": "The same for MIDI: only its own lines, 0 to 4.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8d4f3c84": {
+   "name": "lfo_words_doc",
+   "group": "sounds",
+   "what": "Writes eight words of LFO settings into the document of the sound whose record is `record`. Follow it with the record's LFO apply (`lfo_apply_synth` or `lfo_apply_drum`), so that the sound plays them.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8d4f3d0c": {
+   "name": "lfo_active_doc",
+   "group": "sounds",
+   "what": "Writes the LFO's switch, `on` 1 or 0, into the document of the sound whose record is `record`. Our code calls it right after `lfo_on_synth` or `lfo_on_drum`, so that the switch the sound plays with is the one it is saved with.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d4f64c0": {
+   "name": "lfo_apply_synth",
+   "group": "sounds",
+   "what": "Makes the synth sound whose record is `record` play the LFO its document holds now, as after a change on the unit's own LFO page.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8d4f4f90": {
+   "name": "lfo_apply_drum",
+   "group": "sounds",
+   "what": "The same for a drum sound's record.",
+   "thread": "Ours: the key thread."
+  },
+  "0x8d504308": {
+   "name": "lfo_on_synth",
+   "group": "sounds",
+   "what": "Switches the LFO of synth slot `slot` (0 to 7) on (`on` 1) or off (0), as the unit's own key does. It changes the switch the sound plays with; `lfo_active_doc` writes it into the document.",
+   "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8d5042d8": {
+   "name": "lfo_on_drum",
+   "group": "sounds",
+   "what": "The same for drum slot `slot` (0 to 7).",
+   "thread": "As `lfo_on_synth`."
+  },
+  "0x8d504290": {
+   "name": "lfo_on_synth_read",
+   "group": "sounds",
+   "what": "Whether the LFO of synth slot `slot` (0 to 7) is on: not 0 when it is.",
+   "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8d504260": {
+   "name": "lfo_on_drum_read",
+   "group": "sounds",
+   "what": "The same for drum slot `slot` (0 to 7).",
+   "thread": "Ours: the key thread, the display thread."
+  },
+  "0x8fc275e4": {
+   "name": "lfo_screen_of",
+   "group": "sounds",
+   "what": "The number of the screen the unit shows for an LFO of kind `kind`, in the firmware's own numbering of its six kinds, 0 to 5. Our code asks it once for each kind, at its first frame, and knows the LFO pages by those numbers from then on.",
+   "thread": "Ours: the display thread."
+  },
+  "0x8d4f221c": {
+   "name": "lookup",
+   "group": "sounds",
+   "what": "Finds a row of the unit's catalog of sounds and effects. `database`: which part of the catalog, as the firmware hands it; `key`: the group's key; `name`: the row's name, as the firmware hands it; the row is put into the JSON value `out`. Gives back 0 when there is no such row. Our code calls it from its own function in its place where the master effect's list opens, and then, while the master rides an effect of a pack, puts that effect's id into the row.",
    "thread": "Ours: the key thread."
   },
   "0x8c053a50": {

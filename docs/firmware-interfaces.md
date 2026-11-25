@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 102 functions bound in the sources. 102 are described below, by subject. The other 0 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 112 functions bound in the sources. 112 are described below, by subject. The other 0 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -127,12 +127,22 @@ A screen of the firmware is an object with a picture: an SVG text, parsed into a
 | `0x8c0d5018` | `void system_red(void* row, u32 line, u32 amount)` | The same for SYSTEM: only its own lines, 0 to 5. | Ours: the key thread. |
 | `0x8c0d49d0` | `void midi_red(void* row, u32 line, u32 amount)` | The same for MIDI: only its own lines, 0 to 4. | Ours: the key thread. |
 
-## Sounds, effects and engines
+## Sounds and their LFOs
 
-The synth and the drum each keep eight slots. A slot has a record of 52 bytes whose document, the sound as its file holds it, is the JSON value at the record's +8; the synth's eight records start at `0x080235dc`, the drum's at `0x0802377c`. An effect has a type, 0 to 10 for the firmware's own (delay, grid, punch, phone, spring, mother, nitro, cwo, vocoder, terminal, fazer). The firmware keeps two effect objects at a time: index 0 for the instrument that plays, index 1 for the master.
+The unit has eight synth sounds and eight drum sounds, in slots 0 to 7 each. Each slot has a record, an object of the firmware's at a fixed address, which holds the sound's document: what the unit saves with the sound. A sound's LFO has a kind (a row of the list under shift and T4), eight words of settings and a switch. Our code changes them through the calls below, the way the unit's own keys do, so that what the unit shows, plays and saves agrees.
 
 | Address | The call | What the caller hands over and gets back | Called from |
 | --- | --- | --- | --- |
+| `0x8d4f3c84` | `void lfo_words_doc(void* record, const u32* words)` | Writes eight words of LFO settings into the document of the sound whose record is `record`. Follow it with the record's LFO apply (`lfo_apply_synth` or `lfo_apply_drum`), so that the sound plays them. | Ours: the key thread. |
+| `0x8d4f3d0c` | `void lfo_active_doc(void* record, int on)` | Writes the LFO's switch, `on` 1 or 0, into the document of the sound whose record is `record`. Our code calls it right after `lfo_on_synth` or `lfo_on_drum`, so that the switch the sound plays with is the one it is saved with. | Ours: the display thread. |
+| `0x8d4f64c0` | `void lfo_apply_synth(void* record)` | Makes the synth sound whose record is `record` play the LFO its document holds now, as after a change on the unit's own LFO page. | Ours: the key thread. |
+| `0x8d4f4f90` | `void lfo_apply_drum(void* record)` | The same for a drum sound's record. | Ours: the key thread. |
+| `0x8d504308` | `void lfo_on_synth(u32 slot, int on)` | Switches the LFO of synth slot `slot` (0 to 7) on (`on` 1) or off (0), as the unit's own key does. It changes the switch the sound plays with; `lfo_active_doc` writes it into the document. | Ours: the key thread, the display thread. |
+| `0x8d5042d8` | `void lfo_on_drum(u32 slot, int on)` | The same for drum slot `slot` (0 to 7). | As `lfo_on_synth`. |
+| `0x8d504290` | `u32 lfo_on_synth_read(u32 slot)` | Whether the LFO of synth slot `slot` (0 to 7) is on: not 0 when it is. | Ours: the key thread, the display thread. |
+| `0x8d504260` | `u32 lfo_on_drum_read(u32 slot)` | The same for drum slot `slot` (0 to 7). | Ours: the key thread, the display thread. |
+| `0x8fc275e4` | `u32 lfo_screen_of(u32 kind)` | The number of the screen the unit shows for an LFO of kind `kind`, in the firmware's own numbering of its six kinds, 0 to 5. Our code asks it once for each kind, at its first frame, and knows the LFO pages by those numbers from then on. | Ours: the display thread. |
+| `0x8d4f221c` | `u32 lookup(u32 database, const char* key, const void* name, void* out)` | Finds a row of the unit's catalog of sounds and effects. `database`: which part of the catalog, as the firmware hands it; `key`: the group's key; `name`: the row's name, as the firmware hands it; the row is put into the JSON value `out`. Gives back 0 when there is no such row. Our code calls it from its own function in its place where the master effect's list opens, and then, while the master rides an effect of a pack, puts that effect's id into the row. | Ours: the key thread. |
 | `0x8d4f6c3c` | `void synth_put(void* record, int slot, void* json, int flag)` | Puts a sound on a synth slot: `record` is the slot's record, `slot` its number, 0 to 7, and `json` the sound's document, which is assigned to the record's. With `flag` 0 the firmware then keeps of the record's document only the members it knows. Last it sets the name the screen shows for the slot; a `slot` outside 0 to 7 sets no name. Nothing comes back. | Ours: the firmware's background worker, in place of its own call when a sound is loaded from the unit's list. |
 | `0x8d4f6748` | `void drum_put(void* record, int slot, void* json, int flag)` | The same for a drum slot. With `flag` 0, a document the firmware's check refuses is written as an error into the log. | As `synth_put`. |
 | `0x8d4f3b9c` | `void set_params(u32 record, const u32* words)` | Writes an effect's eight knob words into a slot's document, as the member `fx_params`: each word is a value shifted left by sixteen, and the value is what goes in. Then the record is marked to be written. `record` is the slot's record. | Ours: the display thread. |
