@@ -7,8 +7,8 @@ The base is a pack like any other ([packs](packs.md)), built from `packs/base.js
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 37 |
-| Release | `0.19`: the start screen reads `1.7.3 - open-field 0.19` |
+| Version | 38 |
+| Release | `0.20`: the start screen reads `1.7.3 - open-field 0.20` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
@@ -74,6 +74,7 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 35 | [Layers](layers.md): an effect or an LFO kind of the pack's own as a row in the unit's own lists, riding over the unit's own effect or LFO, which plays under it as always. And for every pack's effect, the list opens on its row | `op1f_layer_1` |
 | 36 | [A held page whose changed parts are drawn again](held-page.md#redrawing-only-the-parts-that-changed-base-36): the pack names the rectangles that changed and the parts of its picture there | `op1f_parts_1` |
 | 37 | [Drum sounds ride an LFO layer](layers.md#an-lfo-layer) too, when it says so | none: `op1f_layer_start` answers for a drum's place |
+| 38 | An effect switched off for its cost plays again after a new pick, and the runs of effects inside packs are handed on once no place runs them ([level 8](level-8.md)); no canvas while the base's own top page is up ([level 4](level-4.md)) | none |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 
@@ -121,7 +122,7 @@ extern "C" void wink_frame(const Op1fFrame* now) OP1F_NAMED("wink_frame");
 | `popup` | Not 0 while the power popup is on the screen: the last moment to say something in the log |
 | `page` | Level 2: the card whose page is shown, or 0 ([below](#level-2-a-page-with-keys-and-knobs)) |
 | `disk` | Level 3: not 0 while the disk mode is open ([below](#the-disk-mode)) |
-| `canvas` | Level 4: this frame's picture, for the painting helpers ([level 4](level-4.md), "Painting") |
+| `canvas` | Level 4: this frame's picture, for the painting helpers ([level 4](level-4.md), "Painting"). From base 38, 0 while the base's own top page is asked for or up |
 
 What a frame function must keep to:
 

@@ -170,8 +170,8 @@ loader: done: 8 pack(s) run, 0 left out, control 0x00000207, 49158269 cycles
 **8. It sets the start screen's text** ([below](#what-the-start-screen-says)).
 
 ```
-loader: the start screen's version text is followed by ' - open-field 0.19': 1 in DDR code written and read back, 0 already there
-loader: the start screen says '1.7.3 - open-field 0.19'
+loader: the start screen's version text is followed by ' - open-field 0.20': 1 in DDR code written and read back, 0 already there
+loader: the start screen says '1.7.3 - open-field 0.20'
 ```
 
 A change that passed its check and then does not go in, or a place that changed between the check and the write, **stops the start-up** with a line that begins `loader: STOPPED`. The firmware would otherwise run with half of a pack's changes. This has not happened on a unit.
@@ -268,9 +268,9 @@ The loader adds its words behind the firmware's own version text on the start sc
 
 | The screen reads | When |
 | --- | --- |
-| `1.7.3 - open-field 0.19` | Pack files run, and none is left out. `0.19` is the base's release |
-| `1.7.3 - open-field 0.19 (1 left out)` | One pack file is there and does not run. The log says why |
-| `1.7.3 - open-field 0.19 (1 needs foo)` | A file is left out because it needs the pack `foo`, and no file of the folder holds `foo` |
+| `1.7.3 - open-field 0.20` | Pack files run, and none is left out. `0.20` is the base's release |
+| `1.7.3 - open-field 0.20 (1 left out)` | One pack file is there and does not run. The log says why |
+| `1.7.3 - open-field 0.20 (1 needs foo)` | A file is left out because it needs the pack `foo`, and no file of the folder holds `foo` |
 | `1.7.3 - open-field` | Pack files run, and none offers a release: `base.pack` is not among them |
 | `1.7.3 stock (no pack)` | No pack file: the unit runs as the original firmware |
 | `1.7.3 stock (4 need base)` | Four pack files are there, and none runs because `base.pack` is not: copy it |

@@ -41,7 +41,7 @@ What happens to a stack:
 - **Closing the top page shows the one under it again.** Four pages can lie under the shown one. When a fifth would go under, the lowest is dropped, with a line in the log.
 - **A mode change closes them all**, unless the top page was shown with `OP1F_PAGE_STAYS`.
 - A page opened the old way, with `op1f_page_open`, still behaves the old way. A page shown over it closes it.
-- **The base's own top page can come over yours** for a moment. It's the page that asks you to confirm something, such as the packs a computer sent over USB MIDI. While it's up, the frame's `page` still names your card, and no key or knob reaches any pack until it's gone.
+- **The base's own top page can come over yours** for a moment. It's the page that asks you to confirm something, such as the packs a computer sent over USB MIDI. While it's up, the frame's `page` still names your card, and no key or knob reaches any pack until it's gone. From base 38, `canvas` is 0 from the frame it's asked for until it's gone, so nothing you paint can hide it.
 - `op1f_page_show` answers 0 for a document your card didn't make, for a card the base doesn't have in use, and for a flag the base doesn't know. Taken is not the same as shown. The frame's `page` is what tells you your page is up.
 
 `sketch` opens and closes its page on one key:
@@ -71,7 +71,7 @@ So on your own page the popups lie over your painting. When you paint over one o
 
 ## Painting
 
-Every frame the screen is drawn whole, and then the base calls the packs' frame functions. The frame's `canvas` is that frame's picture, already drawn. Whatever you paint on it lies over the screen for that one frame (under the unit's own popups, on a pack's page) and is gone at the next. **So you paint again every frame.**
+Every frame the screen is drawn whole, and then the base calls the packs' frame functions. The frame's `canvas` is that frame's picture, already drawn. Whatever you paint on it lies over the screen for that one frame (under the unit's own popups, on a pack's page) and is gone at the next. **So you paint again every frame.** From base 38, `canvas` is 0 while the base's own top page is asked for or up: paint nothing then.
 
 The picture is 480 pixels wide and 224 tall, x from the left and y from the top. Anything that runs off an edge is cut. A colour is sixteen bits, made with `OP1F_COLOUR(r, g, b)` from three numbers of 0 to 255. Take your colours from your unit's own `content/display/palette.svg` so your page looks like the rest of the device. The knobs, for instance, are blue `OP1F_COLOUR(0x3c, 0x60, 0x87)`, ochre `OP1F_COLOUR(0x8a, 0x65, 0x3c)`, grey `OP1F_COLOUR(0xa2, 0xa4, 0xa6)` and red `OP1F_COLOUR(0xe5, 0x28, 0x17)`.
 
