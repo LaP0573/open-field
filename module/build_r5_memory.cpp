@@ -16,14 +16,14 @@
 // fifteen characters of a-z, 0-9, '-' and '_' with its end, no flag, no `shown`, `bytes` not 0 and `align` a power of
 // two from 4 to OP1F_MEMORY_ALIGN_MOST; an ask not in order is left aside with a line, its card still used. Then, in
 // that order, each ask is refused with a line when it asks more than OP1F_MEMORY_MOST, when the asks given before it
-// and it would take more than OP1F_MEMORY_MOST together, when it would be the seventeenth, when the heap's free space
+// and it would take more than OP1F_MEMORY_MOST together, when it would be the thirty-third (base 39; the seventeenth before), when the heap's free space
 // after it would be under OP1F_MEMORY_KEPT, or when the heap answers 0. A block given has its line, with its address
 // and what stays free.
 //
 // The base's own asks (op1f_memory_more, from the display thread, at any frame): each is held to the same limits, its
 // bytes counted with the packs' (16 MiB in all, 8 MiB kept free), and has the same lines with the name it is handed
 // (`whose`) in the place of the ask's and the pack's. They are records of the same table behind the packs' asks, at
-// most OP1F_MEMORIES_MOST more; a record of the base's own matches no card's slot, so that no stage waits for it. The
+// most 16 more (as before base 39, when OP1F_MEMORIES_MOST was 16 too); a record of the base's own matches no card's slot, so that no stage waits for it. The
 // handle is the record's number + 1.
 //
 // The block is asked for its bytes and its alignment more, and begins at the first multiple of the alignment inside
@@ -66,7 +66,7 @@ typedef int (*HeapFreeFn)(int index);
 
 extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
 
-enum { MOST = OP1F_MEMORIES_MOST, MORE = OP1F_MEMORIES_MOST, RECORDS = MOST + MORE, CARDS = OP1F_CARDS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 36,
+enum { MOST = OP1F_MEMORIES_MOST, MORE = 16, RECORDS = MOST + MORE, CARDS = OP1F_CARDS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 36,
        CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, HEAP = 0, ALIGN_LEAST = 4, CLEAR_A_FRAME = 256 * 1024, WHOSE = 48 };
 static const u32 BYTES_MOST = (u32)OP1F_MEMORY_MOST, KEPT = (u32)OP1F_MEMORY_KEPT, ALIGN_MOST = (u32)OP1F_MEMORY_ALIGN_MOST;
 static const u32 BASES = 0xffffffffu;                  // the slot of a record of the base's own: no card's
@@ -258,7 +258,7 @@ static void enrol() {
                 continue;
             }
             if (unit.packs == (u32)MOST) {
-                op1f_log(1, LOG_FILE, 2, "memory: '%s' of '%s' is refused %u bytes: %s", name, card->name, table->bytes, "it would be the seventeenth");
+                op1f_log(1, LOG_FILE, 2, "memory: '%s' of '%s' is refused %u bytes: %s", name, card->name, table->bytes, "it would be the thirty-third");
                 continue;
             }
             Memory* m = &memories[n];

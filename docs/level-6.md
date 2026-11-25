@@ -262,7 +262,7 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | Switched off | Eight calls in one second over twice the declared cost and over the declared cost plus 20,000, or one call over 290,000 |
 | Stack | 1 KiB a call of `process`, with whatever it calls |
 | Stages | 16 in all |
-| Memory | 16 MiB an ask and for all asks, 8 MiB kept free for the unit, align 4 to 4,096, 16 asks in all |
+| Memory | 16 MiB an ask and for all asks, 8 MiB kept free for the unit, align 4 to 4,096, 32 asks in all (16 before base 39; the base leaves the next aside with a line) |
 | Names of pictures that take a place | 256, one ask a card |
 | Settings (base 32) | One ask a card, 1 to 8 options; a list 2 to 8 words; a number -128 to 127; room for 4 of the packs' lines in KEYBOARD, 1 in SYSTEM, 2 in MIDI; the file 4,096 bytes |
 

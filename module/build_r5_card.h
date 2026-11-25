@@ -690,8 +690,8 @@ struct Op1fStage {
 //   OP1F_MEMORY_MOST        the most one ask may have, and all asks together
 //   OP1F_MEMORY_KEPT        what the unit keeps free: an ask after which less would stay free is refused
 //   OP1F_MEMORY_ALIGN_MOST  the most an ask's alignment may be
-//   OP1F_MEMORIES_MOST      how many asks of this kind the packs may make in all
-enum { OP1F_MEMORY_MOST = 16 << 20, OP1F_MEMORY_KEPT = 8 << 20, OP1F_MEMORY_ALIGN_MOST = 4096, OP1F_MEMORIES_MOST = 16 };
+//   OP1F_MEMORIES_MOST      how many asks of this kind the packs may make in all (16 before base 39)
+enum { OP1F_MEMORY_MOST = 16 << 20, OP1F_MEMORY_KEPT = 8 << 20, OP1F_MEMORY_ALIGN_MOST = 4096, OP1F_MEMORIES_MOST = 32 };
 
 // Working memory: what its ask points at. The head's `flags` is 0.
 //   bytes  1 to OP1F_MEMORY_MOST
