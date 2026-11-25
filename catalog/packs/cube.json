@@ -1,0 +1,20 @@
+{
+  "id": "cube",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Stereo resonator with a geometric chamber and an animated resonant object.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/cube.pack",
+  "sha256": "d8400c058b5959a4c7e8e31f7c935198e6333e535c382a592a0e6eba847a1072",
+  "bytes": 17454,
+  "version": 5,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

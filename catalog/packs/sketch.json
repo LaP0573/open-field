@@ -1,0 +1,23 @@
+{
+  "id": "sketch",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of level 4: shift and the metronome key open a drawing board painted on the frame, kept in its own folder.",
+  "path": "sketch.pack",
+  "sha256": "b64d25dbc3d62a9f9a0c7b645da116b398cd098984b94ef630ce9f4868466ae9",
+  "bytes": 8038,
+  "version": 1,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 4,
+  "folders": [
+    {
+      "name": "sketch",
+      "place": "sketch"
+    }
+  ]
+}

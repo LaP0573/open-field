@@ -1,0 +1,23 @@
+{
+  "id": "dub",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of levels 6 and 7: an echo on everything the unit plays, its values kept with each tape.",
+  "path": "dub.pack",
+  "sha256": "44ffaa72d81c80be725ae3d6e9b8ffbbb461608bd4b935a1eb0839a73cf0314f",
+  "bytes": 11196,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 7,
+  "folders": [
+    {
+      "name": "dub",
+      "place": "dub"
+    }
+  ]
+}

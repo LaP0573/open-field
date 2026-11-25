@@ -1,0 +1,18 @@
+{
+  "id": "crush",
+  "author": "open-field",
+  "status": "reserved",
+  "categories": [
+    "examples"
+  ],
+  "description": "The example of levels 8 and 10: an effect in the unit's own lists, fewer bits and a lower rate, riding on punch.",
+  "path": "crush.pack",
+  "sha256": "a417e9012a0734b7ab60d739d95b9fa63cd7beb01c8843e1c8fefaa2c500a2dd",
+  "bytes": 2668,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

@@ -1,0 +1,20 @@
+{
+  "id": "skatter",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Stereo granular effect with a rolling sample buffer, adjustable grain length and scatter.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "path": "packs/skatter.pack",
+  "sha256": "d5c998d9c14aa0f8920a9147b9170878237aa50eb221c83a3dc13d82e6416b39",
+  "bytes": 149335,
+  "version": 6,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

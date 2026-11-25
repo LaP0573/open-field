@@ -33,7 +33,7 @@ The page loads its code from files beside it and uses USB MIDI, so the browser w
 python -m http.server 8000 --directory builder
 ```
 
-On a Mac or Linux the command's first word is `python3`. Then open `http://localhost:8000/` in a browser [the guide](../docs/guide.md#what-you-need) names for your computer. The line the page gives for the helper fetches the helper from the same address. Served this way, the page has no listing of packs beside it (the host's pages put one there), so its packs section shows no pack. To have the listing, copy `catalog/packs.json` into `builder/` as `packs.json` first, and do not commit that copy.
+On a Mac or Linux the command's first word is `python3`. Then open `http://localhost:8000/` in a browser [the guide](../docs/guide.md#what-you-need) names for your computer. The line the page gives for the helper fetches the helper from the same address. Served this way, the page has no listing of packs beside it (the host's pages put one there), so its packs section shows no pack. To have the listing, join the files of `catalog/` into one file beside the page first, with `python -I tools/catalog_check.py --join builder/packs.json`, and do not commit that file.
 
 ## What the page shows
 
@@ -92,7 +92,7 @@ A version's name works wherever its manifest lies: beside `loader.json`, or as `
 
 The page can be served from any web address over HTTPS: the unit's check uses USB MIDI, and the folder the page and the helper share uses the browser's folder access, and a browser offers both only to a page served over HTTPS or from the computer itself. The workflow `.github/workflows/pages.yml` publishes this folder, `builder/`, on the host's pages, once the checks have passed on `main`. What that needs:
 
-- **This folder alone is served**, as it stands on `main`, with the listing of packs beside it: the workflow copies `catalog/packs.json` into it as `packs.json` before it publishes. The page loads only files beside it, by relative paths, and one thing from another site: the file of a pack the owner ticks, from its author's repository at the commit the listing names (`raw.githubusercontent.com`), held to the listing's size and SHA-256 before it is used. `tools/tests/test_tree.py` holds that (`ThePagesOnAHost`). Its one link to another site is a link the owner may follow, not a load.
+- **This folder alone is served**, as it stands on `main`, with the listing of packs beside it: the workflow joins the files of `catalog/` into it as `packs.json` before it publishes. The page loads only files beside it, by relative paths, and one thing from another site: the file of a pack the owner ticks, from its author's repository at the commit the listing names (`raw.githubusercontent.com`), held to the listing's size and SHA-256 before it is used. `tools/tests/test_tree.py` holds that (`ThePagesOnAHost`). Its one link to another site is a link the owner may follow, not a load.
 - **Script files ending in `.mjs` are served as scripts.** A browser runs a module only when the server says it is JavaScript.
 - **`open-field-helper.ps1` is served as text or as a download.** PowerShell reads it either way. So is `open-field-helper.py`, which `curl` fetches and hands to `python3`. The line the page shows for either is made from the page's own address, so it names the host's address there.
 - **`base.pack` and the loader's file are served as they are**, byte for byte: the page holds each to its SHA-256 and refuses one that is not.

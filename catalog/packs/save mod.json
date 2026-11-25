@@ -1,0 +1,21 @@
+{
+  "id": "save mod",
+  "author": "Reverdy-Carrasco",
+  "status": "listed",
+  "categories": [
+    "tape",
+    "mixer"
+  ],
+  "description": "Keeps per tape the master EQ, effect (with its switch and a pack's effect on it), compressor, tape speed and M1/M2.",
+  "repository": "https://github.com/Reverdy-Carrasco/save-mod",
+  "commit": "554fd8d9ce8421bb520d65316ffa8a1883546ca2",
+  "path": "out/save mod.pack",
+  "sha256": "08085ba94186f94e8c4e582da22fc719db01db6b6be497c4de0b6137534eab4d",
+  "bytes": 9812,
+  "version": 4,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 7,
+  "folders": []
+}

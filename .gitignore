@@ -19,10 +19,12 @@ __pycache__/
 *.pack
 !/builder/base.pack
 
-# A listing of your own unit's disk, made for the placement step, and the files the installer hands you.
+# A listing of your own unit's disk, made for the placement step, and the files the installer hands you. The listing
+# of packs' files of that name, catalog/listing.json and a pack's catalog/packs/listing.json, are kept.
 listing.json
+!/catalog/**/listing.json
 /downloads/
 
-# The listing of packs beside the install page: the pages workflow copies catalog/packs.json there when it publishes,
-# and a copy made to serve the page on your own computer would go stale (builder/README.md).
+# The listing of packs beside the install page: the pages workflow joins the files of catalog/ into it when it
+# publishes, and a copy made to serve the page on your own computer would go stale (builder/README.md).
 /builder/packs.json

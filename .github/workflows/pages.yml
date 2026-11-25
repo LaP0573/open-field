@@ -36,10 +36,14 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      # The page reads the listing of packs beside it (builder/catalog.mjs): a copy of catalog/packs.json as it stands
-      # on main, so that a pull request that adds a pack changes that one file only.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # The page reads the listing of packs beside it, as packs.json (builder/catalog.mjs): the files of catalog/ as
+      # they stand on main, joined into one, so that a pull request that adds a pack adds one file of its own.
       - name: The listing of packs beside the page
-        run: cp catalog/packs.json builder/packs.json
+        run: python -I tools/catalog_check.py --join builder/packs.json
 
       - name: The folder served
         uses: actions/upload-pages-artifact@v3

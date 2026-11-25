@@ -1,0 +1,19 @@
+{
+  "id": "8 tracks",
+  "author": "Faust",
+  "status": "listed",
+  "categories": [
+    "tape"
+  ],
+  "description": "Eight tape tracks instead of four, on the tape and in the mixer.",
+  "repository": "https://github.com/LaP0573/open-field-packs",
+  "follow": "main",
+  "path": "8 tracks.pack",
+  "version": 11,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "8 tracks/picture.png"
+  }
+}
