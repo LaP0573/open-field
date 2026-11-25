@@ -42,7 +42,8 @@ part's stretch. The pack holds numbers and text of ours; the stretches are read 
 
 `compile` writes the instructions for a picture that is a stock picture with one stretch of ours before its closing
 tag, and refuses any other picture. `check` holds that what a set of instructions carries is ours: no tag and no
-shape of any stock picture (tools/stock_search.py's measure), and that it makes a picture.
+shape of any stock picture (tools/stock_search.py's measure), and that it makes a picture, one that does not stop the
+unit at its start (below).
 
 Since R1 a fourth command, `census`: from every picture of `--display`, the unit's own, it collects the element names,
 the attribute names by element, the values of every attribute that is not a number, a colour, an id (or a reference
@@ -54,7 +55,7 @@ command outside COMMANDS_DRAWN is refused, `<path>: uses the path command '<x>',
 does not know: it can stop the unit at its start`, and the answer is 1. Any other element, attribute, such a value or
 markup the census has not is listed, `<path>: uses <what> '<value>', which no picture of the unit has: not proven on a
 unit`; the answer stays 0, and is 1 with `--strict`. A folder with no picture in it is an error, never a census that
-lets everything through. `check` is as it was.
+lets everything through.
 
 `census` holds one thing more: a picture served under the name of one of the unit's own pictures takes that picture's
 place, and the firmware's own screen looks the picture's parts up by their names. So the picture that is made must hold
@@ -63,6 +64,25 @@ an underscore, `_x2D_` a `-`, and so on), or the screen can stop the unit at its
 `<path>: takes the place of the unit's own <name> and has no part '<id>', which the unit's own has: the firmware's
 screen can stop the unit at its start`, the first five named and a line with the count, and the answer is 1. The
 picture's name is its instructions' file name less `.make`, or `--name` for one set.
+
+`check` and `census` hold one thing more of the bytes of ours: three things a picture can hold stop the unit at its
+start, with a message on the screen:
+
+- a part's name (`id`) with a `_x` that is no character's code. Taken from the front, a `_x` with two hex digits and a
+  `_` behind it passes as the code of a character, as the unit's own pictures write one (`_x2D_` for a `-`), and the
+  name is held again with the character in the code's place: `a_x5F_x4` is held as `a_x4`. A `_x` with no `_` behind
+  it stops, and so does one with two characters before the next `_` that are not both hex digits. A `_x` with any
+  other count of characters before the next `_` passes, with all that follows it. So `knob_x`, `knob_x1`,
+  `my_xml_page` and `a_x5F_x4` stop a unit; `knob_x_1` and `max_xpos_a` do not;
+- a number with more than four digits behind its point, in a path's `d`, a `points` list, a `matrix`, or an attribute
+  that is a number. A number written with an exponent is not held to this;
+- a `matrix` with fewer than six numbers, and a `translate` or a `scale` that is not two numbers with a comma or a
+  space between them: `translate(10)` stops a unit, and so does `translate(10-20)`.
+
+Each is refused, `<path>: ...: it stops the unit at its start`, the first five named and a line with the count, and
+the answer is 1. The first was seen on a unit: a part named `..._x`, and the unit started again with the part
+renamed. The others are read from the reader's code and were not tried on a unit. None of the unit's own pictures
+holds any of the three.
 
 Reads its inputs; `compile` and `make --out` write one file each and refuse to overwrite it.
 """
@@ -444,6 +464,97 @@ def picture_name(path):
     return base[:-len(".make")] if base.endswith(".make") else base
 
 
+# ---------------------------------------------------------------- what stops the unit at its start
+
+DIGITS_MOST = 4                 # the most digits behind a number's point that pass
+STOPS_SAID = 5                  # the stops named one a line; the count of all of them follows
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+_PARTS_OF_NUMBER = re.compile(rb"[-+]?(?:[0-9]+(?:\.([0-9]*))?|\.([0-9]+))([eE][-+]?[0-9]+)?")       # the digits behind the point; an exponent
+_FUNCTION = re.compile(rb"([A-Za-z]+)\s*\(([^)]*)\)")                                              # one function of a transform
+_PAIR = re.compile(rb"\s*" + _NUMBER + rb"[ ,]+\s*" + _NUMBER)                                     # two numbers, a comma or a space between
+
+
+def id_stop(written):
+    """Why a part's name, as a picture writes it, stops the unit at its start, or None when it passes. Taken from the
+    front, a `_x` with two hex digits and a `_` behind it passes as the code of a character (`_x2D_` for a `-`), and
+    the name is held again with the character in the code's place: `a_x5F_x4` is held as `a_x4`. A code of zero
+    (`_x00_`) passes with all that follows it. A `_x` with no `_` behind it stops (`knob_x`, `knob_x1`), and so does
+    one with two characters before the next `_` that are not both hex digits (`my_xml_page`). A `_x` with any other
+    count of characters before the next `_` passes, with all that follows it (`knob_x_1`, `max_xpos_a`)."""
+    while True:
+        at = written.find("_x")
+        if at < 0:
+            return None
+        end = written.find("_", at + 2)
+        if end < 0:
+            return "a `_x` has no `_` behind it"
+        if end - at != 4:
+            return None
+        code = written[at + 2:end]
+        if any(c not in _HEX_DIGITS for c in code):
+            return "'%s' behind a `_x` is no code" % code
+        if int(code, 16) == 0:
+            return None                                         # a code of zero passes, with all that follows it
+        written = written[:at] + chr(int(code, 16)) + written[end + 1:]
+
+
+def _long_numbers(text):
+    """The numbers of a text with more than DIGITS_MOST digits behind the point, each as written. A number written
+    with an exponent is not held to this and is not one of them."""
+    return [number.group(0).decode("latin-1") for number in _PARTS_OF_NUMBER.finditer(text)
+            if number.group(3) is None and len(number.group(1) or number.group(2) or b"") > DIGITS_MOST]
+
+
+def stops_in(picture, spans):
+    """What the bytes of ours in a picture hold that stops the unit at its start: the lines to say, in the order met.
+    `spans` are where the bytes of ours stand, as `make` gives them."""
+    spans = sorted(spans)
+    starts = [first for first, _end in spans]
+    out = []
+    for token in _MARKUP.finditer(picture):
+        if token.group(2) is None:
+            continue
+        for attribute in _ATTRIBUTE.finditer(picture, token.start(3), token.end(3)):
+            group = 2 if attribute.group(2) is not None else 3
+            name, value, first = attribute.group(1), attribute.group(group), attribute.start(group)
+            place = bisect.bisect_right(starts, first + len(value) - 1) - 1      # the last block that begins before this ends
+            if place < 0 or spans[place][1] <= first:
+                continue                                        # none of its bytes is ours
+            long_numbers = []
+            if name == b"id":
+                why = id_stop(value.decode("latin-1"))
+                if why is not None:
+                    out.append("names a part '%s', where %s (a `_x` in a name passes as the code of a character, as in `_x2D_`)"
+                               % (value.decode("latin-1"), why))
+            elif name == b"transform":
+                for function in _FUNCTION.finditer(value):
+                    word, numbers = function.group(1), function.group(2)
+                    said = re.sub(rb"\s+", b" ", function.group(0)).decode("latin-1")
+                    if word == b"matrix":
+                        count = len(re.findall(_NUMBER, numbers))
+                        if count < 6:
+                            out.append("has the transform %s, with %d number(s), fewer than six" % (said, count))
+                        long_numbers += _long_numbers(numbers)
+                    elif word in (b"translate", b"scale") and _PAIR.match(numbers) is None:
+                        out.append("has the transform %s, which is not two numbers with a comma or a space between them" % said)
+            elif name in (b"d", b"points") or _NUMBERS.fullmatch(value) is not None:
+                long_numbers = _long_numbers(value)
+            for number in long_numbers:
+                out.append("writes the number %s, with %d digits behind the point, more than %d"
+                           % (number, len(number) - number.index(".") - 1, DIGITS_MOST))
+    return out
+
+
+def say_stops(path, lines):
+    """Says what `stops_in` found for the instructions at `path`, the first few a line each and then the count of all;
+    answers that count."""
+    for line in lines[:STOPS_SAID]:
+        print("%s: %s: it stops the unit at its start" % (path, line))
+    if len(lines) > STOPS_SAID:
+        print("%s: %d thing(s) in all that stop the unit at its start" % (path, len(lines)))
+    return len(lines)
+
+
 def write_new(path, data):
     if os.path.exists(path):
         raise ValueError("%s exists; this tool does not overwrite" % path)
@@ -485,12 +596,13 @@ def cmd_check(args):
     for path in args.instructions:
         with open(path, "rb") as f:
             data = f.read()
-        blocks = []
-        picture = make(data, stock_reader(args.display), blocks, args.sources)
+        blocks, spans = [], []
+        picture = make(data, stock_reader(args.display), blocks, args.sources, spans)
         ours = b"".join(blocks)
         measure = display.measure(ours)
         stock_bytes = measure["stock tags"] + measure["stock shapes"] + measure["stock shapes, moved"]
         bad += 1 if stock_bytes else 0
+        bad += say_stops(path, stops_in(picture, spans))        # what stops the unit at its start
         print("%s: %d bytes of instructions, %d of them ours in %d tags, %d bytes of them a stock picture's; makes %d bytes, CRC-32 %08x"
               % (path, len(data), len(ours), measure["tags"], stock_bytes, len(picture), zlib.crc32(picture) & 0xffffffff))
     return 1 if bad else 0
@@ -507,7 +619,7 @@ def cmd_census(args):
     """Since R1: what the instructions' own bytes use, against the census of the unit's own pictures. A path command
     outside COMMANDS_DRAWN is refused; anything else no picture of the unit has is listed as not proven on a unit,
     and refused too with --strict. A picture that takes the place of one of the unit's own and lacks one of its parts
-    is refused."""
+    is refused. So is one with something that stops the unit at its start (`stops_in`)."""
     held = census(args.display)                                 # the unit's vocabulary, made now from its own pictures
     if args.name is not None and len(args.instructions) != 1:
         raise ValueError("--name names the picture of one set of instructions; %d were handed in" % len(args.instructions))
@@ -526,6 +638,7 @@ def cmd_census(args):
                       % (path, own[0], part))
             if missing:
                 print("%s: %d part(s) of the unit's own %s missing in all" % (path, len(missing), own[0]))
+        refused += say_stops(path, stops_in(picture, spans))    # what stops the unit at its start
         unknown = not_in_census(picture, spans, held)
         for what, value in unknown:
             if what == "the path command" and value not in COMMANDS_DRAWN:
