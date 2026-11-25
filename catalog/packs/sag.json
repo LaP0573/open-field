@@ -7,7 +7,7 @@
   ],
   "description": "Stereo drive effect with adjustable power-supply sag, tone and wet/dry mix.",
   "repository": "https://github.com/midnightops94/open-field-midnight94",
-  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
   "path": "packs/sag.pack",
   "sha256": "41af9c4b38145fabc1e43a905e26b97d2617262240cce7a1a9e5ca377f6f32b2",
   "bytes": 86669,
@@ -16,5 +16,10 @@
   "places": 0,
   "needs": [],
   "level": 10,
-  "folders": []
+  "folders": [],
+  "picture": {
+    "path": "thumbs/sag.png",
+    "sha256": "1fbc835ed8a92aa7c55536d4120d126a7a2c1a920190982c759e716ef1076f8c",
+    "bytes": 17969
+  }
 }

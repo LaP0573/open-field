@@ -7,7 +7,7 @@
   ],
   "description": "Chip synthesizer with pulse width, oscillator sync, ring modulation, filtering and drive.",
   "repository": "https://github.com/midnightops94/open-field-midnight94",
-  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
   "path": "packs/sid.pack",
   "sha256": "efddad065b91c49ad3dd37413ab6660c6c1ddf81cc307f0b5504ebc9d41093e5",
   "bytes": 44395,
@@ -16,5 +16,10 @@
   "places": 0,
   "needs": [],
   "level": 10,
-  "folders": []
+  "folders": [],
+  "picture": {
+    "path": "thumbs/sid.png",
+    "sha256": "b8f3d42b1f061ed24684b126c6ec5a2dbadc7b5c44da36f2619d0f8ea98b69f5",
+    "bytes": 14269
+  }
 }

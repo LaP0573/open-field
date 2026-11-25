@@ -7,7 +7,7 @@
   ],
   "description": "Electric bass with four playing techniques, switchable pickups, damping and amplifier circuits.",
   "repository": "https://github.com/midnightops94/open-field-midnight94",
-  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
   "path": "packs/fret.pack",
   "sha256": "38791f4422d7ac590223caa2ab9dd59a37a5dce19401811213f95e39926fffc1",
   "bytes": 64588,
@@ -16,5 +16,10 @@
   "places": 0,
   "needs": [],
   "level": 10,
-  "folders": []
+  "folders": [],
+  "picture": {
+    "path": "thumbs/fret.png",
+    "sha256": "a4fc571092c9fbbd1f01d40519f127fa28647da5d38f6fabb8a2a6772ba0a502",
+    "bytes": 39013
+  }
 }

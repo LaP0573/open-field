@@ -7,7 +7,7 @@
   ],
   "description": "Stereo crossover drive with independent low-band and high-band gain.",
   "repository": "https://github.com/midnightops94/open-field-midnight94",
-  "commit": "2a5fc6ade1356409d2b7a3db6410314127de4486",
+  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
   "path": "packs/split.pack",
   "sha256": "6adc6f5e6ddd438080e1d1850c54a6bf8b825240f1c762429edc247df996d5f8",
   "bytes": 55777,
@@ -16,5 +16,10 @@
   "places": 0,
   "needs": [],
   "level": 10,
-  "folders": []
+  "folders": [],
+  "picture": {
+    "path": "thumbs/split.png",
+    "sha256": "5ba1a450a38b28af861f7da9d3280f8d4d3b3335d0986cb71f66aa9fa451bfce",
+    "bytes": 21236
+  }
 }
