@@ -57,7 +57,7 @@ const R2 = {
   lfo: { sha256: "d2215f995b523baa89a771eae030ec50a583fa61361b1393dd20b32be050d664", bytes: 430062, version: 9 },
   sidechain: { sha256: "9c5d031d1da64a85e3adca74ea2c74159e964657186fbb69787a395eb195b02f", bytes: 106150, version: 8 },
 };
-const CATS = { tape: "tape", effects: "effects", modulation: "modulation", sequencing: "sequencing", mixer: "mixer", looks: "screens and looks", tools: "tools", examples: "examples", library: "library" };
+const CATS = { tape: "tape", effects: "effects", synths: "synths", drums: "drums", modulation: "modulation", sequencing: "sequencing", mixer: "mixer", looks: "screens and looks", tools: "tools", examples: "examples", library: "library" };
 const FEATURES = [["8 tracks", "tape"], ["fx train", "effects"], ["lfo", "modulation"], ["sidechain", "mixer"]];
 
 function listingOf(set, commit, extra = [], earlier = null) {
