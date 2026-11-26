@@ -7,12 +7,12 @@ The base is a pack like any other ([packs](packs.md)), built from `packs/base.js
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 39 |
-| Release | `0.21`: the start screen reads `1.7.3 - open-field 0.21` |
+| Version | 40 |
+| Release | `0.22`: the start screen reads `1.7.3 - open-field 0.22` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
-| Its changes of the firmware | Sixty-four: [the change list](changes.md), "The base, `base.pack`" |
+| Its changes of the firmware | Sixty-six: [the change list](changes.md), "The base, `base.pack`" |
 
 Since the base is a file, a new base is a new file copied into `user/pk`, with no install. The **loader**, our small piece inside the firmware file, only reads, places and joins the pack files. It hands the base what it needs and knows nothing of what the base offers.
 
