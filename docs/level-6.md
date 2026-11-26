@@ -92,10 +92,11 @@ A pack's own zeroed data is small, and the room for pack files is shared by ever
 { "kind": "memory", "name": "dub", "bytes": 1048576, "align": 32 }
 ```
 
-- **How much**: 1 byte to 16 MiB an ask, and 16 MiB for all packs' asks together. `align` is a power of two from 4 to 4,096 (4 if you leave it out).
-- **When it comes**: the base takes it from the unit at its first frame, in the order of the files' names and then of the asks. It clears it to 0, a quarter of a megabyte a frame, and only then hands it over. `op1f_memory(card, ask)` answers 0 until then, and the same block from then on, from any thread. A megabyte is there some four frames after the start.
-- **When it's refused**: when the ask is over 16 MiB, when the packs before it took the rest of the 16 MiB, when the unit would keep less than 8 MiB free after it, or when the unit doesn't have the room. The log says so, with your pack's name and the bytes. `op1f_memory` then answers 0 for good, and your pack runs without it. **Write your pack so it does nothing harmful with no memory**, and say so on its page.
-- It's never given back while the unit runs.
+- **How much**: from base 41, 1 byte to 32 MiB an ask, and 64 asks of all packs together. The base hands out first the unit's spare memory, 95.75 MiB, and only when an ask doesn't fit there, the unit's heap, up to 16 MiB for all asks together. A base before 41 gives 16 MiB an ask and for all asks together, and 16 asks. `align` is a power of two from 4 to 4,096 (4 if you leave it out).
+- **When it comes**: the base takes it at its first frame, in the order of the files' names and then of the asks. It clears it to 0, a quarter of a megabyte a frame, and only then hands it over. The asks that come to 16 MiB together are cleared first, in their order, and the others after them. `op1f_memory(card, ask)` answers 0 until then, and the same block from then on, from any thread. A megabyte is there some four frames after the start, the first 16 MiB within some 66 frames as on older bases, and every 32 MiB after them some 128 frames more.
+- **When it's refused**: when the ask is over 32 MiB, when it would be the 65th, or when there's no room left for it: none in the spare memory, and none in the heap either, where the packs take 16 MiB at most and the unit keeps 8 MiB free. The log says so, with your pack's name and the bytes. `op1f_memory` then answers 0 for good, and your pack runs without it. **Write your pack so it does nothing harmful with no memory**, and say so on its page.
+- **The mark `op1f_memory_2`**: if your pack can't do without base 41's limits (an ask over 16 MiB, or more asks than an older base gives), name `op1f_memory_2` in your code, as a line in the log that prints it. Under an older base the loader then leaves your pack out, and its line names the mark.
+- It's never given back while the unit runs, and it holds nothing of an earlier start: the base hands it out anew at every start, cleared.
 
 **A stage that needs the memory waits for it.** Name the memory ask in the stage's `"memory"`. The base doesn't call the stage before the memory is handed over, and never when it was refused. So `process` can count on the memory being there. `dub` still checks it once, which costs nothing.
 
@@ -243,7 +244,7 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | `stage: '<name>' of '<pack>' is left aside: ...` | Why not: its cost, the sum of all stages, its table, its memory refused |
 | `stage: '<name>' this period: ...` | Through the base's quiet gate: calls, the most cycles, the average, and calls over what it declared |
 | `stage: '<name>' of '<pack>' is switched off until the next start: ...` | The call that went too far, or how many calls went over in one second and the most of them, against what it declared |
-| `memory: '<name>' of '<pack>' is given <bytes> bytes at ...` | Your memory, and how much the unit keeps free |
+| `memory: '<name>' of '<pack>' is given <bytes> bytes at ...` | Your memory, and how much is left where it came from: `of the spare memory stay`, or `stay free` for the unit's heap |
 | `memory: '<name>' of '<pack>' is refused <bytes> bytes: ...` | Why not |
 | `cards: '<pack>' carries a picture named ... and does not take its place` | A screen asked for a name your pack carries and doesn't list |
 | `options: <n> pack(s) with options, <n> value(s) read from user/pf/.options ...` | From base 32, once a start: how many values the file gave, how many packs are under PACKS and how many lines went to KEYBOARD, SYSTEM and MIDI |
@@ -262,7 +263,8 @@ Shifting by 6 first keeps the multiply inside 32 bits at any tempo the unit has.
 | Switched off | Eight calls in one second over twice the declared cost and over the declared cost plus 20,000, or one call over 290,000 |
 | Stack | 1 KiB a call of `process`, with whatever it calls |
 | Stages | 16 in all |
-| Memory | 16 MiB an ask and for all asks, 8 MiB kept free for the unit, align 4 to 4,096, 16 asks in all |
+| Memory (base 41) | 32 MiB an ask, 64 asks in all, align 4 to 4,096; 95.75 MiB of spare memory first, then up to 16 MiB of the unit's heap with 8 MiB kept free |
+| Memory (before base 41) | 16 MiB an ask and for all asks, 8 MiB kept free for the unit, align 4 to 4,096, 16 asks in all |
 | Names of pictures that take a place | 256, one ask a card |
 | Settings (base 32) | One ask a card, 1 to 8 options; a list 2 to 8 words; a number -128 to 127; room for 4 of the packs' lines in KEYBOARD, 1 in SYSTEM, 2 in MIDI; the file 4,096 bytes |
 

@@ -57,7 +57,7 @@ The table the tool writes is an `Op1fEngine`:
 
 **Where it shows.** The unit sorts its engine list by name, so your engine stands among the unit's own where its name falls, not at the end. In that list your engine's row has no sounds under it (its sounds are in the sound list, below). A walk that steps from sound to sound goes straight past any such row, the unit's own `fm` and `phase` as well as yours, so look for it by its name. Picked, the sound takes your engine's name, as it would take `fm`'s.
 
-**Level 9 is the synth's.** The drum's sounds are made another way, and no engine of this level reaches them. From base 40 a pack can add a [drum engine](drum-engine.md) to the drum's own list instead: it rides the drum sampler and has a page, not a sound of its own.
+**Level 9 is the synth's.** The drum's sounds are made another way, and no engine of this level reaches them. From base 43 a pack can add a [drum engine](drum-engine.md) to the drum's own list instead: it rides the drum sampler and has a page, not a sound of its own.
 
 ## What the unit keeps doing
 
@@ -240,7 +240,7 @@ Sounds are said as `synth 1` to `synth 8`. The tag is `op1f_engines`.
 | Declared cost | 1 to 40,000 cycles a voice's render |
 | Switched off | Eight renders in one second over twice the declared cost and over the declared cost plus 20,000, or one render over 120,000 |
 | Stack | 1 KiB a render, with whatever it calls |
-| Working memory | Up to 1 MiB a voice, six voices, from level 6's 16 MiB, 8 MiB kept free |
+| Working memory | Up to 1 MiB a voice, six voices, from level 6's working memory and inside its limits ([level 6](level-6.md#limits-in-one-place)) |
 | Sounds | 32 an engine, 2,048 bytes each, written only with room for all and 20 more of the owner's |
 
 ## How `pluck` works

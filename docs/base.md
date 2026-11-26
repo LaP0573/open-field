@@ -1,14 +1,14 @@
 # The base: what it offers a pack
 
-**The base** is the shared pack every other pack relies on: the file `base.pack`, in the folder `user/pk` of the unit like any pack file. It holds the interface every pack uses, ours and yours alike, and nothing made for one pack: a call every frame, pictures, a page of its own with keys and knobs, folders and files on the unit's disk, and text on its page (levels 1 to 3, on this page), then painting and pages that stack (level 4), a sequencer of a pack's own and the notes heard (level 5), a place in the sound and working memory (level 6), values kept in the unit's own tapes and sounds (level 7), an effect of a pack's own in the unit's lists of effects (level 8), a synth engine of a pack's own in the unit's list of engines (level 9), and the value as the sound plays it (level 10), each on a page of its own. After level 10 come parts with a mark of their own instead of a level: a page that holds its picture or redraws only its changed parts (bases 33 and 36), layers, rows of a pack's own in the unit's lists of effects and LFOs (bases 35 and 37), and a cut the tape has lifted, dropped into the sample of a sound that plays a pack's engine (base 39). This page says what it offers, how a pack asks for it, and what it does not offer yet.
+**The base** is the shared pack every other pack relies on: the file `base.pack`, in the folder `user/pk` of the unit like any pack file. It holds the interface every pack uses, ours and yours alike, and nothing made for one pack: a call every frame, pictures, a page of its own with keys and knobs, folders and files on the unit's disk, and text on its page (levels 1 to 3, on this page), then painting and pages that stack (level 4), a sequencer of a pack's own and the notes heard (level 5), a place in the sound and working memory (level 6), values kept in the unit's own tapes and sounds (level 7), an effect of a pack's own in the unit's lists of effects (level 8), a synth engine of a pack's own in the unit's list of engines (level 9), and the value as the sound plays it (level 10), each on a page of its own. After level 10 come parts with a mark of their own instead of a level: a page that holds its picture or redraws only its changed parts (bases 33 and 36), layers, rows of a pack's own in the unit's lists of effects and LFOs (bases 35 and 37), and a cut the tape has lifted, dropped into the sample of a sound that plays a pack's engine (base 39), and more working memory, from the unit's spare memory (base 41). This page says what it offers, how a pack asks for it, and what it does not offer yet.
 
 The base is a pack like any other ([packs](packs.md)), built from `packs/base.json`. Two things set it apart: **every unit with open-field needs it**, and its release is what the start screen shows. Without `base.pack` no feature runs, and the start screen says `1.7.3 stock (4 need base)`.
 
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 40 |
-| Release | `0.22`: the start screen reads `1.7.3 - open-field 0.22` |
+| Version | 43 |
+| Release | `0.25`: the start screen reads `1.7.3 - open-field 0.25` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
@@ -76,9 +76,22 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 37 | [Drum sounds ride an LFO layer](layers.md#an-lfo-layer) too, when it says so | none: `op1f_layer_start` answers for a drum's place |
 | 38 | An effect switched off for its cost plays again after a new pick, and the runs of effects inside packs are handed on once no place runs them ([level 8](level-8.md)); no canvas while the base's own top page is up ([level 4](level-4.md)) | none |
 | 39 | [A sound's sample](sample.md): a cut the tape has lifted, dropped by the unit into the sample of a synth sound that plays the pack's engine, as its sampler takes one and kept over a restart; and any synth or drum sound's sample read | `op1f_sample_1` |
-| 40 | [A drum engine](drum-engine.md): a pack's engine in the drum's engine list, riding the drum sampler; picked, its page stands on T1 with the keys and knobs offered to it first, and the drum sound's file keeps its name; one pack holds it | `op1f_drum_engine_1` |
+| 40 | Ready for a later loader that takes more pack files: the base reads that loader's numbers and offers it a second, longer list of cards ([below](#base-40-and-the-next-loader)). Under today's loader a unit runs as on base 39, but for one thing: a folder with too many pack files can still take a change that does not add files. Nothing for a pack to ask | none |
+| 41 | [More working memory](level-6.md#working-memory): the unit's spare memory first, then its heap as before; up to 32 MiB an ask and 64 asks in all | `op1f_memory_2`, for a pack that cannot do without these limits |
+| 42 | Ready for a later loader's longer list of cards: the base serves up to 128 of them ([below](#base-40-and-the-next-loader)). Under today's loader a unit runs as on base 41. Nothing for a pack to ask | none |
+| 43 | [A drum engine](drum-engine.md): a pack's engine in the drum's engine list, riding the drum sampler; picked, its page stands on T1 with the keys and knobs offered to it first, and the drum sound's file keeps its name; one pack holds it | `op1f_drum_engine_1` |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
+
+### Base 40 and the next loader
+
+Base 40 gets ready for a later loader, which is not out yet. Under today's loader the door takes what it took before, and a pack has nothing to do.
+
+- **It asks for `op1f_loader_2`**, an optional name. Today's loader does not offer it, so it reads 0. A later loader offers it with the address of a record of six numbers: the record's size in bytes, the loader's generation, the first address of the room for packs, the room's bytes, the largest number of pack files it reads, and the largest number of cards it hands over.
+- **The door reads its limits from that record.** It takes the room, its first address and the largest number of pack files from there. With no record it takes today's loader's: 2,031,616 bytes and 32 files. The door now counts up to 192 files in `user/pk`. New with base 40: a change that does not raise the count of files is never refused for the count, so a folder that already holds too many can still drop files and take a new `base.pack`.
+- **`hello 04`** answers with the 68 bytes of `hello 03` and 8 more: the loader's generation (1 today), the largest number of pack files, and the room's bytes. `hello 03` answers as before. A door before base 40 answers `hello 04` with the plain 68 bytes, which means today's loader.
+- **It offers `op1f_cards_2`**, a second list of cards with 128 slots. A loader that fills it hands every pack's card over there too, and from base 42 the base serves up to 128 of them (base 40 and 41 serve the first 32). Today's loader does not fill it, and the base serves the cards of the first list, 32 as before.
+- **From base 42 the door's list of `user/pk` takes the file to start from**, 0 to 191, so a page can read all 192 files a few at a time. An older door lists the first 64.
 
 ### The words a pack includes
 

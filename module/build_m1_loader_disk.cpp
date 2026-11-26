@@ -37,6 +37,17 @@
 //
 // One log line a disk mode start, one for a file the computer brings and one for a delete, from the disk mode's
 // thread, as stock's own folder maker logs there.
+//
+// Two generations, as build_m4_loader.cpp has them: with no define this
+// is generation 1, N1's unit byte for byte; a wrapper unit compiles it as generation 2, N2's, whose
+// folder shows 128 names (MAX_FILES), as many as N2 looks at. Nothing else differs.
+
+#ifndef OP1F_LOADER_GENERATION
+#define OP1F_LOADER_GENERATION 1                            // no define: N1's unit
+#endif
+#if OP1F_LOADER_GENERATION != 1 && OP1F_LOADER_GENERATION != 2
+#error "OP1F_LOADER_GENERATION is 1 or 2"
+#endif
 
 typedef unsigned int u32;
 
@@ -80,7 +91,12 @@ typedef int (*DirCloseFn)(void* handle);
 
 enum { FS_FILE_BYTES = 0x40, JSON_OBJECT_KIND = 7 };
 enum { FS_FILE_SLOTS = 12, FS_DELETE_SLOT = 7, FS_PATH_OWN = 8, FS_PATH_ROOM = 0x1c };
-enum { MAX_FILES = 32, FILE_CHARS = 40, PATH_CHARS = 48, DIR_NAME_AT = 11 };   // as build_m4_loader.cpp has them
+#if OP1F_LOADER_GENERATION == 2
+enum { FILES_MOST = 128 };                                  // N2: as many names as the loader looks at files (its MAX_PACKS)
+#else
+enum { FILES_MOST = 32 };
+#endif
+enum { MAX_FILES = FILES_MOST, FILE_CHARS = 40, PATH_CHARS = 48, DIR_NAME_AT = 11 };   // as build_m4_loader.cpp has them
 
 static const char LOG_FILE[] = "../src/main/op1f_loader.cpp";
 static const char FOLDER_NAME[] = "packs";

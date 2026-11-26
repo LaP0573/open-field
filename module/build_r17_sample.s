@@ -48,7 +48,7 @@ op1f_sample_sd_stub:
     RTS;
 .size op1f_sample_sd_stub, .-op1f_sample_sd_stub
 
-/* R18 (base 40): DD, the head of the worker's drum drop job (0x8f00ba38, request 10; its first eight bytes are the same
+/* R21 (base 43): DD, the head of the worker's drum drop job (0x8f00ba38, request 10; its first eight bytes are the same
  * three instructions as SD's), in SD's form: no ticket for this drum slot (op1f_sample_dd_armed is not the slot + 1),
  * the unit's own drop, counted (op1f_sample_dd_passes) and on to the room; a ticket, op1f_sample_drum_job(slot, clip).
  */

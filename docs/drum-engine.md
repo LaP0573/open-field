@@ -1,6 +1,6 @@
-# A drum engine (base 40)
+# A drum engine (base 43)
 
-At [level 9](level-9.md) a pack adds a synth engine that rides the unit's `dsynth`. From base 40 a pack can add an engine to the **drum's** engine list too (shift and T1 in the drum's mode, where the unit offers the drum sampler and `dbox`). A drum engine rides the unit's **drum sampler** and makes no sound of its own: under it the drum sampler plays on as always, with its kit, its sample, its keys' points, and the unit saves and loads the kit as it did. What is yours is the engine's name in the list and in the sound's file, and its page on T1, with the keys and knobs offered to it first. A pack that works on the kit (one that cuts the kit's sample into its keys, say) is such an engine.
+At [level 9](level-9.md) a pack adds a synth engine that rides the unit's `dsynth`. From base 43 a pack can add an engine to the **drum's** engine list too (shift and T1 in the drum's mode, where the unit offers the drum sampler and `dbox`). A drum engine rides the unit's **drum sampler** and makes no sound of its own: under it the drum sampler plays on as always, with its kit, its sample, its keys' points, and the unit saves and loads the kit as it did. What is yours is the engine's name in the list and in the sound's file, and its page on T1, with the keys and knobs offered to it first. A pack that works on the kit (one that cuts the kit's sample into its keys, say) is such an engine.
 
 This is not a level. The level stays 10. Base 40 adds one kind of ask, `OP1F_ASK_DRUM_ENGINE` (12), on a card of level 8 or later, and a mark, `op1f_drum_engine_1` ([below](#the-mark)).
 
@@ -41,7 +41,7 @@ The drum engine's page uses the same place in the base as an engine's page (the 
 
 A pack with an ask of this kind names `op1f_drum_engine_1` (a constant 1), so that a base before 40 leaves it out. A base before 40 that loads a pack without naming the mark leaves the ask aside with its line for kinds it does not know.
 
-The base built at e005db8 knew kind 12 as "the drum's page" (a page on every drum sound that plays the drum sampler, mark `op1f_drum_page_1`). That form was never released; base 40 has the drum engine in its place, and a pack built for the page is left out (its mark is not offered).
+The base built at e005db8 knew kind 12 as "the drum's page" (a page on every drum sound that plays the drum sampler, mark `op1f_drum_page_1`). That form was never released; base 43 has the drum engine in its place, and a pack built for the page is left out (its mark is not offered).
 
 ## The lines the base writes
 

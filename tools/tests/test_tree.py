@@ -218,7 +218,7 @@ class TheRecipes(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("c++"), "a C++ compiler on the computer")
     def test_the_drop_s_checks_take_a_drum_place_that_rides_and_its_pool(self):
-        """module/build_r17_sample.h compiled on the computer: base 40 takes a drum place riding the drum engine, holds
+        """module/build_r17_sample.h compiled on the computer: base 43 takes a drum place riding the drum engine, holds
         it to the drum's pool, and still refuses a drum place where `drums` is 0 (base 39's answer)."""
         source = r'''
 #include <cstdio>

@@ -1,4 +1,25 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// One source, two generations. The build define
+// OP1F_LOADER_GENERATION is 1 or 2; where it is not defined the unit is generation 1, which compiles to N1's loader
+// byte for byte (and to M4's for 1.7.0), so every build of this file that names it alone still makes N1. Generation 2
+// is the loader N2, compiled from two small wrapper units this tree does not hold yet (the define as 2 and an
+// include). Against generation 1 it
+//
+//   n1. loads packs into a room of its own, 16 MiB from 0x85000000 (PACK_BASE, PACK_ROOM), and its own block is the
+//       top 128 KiB of our reservation (BASE_START, LOADER_BYTES), its end BASE_START + LOADER_BYTES
+//       where generation 1 took PACK_BASE for it: the room no longer lies above the loader;
+//   n2. looks at 128 pack files (MAX_PACKS; the disk mode's folder shows as many, MAX_FILES);
+//   n3. answers a second mark, op1f_loader_2, with the address of a record of six words in its constant data
+//       (op1f_loader_record: its bytes, the generation, the room's first address and bytes, the most files, the most
+//       cards); a pack that needs it runs only under N2, and under N1 the name gives nothing;
+//   n4. hands the cards over into a second list too, op1f_cards_2, of 128 slots, beside op1f_cards with its 32;
+//   n5. no longer runs a pack of the old kind (format 2): it is left out with the line for a format the loader does
+//       not know, and the old kind's run is not compiled;
+//   n6. names itself N2 in its first line.
+//
+// Every other line, check and rule is generation 1's, and a pack file runs under N2 exactly as under N1: packs are
+// still linked for N1's room and moved by the distance to their place.
+//
 // Step M4 image M4: the loader of step M1 with the start screen's new words: the main version, a dash, open-field,
 // and the release of the base, "1.7.0 - open-field 0.3".
 //
@@ -114,6 +135,13 @@
 // the room, the loader's own tables and the font's widths are the harness's there, behind the names marked
 // OP1F_HOST below.
 
+#ifndef OP1F_LOADER_GENERATION
+#define OP1F_LOADER_GENERATION 1                            // no define: N1's loader
+#endif
+#if OP1F_LOADER_GENERATION != 1 && OP1F_LOADER_GENERATION != 2
+#error "OP1F_LOADER_GENERATION is 1 or 2"
+#endif
+
 typedef unsigned int u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
@@ -145,7 +173,12 @@ typedef int (*DirCloseFn)(void* handle);
 #define STOCK_DIR_CLOSE ((DirCloseFn)0x8c0a57d4u)
 
 enum { HEADER_BYTES = 64, PACK_FORMAT = 2, PIECE_BYTES = 16384, ENTRY_BYTES = 20, MAX_ENTRIES = 4096 };
-enum { HEADER3_BYTES = 96, PACK_FORMAT_LINKED = 3, MAX_PACKS = 32, FILE_CHARS = 40, PATH_CHARS = 48, MAX_SKIPS = 64, LIST_COUNTS = 6, PACK_ALIGN = 32 };
+#if OP1F_LOADER_GENERATION == 2
+enum { PACKS_MOST = 128 };                                  // N2: the pack files looked at
+#else
+enum { PACKS_MOST = 32 };
+#endif
+enum { HEADER3_BYTES = 96, PACK_FORMAT_LINKED = 3, MAX_PACKS = PACKS_MOST, FILE_CHARS = 40, PATH_CHARS = 48, MAX_SKIPS = 64, LIST_COUNTS = 6, PACK_ALIGN = 32 };
 enum { DIR_NAME_AT = 11 };                                  // a folder entry's name: the text at its +0xb
 
 // A pack's card and what goes with it (module/build_m1_card.h has them for the packs; a test holds the two files to
@@ -154,15 +187,31 @@ enum { DIR_NAME_AT = 11 };                                  // a folder entry's 
 // CARDS_MOST slots of three words: where a card stands, its pack's first address, the address behind its pack's
 // last. A release is a text in RELEASE_BYTES bytes, its end among them; so is the name of a pack a file is in want of.
 enum { CARD_MARK = 0x44524143, CARD_LEAST = 8, CARDS_MOST = 32, SLOT_WORDS = 3, CARDS_WORDS = 2 + SLOT_WORDS * CARDS_MOST, RELEASE_BYTES = 16, MISSING_BYTES = 16 };
+#if OP1F_LOADER_GENERATION == 2
+// N2's second list, op1f_cards_2: the same two words and CARDS_MOST_2 slots of three, one for every pack file looked at.
+enum { CARDS_MOST_2 = 128, CARDS_WORDS_2 = 2 + SLOT_WORDS * CARDS_MOST_2 };
+#endif
 
 // The first four bytes of the stock OS image's SHA-256 (f9 77 75 d6 ...), little-endian: the OS a pack is for.
 static const u32 OS_ID = 0x1aeb34d1u;
 
+#if OP1F_LOADER_GENERATION == 2
+// N2: packs are loaded into the room our loader N2 takes for them, 16 MiB from 0x85000000; the loader's own block is
+// the top LOADER_BYTES of our reservation, and it ends there. Packs are still linked for N1's room (linker/op1f-1.7.0-pack.ld)
+// and moved by the distance to their place, which is now below where they were linked.
+static const u32 PACK_BASE = 0x85000000u;
+static const u32 PACK_ROOM = 0x01000000u;
+static const u32 BASE_START = 0x8d4c4234u;
+static const u32 LOADER_BYTES = 0x00020000u;
+static const u32 LOADER_END = BASE_START + LOADER_BYTES;    // the end of the loader's own code and data
+#else
 // Where packs are loaded: the reservation's first byte plus the loader's 64 KiB, to the reservation's end
 // (linker/op1f-1.7.0-pack.ld). The loader itself lies in the 64 KiB before it (linker/op1f-1.7.0-base.ld).
 static const u32 PACK_BASE = 0x8d2f4234u;
 static const u32 PACK_ROOM = 0x001f0000u;
 static const u32 BASE_START = 0x8d2e4234u;
+static const u32 LOADER_END = PACK_BASE;                    // the room's first byte is the end of the loader's own code
+#endif
 
 // Where a site may lie (tools/boot_table.py: L1_CODE and DDR).
 static const u32 L1_CODE_START = 0x11a00000u;
@@ -182,6 +231,19 @@ static const char LOG_FILE[] = "../src/main/op1f_loader.cpp";
 static const char NAME_LOADER[] = "op1f_loader_1";
 static const char NAME_CARDS[] = "op1f_cards";
 static const char NAME_RELEASE[] = "op1f_release";
+#if OP1F_LOADER_GENERATION == 2
+// N2's two names more: its second mark, which it answers with the address of its record, and the second list for
+// the cards, which a pack may offer beside the first.
+static const char NAME_LOADER_2[] = "op1f_loader_2";
+static const char NAME_CARDS_2[] = "op1f_cards_2";
+// The record behind op1f_loader_2, six words in the loader's constant data, never written: its own size in bytes, the
+// loader's generation, the room's first address and its bytes, the most pack files looked at, the most cards handed
+// over (op1f_cards_2's slots). A reader takes `bytes` first and only the fields it covers; a later loader adds words
+// behind and never changes the meaning of one.
+enum { RECORD_WORDS = 6 };
+extern "C" const u32 op1f_loader_record[RECORD_WORDS] asm("op1f_loader_record");
+const u32 op1f_loader_record[RECORD_WORDS] = { 4 * RECORD_WORDS, 2, PACK_BASE, PACK_ROOM, MAX_PACKS, CARDS_MOST_2 };
+#endif
 // And the family of the first: every name that begins so is a loader's mark, this one's or a later one's, and the
 // loader keeps them all to itself. It answers for its own alone; a pack that offers any of them is left out, so that
 // a pack that needs a later loader finds nobody under this one, whatever files lie in the folder.
@@ -929,7 +991,7 @@ static const char* said(int code) {
 // The loader's own two changes, the disk mode's folder "packs": checked whole, then written. TABLE_BYTES when a site
 // is not stock's any more: a pack of the old kind has taken it for its own folders.
 OWN static int add_folder(TableResult* result) {
-    int own = op1f_base_check(own_table(0), own_table(1), BASE_START, PACK_BASE, result);
+    int own = op1f_base_check(own_table(0), own_table(1), BASE_START, LOADER_END, result);
     if (own == TABLE_OK) own = op1f_base_write(own_table(0), own_table(1), result);
     return own;
 }
@@ -990,7 +1052,7 @@ static void screen_says(const char* a, const char* b, const char* c) {
 // Where the site is not stock's, the text stays stock's. A write that does not take stops the start-up, as a pack's
 // does: the site is run in a moment.
 OWN static void add_screen_text(TableResult* result) {
-    int code = op1f_base_check(text_table(0), text_table(1), BASE_START, PACK_BASE, result);
+    int code = op1f_base_check(text_table(0), text_table(1), BASE_START, LOADER_END, result);
     if (code != TABLE_OK) {
         STOCK_LOG(2, LOG_FILE, 26, "loader: the start screen keeps stock's version text, %s: entry %d, site 0x%08x, kind %u, found %08x %08x, wanted %08x %08x",
                   said(code), result->index, result->site, result->kind, result->found[0], result->found[1], result->wanted[0], result->wanted[1]);
@@ -1139,10 +1201,15 @@ OWN static void look() {
         }
         for (int c = 0; c < 16; ++c) p->name[c] = (p->h.name[c] >= 0x20 && p->h.name[c] < 0x7f) ? p->h.name[c] : 0;
         p->name[16] = 0;
+#if OP1F_LOADER_GENERATION == 2
+        // N2 runs no pack of the old kind: format 2 is a format this loader does not know (line 38), and line 30 counts 0 of it
+        if (p->h.format == PACK_FORMAT_LINKED && want == HEADER3_BYTES) {
+#else
         if (p->h.format == PACK_FORMAT) {
             p->state = P_OLD;
             ++old;
         } else if (p->h.format == PACK_FORMAT_LINKED && want == HEADER3_BYTES) {
+#endif
             p->state = P_NEW;
             ++fresh;
         } else {
@@ -1308,6 +1375,9 @@ OWN static Pack* pack_named(const char* name, const Pack* but) {
 // (M1) is a name the loader answers for itself, before any pack is asked: its own first byte.
 OWN static u32 address_of(const char* name, const Pack* self) {
     if (same_text(name, NAME_LOADER)) return BASE_START;
+#if OP1F_LOADER_GENERATION == 2
+    if (same_text(name, NAME_LOADER_2)) return (u32)op1f_loader_record;      // N2: its second mark, the record's address
+#endif
     for (u32 i = 0; i < pack_count; ++i) {
         const Pack* q = &packs[i];
         if (q == self || !in_set(q)) continue;
@@ -1553,8 +1623,16 @@ OWN static void take_release() {
 // list stands) gets a slot for each pack that runs and has a card, in the order of the files: where the card stands,
 // the pack's first address, and the address behind the last byte of its body and zeroed data. The list is held to
 // lie whole in the pack that offers it, on a word. It holds CARDS_MOST slots, as many as the loader takes pack files;
-// a card that finds none is counted in the list's second word.
+// a card that finds none is counted in the list's second word. N2 calls it once for each list offered, op1f_cards
+// with CARDS_MOST slots and op1f_cards_2 with CARDS_MOST_2, each list held to its own size; with neither offered,
+// once with -1 for line 53.
+#if OP1F_LOADER_GENERATION == 2
+OWN static void hand_cards(int owner, u32 list_at, u32 most) {
+    const u32 words = 2 + SLOT_WORDS * most;               // the list's words: its two, and three a slot
+#else
 OWN static void hand_cards(int owner, u32 list_at) {
+    const u32 most = CARDS_MOST, words = CARDS_WORDS;
+#endif
     if (owner < 0) {
         u32 carried = 0;
         for (u32 i = 0; i < pack_count; ++i) if (packs[i].state == P_RUNS && packs[i].h.card_place) ++carried;
@@ -1563,7 +1641,7 @@ OWN static void hand_cards(int owner, u32 list_at) {
     }
     const Pack* q = &packs[owner];
     u32 bytes = q->h.body_bytes + q->h.zeroed_bytes;        // the pack's memory from its first byte on
-    if ((list_at & 3) != 0 || bytes < 4 * CARDS_WORDS || list_at - q->place > bytes - 4 * CARDS_WORDS) {
+    if ((list_at & 3) != 0 || bytes < 4 * words || list_at - q->place > bytes - 4 * words) {
         STOCK_LOG(1, LOG_FILE, 52, "loader: the list of cards '%s' offers is not used: it does not lie whole in the pack, on a word (0x%08x)", q->name, list_at);
         return;
     }
@@ -1572,7 +1650,7 @@ OWN static void hand_cards(int owner, u32 list_at) {
     for (u32 i = 0; i < pack_count; ++i) {
         const Pack* p = &packs[i];
         if (p->state != P_RUNS || !p->h.card_place) continue;
-        if (count == CARDS_MOST) {
+        if (count == most) {
             ++more;
             continue;
         }
@@ -1581,7 +1659,7 @@ OWN static void hand_cards(int owner, u32 list_at) {
         slot[1] = p->place;
         slot[2] = p->place + p->h.body_bytes + p->h.zeroed_bytes;
     }
-    for (u32 w = 2 + SLOT_WORDS * count; w < CARDS_WORDS; ++w) list[w] = 0;    // a slot that is not used holds nothing, wherever the list lies
+    for (u32 w = 2 + SLOT_WORDS * count; w < words; ++w) list[w] = 0;    // a slot that is not used holds nothing, wherever the list lies
     list[0] = count;
     list[1] = more;
     STOCK_LOG(3, LOG_FILE, 51, "loader: %u card(s) handed to '%s', its list at 0x%08x; %u more than the list holds", count, q->name, list_at, more);
@@ -1670,6 +1748,10 @@ OWN static u32 run_new(TableResult* result, u32 started) {
     op1f_base_more_populate = address_of(NAME_MORE_POPULATE, 0);
     u32 cards_at = 0;
     int cards_owner = pack_with(NAME_CARDS, 0, &cards_at);
+#if OP1F_LOADER_GENERATION == 2
+    u32 cards2_at = 0;
+    int cards2_owner = pack_with(NAME_CARDS_2, 0, &cards2_at);
+#endif
     take_release();
 
     // join: every wanted name's places filled with the address of the pack that offers it, or with nothing
@@ -1709,7 +1791,13 @@ OWN static u32 run_new(TableResult* result, u32 started) {
         p->state = P_RUNS;
         op1f_base_flush(p->place, p->place + p->h.body_bytes + p->h.zeroed_bytes);
     }
+#if OP1F_LOADER_GENERATION == 2
+    // N2: each list offered gets the cards, op1f_cards its 32 slots and op1f_cards_2 its 128; line 53 only when neither is
+    if (cards_owner >= 0 || cards2_owner < 0) hand_cards(cards_owner, cards_at, CARDS_MOST);
+    if (cards2_owner >= 0) hand_cards(cards2_owner, cards2_at, CARDS_MOST_2);
+#else
     hand_cards(cards_owner, cards_at);                      // the cards (M1): into zeroed data that is cleared, before anything of a pack can run
+#endif
 
     // the loader's own folder first, then the tables: a pack other packs lean on after those that lean on it
     int own = add_folder(result);
@@ -1868,13 +1956,17 @@ void op1f_boot_apply() {
     u32 changes = 0, passed = 0, by_sum = 0;
     for (const BootPatch* e = own_table(0); e != own_table(1); ++e) ++changes;
     for (const BootPatch* e = text_table(0); e != text_table(1); ++e) ++changes;
-    op1f_base_check(own_table(0), own_table(1), BASE_START, PACK_BASE, &result);
+    op1f_base_check(own_table(0), own_table(1), BASE_START, LOADER_END, &result);
     passed += result.entries;
     by_sum += result.sums;
-    op1f_base_check(text_table(0), text_table(1), BASE_START, PACK_BASE, &result);
+    op1f_base_check(text_table(0), text_table(1), BASE_START, LOADER_END, &result);
     passed += result.entries;
     by_sum += result.sums;
+#if OP1F_LOADER_GENERATION == 2
+    STOCK_LOG(3, LOG_FILE, 1, "loader: N2 at the load point: control 0x%08x, packs are loaded from 0x%08x, room %u bytes; "
+#else
     STOCK_LOG(3, LOG_FILE, 1, "loader: M4 at the load point: control 0x%08x, packs are loaded from 0x%08x, room %u bytes; "
+#endif
               "%u of its own %u changes of stock pass their check, %u by a checksum",
               control_before, PACK_BASE, PACK_ROOM, passed, changes, by_sum);
 
@@ -1919,8 +2011,9 @@ void op1f_boot_apply() {
                 return;
             }
         }
+#if OP1F_LOADER_GENERATION == 1
         // A pack of the old kind, as J5b runs it: the first file that loads and whose table can be applied whole.
-        // Nothing of stock is written before a table has passed.
+        // Nothing of stock is written before a table has passed. (Not in N2, which leaves such a file out in look.)
         const PackHeader* h = &load.header;
         for (u32 i = 0; i < pack_count; ++i) {
             if (packs[i].state != P_OLD) continue;
@@ -1983,6 +2076,7 @@ void op1f_boot_apply() {
             add_screen_text(&result);
             return;
         }
+#endif
     }
 
     // No pack, or the help key held: the unit runs as stock. The loader's own two changes give the disk mode the

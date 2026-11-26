@@ -113,7 +113,17 @@ u32 op1f_options_add_room[4];
 #define RD32(a) (*(volatile u32*)(a))
 #define WR32(a, v) (*(volatile u32*)(a) = (u32)(v))
 
-enum { MOST = OP1F_CARDS_MOST, OPTIONS = OP1F_OPTIONS_MOST, TEXT_MOST = 4096, LINES = 7, LINE_ROOM = 32, SHOWN_MOST = 15,
+// R20 (base 42): the cards unit's second list and two of its names (module/build_r3_base.h, which this unit's card
+// header does not take): the same declarations.
+#ifndef OP1F_BUILD_R3_BASE_H
+enum { OP1F_SLOTS_MOST = 128 };
+struct Op1fCards2 { unsigned count, more; Op1fCardSlot slots[OP1F_SLOTS_MOST]; };
+extern "C" Op1fCards2 op1f_cards_2 OP1F_NAMED("op1f_cards_2");
+extern "C" void op1f_cards_lists() OP1F_NAMED("op1f_cards_lists");
+extern "C" int op1f_cards_in_use(unsigned slot) OP1F_NAMED("op1f_cards_in_use");
+#endif
+
+enum { MOST = OP1F_SLOTS_MOST, OPTIONS = OP1F_OPTIONS_MOST, TEXT_MOST = 4096, LINES = 7, LINE_ROOM = 32, SHOWN_MOST = 15,
        KNOB_OCHRE = 1, KNOB_RED = 3, KEY_T1 = 6, LINE_SHIFT = 2, WRITE_AFTER_MS = 1500, VALUE_MOST = 255 };
 // The list row of KEYBOARD, SYSTEM and MIDI, and its line picker, a CtlKnob; the category screen.
 enum { ROW_PICKER = 0x04, ROW_COUNT = 0x2c, ROW_SCREEN = 0x30, KNOB_VALUE = 0x10, KNOB_TOP = 0x18,
@@ -127,8 +137,6 @@ static const char PATH[] = "user/pf/.options";
 static const char READ_MODE[] = "rb";
 static const char ROW_NAME[] = "packs";
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
-extern "C" u32 op1f_cards_used() OP1F_NAMED("op1f_cards_used");
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 extern "C" int op1f_folders_write_base(const char* path, const void* data, unsigned bytes) OP1F_NAMED("op1f_folders_write_base");
 
@@ -143,9 +151,9 @@ static struct State {
     const Op1fOptions* table[MOST];                     // each used card's ask, in order, or 0
     OpenPageFn open[MOST];
     u8 on_page[MOST];                                   // bit n: option n shows on its pack's page under PACKS
-    u8 listed[MOST];                                    // the packs under PACKS, in order
+    u8 listed[MOST];                                    // the packs under PACKS, in order (R20: slots 0 to 127, a byte holds them)
     u32 listed_count;
-    u8 cat_slot[CATEGORIES][ROOM_MOST], cat_option[CATEGORIES][ROOM_MOST];
+    u8 cat_slot[CATEGORIES][ROOM_MOST], cat_option[CATEGORIES][ROOM_MOST];   // R20: a slot of the 128 fits a byte
     u32 cat_count[CATEGORIES];
     // the display thread's
     u32 too_big, dirty, changed_ms, text_bytes;
@@ -209,7 +217,7 @@ static int pack_function(const Op1fCardSlot* slot, const void* f) {     // 0, or
 // first ask of this kind with a table of at least 708 bytes, 1 to 8 options each in order, `changed` and `open` the
 // pack's. Reads only: from any thread.
 static const Op1fOptions* table_of(u32 slot, const char** why, OpenPageFn* open) {
-    const Op1fCardSlot* place = &op1f_cards.slots[slot];
+    const Op1fCardSlot* place = &op1f_cards_2.slots[slot];
     const Op1fCard* card = place->card;
     if (card == 0 || card->bytes < (u32)OP1F_CARD_LEVEL_6_BYTES || card->level < 6u || card->asks == 0) return 0;
     for (u32 i = 0; i < card->ask_count && i < (u32)OP1F_ASKS_MOST; ++i) {
@@ -231,13 +239,14 @@ static const Op1fOptions* table_of(u32 slot, const char** why, OpenPageFn* open)
 }
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)MOST ? (u32)MOST : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)MOST ? (u32)MOST : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return (int)i;
+        if (op1f_cards_2.slots[i].card == card) return (int)i;
     return -1;
 }
 
-static int used(u32 slot) { return (int)((op1f_cards_used() >> slot) & 1u); }
+static int used(u32 slot) { return op1f_cards_in_use(slot); }   // R20: any of the 128
 
 extern "C" int op1f_option(const Op1fCard* card, unsigned option) {
     int slot = card ? slot_of(card) : -1;
@@ -361,7 +370,7 @@ static void place() {
             s.on_page[slot] = (u8)(s.on_page[slot] | (1u << n));
         }
         if (sent)
-            STOCK_LOG(2, LOG_FILE, 6, "options: '%s': %u option(s) on its page under PACKS, full:%s%s%s", op1f_cards.slots[slot].card->name, sent,
+            STOCK_LOG(2, LOG_FILE, 6, "options: '%s': %u option(s) on its page under PACKS, full:%s%s%s", op1f_cards_2.slots[slot].card->name, sent,
                       (full >> IN_KEYBOARD) & 1u ? " keyboard" : "", (full >> IN_SYSTEM) & 1u ? " system" : "", (full >> IN_MIDI) & 1u ? " midi" : "");
         if (s.open[slot] || s.on_page[slot]) s.listed[s.listed_count++] = (u8)slot;
     }
@@ -385,13 +394,13 @@ static void read_file() {
         const char* why = 0;
         OpenPageFn open = 0;
         const Op1fOptions* o = used(slot) ? table_of(slot, &why, &open) : 0;
-        if (why) STOCK_LOG(1, LOG_FILE, 7, "options: '%s' asks for options not in order (%s): left aside", op1f_cards.slots[slot].card->name, why);
+        if (why) STOCK_LOG(1, LOG_FILE, 7, "options: '%s' asks for options not in order (%s): left aside", op1f_cards_2.slots[slot].card->name, why);
         if (o == 0) continue;
         s.table[slot] = o;
         s.open[slot] = open;
         ++packs;
         for (u32 n = 0; n < o->count; ++n) {
-            int v = kept(op1f_cards.slots[slot].card->name, o->options[n].name);
+            int v = kept(op1f_cards_2.slots[slot].card->name, o->options[n].name);
             if (v >= 0 && (u32)v <= top_of(&o->options[n])) ++found;
             value[slot][n] = (u8)(v >= 0 && (u32)v <= top_of(&o->options[n]) ? (u32)v : (u32)o->options[n].first);
         }
@@ -415,7 +424,7 @@ static u32 put(char* out, u32 at, const char* t, u32* over) {
 
 static int here(const char* pack, u32 n) {                     // a pack of that name (its first n bytes) has options now
     for (u32 slot = 0; slot < (u32)MOST; ++slot)
-        if (s.table[slot] && used(slot) && same_to(pack, op1f_cards.slots[slot].card->name, n)) return 1;
+        if (s.table[slot] && used(slot) && same_to(pack, op1f_cards_2.slots[slot].card->name, n)) return 1;
     return 0;
 }
 
@@ -435,7 +444,7 @@ static void write_file() {
             u32 d = number_text(digits, (int)value[slot][n]);
             digits[d] = '\n';
             digits[d + 1] = 0;
-            at = put(out, at, op1f_cards.slots[slot].card->name, &over);
+            at = put(out, at, op1f_cards_2.slots[slot].card->name, &over);
             at = put(out, at, "/", &over);
             at = put(out, at, o->options[n].name, &over);
             at = put(out, at, "=", &over);
@@ -546,7 +555,7 @@ extern "C" void op1f_options_frame() {
         u32 slot = s.open_asked - 1u;
         s.open_asked = 0;
         if (s.open[slot] && used(slot)) {
-            STOCK_LOG(3, LOG_FILE, 3, "options: '%s' opens its page", op1f_cards.slots[slot].card->name);
+            STOCK_LOG(3, LOG_FILE, 3, "options: '%s' opens its page", op1f_cards_2.slots[slot].card->name);
             s.open[slot]();
         }
     }
@@ -590,7 +599,7 @@ static void packs_draw(void* screen, void* context) {
         first = window(&s.list_first, line, count);
         for (u32 i = 0; i < (u32)LINES && first + i < count; ++i) {
             char name[LINE_ROOM];
-            shown(name, op1f_cards.slots[s.listed[first + i]].card->name, SHOWN_MOST);
+            shown(name, op1f_cards_2.slots[s.listed[first + i]].card->name, SHOWN_MOST);
             STOCK_LINE_NAME(screen, i, name);
             STOCK_LINE_VALUE(screen, i, "");
         }

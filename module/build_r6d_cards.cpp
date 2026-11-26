@@ -464,9 +464,9 @@
 //   the directory's two texts end inside their room and no picture is larger than the picture loader's largest, a
 //   megabyte. A card that fails is not used, and one line says which pack's and why. What a card says of its level
 //   is printed and not judged: a pack that uses a later level names that level's mark, which this base does not
-//   offer, and the loader leaves such a pack out before its card comes here. The list holds thirty-two cards, as
-//   many as the loader takes pack files: a count above that is read as thirty-two, and the first line counts the
-//   rest with the cards the loader says it found no slot for. The first use is the first picture stock asks for
+//   offer, and the loader leaves such a pack out before its card comes here. The list served (R20, base 42: the
+//   second, op1f_cards_2) holds 128 cards: a count above that is read as 128, and the first line counts the rest with
+//   the cards the loader says it found no slot for; under N1 the second holds the first's thirty-two. The first use is the first picture stock asks for
 //   while it makes its screens, on the main thread, before the first frame. What the check finds is written before
 //   the word that says it was made, and the source forces that order (a barrier the compiler moves nothing across),
 //   so a second caller, and the threads that hand keys in, read either nothing or all of it.
@@ -601,7 +601,7 @@ enum { CARD_3_BYTES = OP1F_CARD_LEVEL_3_BYTES, FOLDER_BYTES = 36, FOLDERS_MOST =
 enum { CALLING_REACH = 8192 };                         // M3: how far below the frame call's stack a call from inside a frame function may stand (a task's stack is 32 KB)
 enum { FIRST_SCREEN = 1, LAST_SCREEN = 85, SCREEN_DOCUMENT = 1, NODE_DISPLAY = 0x5c, PAGE_SCREEN = 77, SCREEN_WORDS = 16 };
 enum { PERIOD_FRAMES = 256, CYCLES_PER_MS = 400000, SLOW_US = 1000 };
-enum { CARD_BYTES = OP1F_CARD_LEVEL_1_BYTES, CARD_2_BYTES = OP1F_CARD_LEVEL_2_BYTES, CARD_NAME = 16, MOST = OP1F_CARDS_MOST };
+enum { CARD_BYTES = OP1F_CARD_LEVEL_1_BYTES, CARD_2_BYTES = OP1F_CARD_LEVEL_2_BYTES, CARD_NAME = 16, MOST = OP1F_SLOTS_MOST };   // R20 (base 42): a table a slot of op1f_cards_2
 enum { ART_MAGIC = 0x31545241, ART_NAME = 24, ART_PACK = 16, ART_PATH = 48, ART_HEAD_BYTES = 80, ART_ENTRY_BYTES = 36, ART_MOST = 0xffff, NAMES_SAID = 16 };
 enum { ART_LARGEST = 1 << 20 };                         // the picture loader's largest picture (M3's picture loader, LARGEST)
 enum { NAME_KEPT = ART_NAME - 1 };                      // a name said is remembered by its first 23 characters
@@ -667,6 +667,15 @@ struct Measure {
 // The list the loader fills. Zeroed data: the loader clears it with the rest of the pack's and then writes it.
 extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
 Op1fCards op1f_cards;
+
+// R18 (base 40): the second list, of 128 slots, which the loader N2 fills beside the first (the first then holds the
+// first thirty-two and counts the rest as more). Zeroed data, on a word, as the first. The public headers keep the
+// first's thirty-two. R20 (base 42): its shape is the base's (module/build_r3_base.h), and the base serves from it
+// alone, every slot: under N1 op1f_cards_lists fills it from the first, which stays as the loader wrote it.
+static_assert(sizeof(Op1fCards2) == 8 + 12 * OP1F_SLOTS_MOST && sizeof(Op1fCards2) == 1544, "the second list of cards is 1,544 bytes");
+Op1fCards2 op1f_cards_2;
+// R18: the loader's word (module/build_r18_loader_2.s): the address of N2's mark, 0 under a loader that has none (N1).
+extern "C" const u32* const r18_loader_2_record OP1F_NAMED("r18_loader_2_record");
 
 // The marks of a base that reads cards (level 1) and lends a page with keys and knobs (level 2). A pack with a card
 // needs the mark of its card's level; no base of before M1 offers the first, none of before M2 the second.
@@ -767,7 +776,7 @@ enum { OP1F_ASK_LFO = 11, OP1F_LFO_DRUM = 1, OP1F_LFOS_MOST = 8 };
 enum { LFO_BYTES = 28, STAND_LFO = 3, LFO_KINDS = 6 };
 enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2, BY_DRUM = 3 };
 
-// R18 (base 40): the drum engine's page. One ask of kind OP1F_ASK_DRUM_ENGINE (module/build_r6e_card.h), on a card of
+// R21 (base 43): the drum engine's page. One ask of kind OP1F_ASK_DRUM_ENGINE (module/build_r6e_card.h), on a card of
 // level 8 or later: an engine the drum unit (module/build_r18_drum.cpp) adds to the drum's engine list, riding the drum
 // sampler, whose page stands in for the engine page (T1) of the drum while the sound the owner sees there rides it. The
 // first card in the list's order (the packs' file names) holds it; any other's ask is left aside with line 51. Its page
@@ -779,12 +788,12 @@ enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2, BY_DRUM = 3 };
 enum { OP1F_ASK_DRUM_ENGINE = 12 };
 #endif
 enum { DRUM_SAMPLER = 9, DRUM_MODE = 1 };
-static const u32 DRUM_GUI_SLOT = 0x11904708u;           // R18: the drum slot the owner sees
-typedef u32 (*DrumScreenFn)(u32 type);                  // R18: 0x8fc2757c: the drum's screen of an engine type (T1)
+static const u32 DRUM_GUI_SLOT = 0x11904708u;           // R21: the drum slot the owner sees
+typedef u32 (*DrumScreenFn)(u32 type);                  // R21: 0x8fc2757c: the drum's screen of an engine type (T1)
 #ifndef OP1F_HOST
 #define STOCK_DRUM_SCREEN ((DrumScreenFn)0x8fc2757cu)
 #endif
-// R18: the drum unit's two names (module/build_r18_drum.cpp), weak: away, no drum sound rides a pack's engine.
+// R21: the drum unit's two names (module/build_r18_drum.cpp), weak: away, no drum sound rides a pack's engine.
 #if defined(OP1F_HOST)
 static int (*const r18_none_drum_rides)(unsigned drum, unsigned slot, unsigned ask) = 0;
 #define op1f_drum_rides (*r18_none_drum_rides)
@@ -1045,7 +1054,7 @@ static struct {
     u32 mode;                                           // the mode the shown page and the pages under it stand in
     void* shown_document;                               // the document of the page shown, and how it was asked
     u32 shown_how;
-    volatile u32 closing;                               // a bit a slot: its pack closed its page since the last frame
+    Op1fSlotSet closing;                                // a bit a slot: its pack closed its page since the last frame (R20: set and taken masked only)
     void* blank;                                        // the base's blank page, once made
     u32 blank_tried;                                    // it was asked for: made, or said once that it could not be
     u32 covered, uncovered, dropped;                    // since the start
@@ -1066,7 +1075,7 @@ static struct {
 static struct {
     u32 checked, said;                                 // the cards were looked at; the check's lines were printed
     u32 seen, in_use, more;                            // slots read; cards in use; cards that found no slot
-    u32 used, framed;                                  // a bit a slot: its card is in use; and has a frame function
+    Op1fSlotSet used, framed;                          // a bit a slot: its card is in use; and has a frame function (R20: 128 slots)
     u32 started;                                       // the first frame has come
     u32 last_cycles, cycle_acc, ms;                    // the clock
     int countdown;                                     // frames until the period ends
@@ -1083,7 +1092,7 @@ static struct {
     u32 last_screen;                                   // the screen shown at the last frame, for the line when it changes
     u32 seen_down, seen_up, seen_turns, seen_taken;    // the input's totals at the last period
     u32 seen_took[MOST];
-    u32 inputs;                                        // a bit a slot: its card is in use and has an input function (behind M1's fields, which keep their places)
+    Op1fSlotSet inputs;                                // a bit a slot: its card is in use and has an input function (behind M1's fields, which keep their places)
     u32 calling;                                       // M3: the slot + 1 whose frame function is being called now, 0 between them (the display thread's; stored before and after an outside call, which the compiler keeps)
     u32 calling_sp;                                    // M3: where the display thread's stack stood at that call
     u32 settled;                                       // M3: the folders unit was asked to settle the folders
@@ -1093,7 +1102,7 @@ static struct {
 // on the thread that hands the down in and taken by the one that hands the up in, each with interrupts masked. The
 // counts are for the log, as the input's.
 static struct {
-    volatile u32 keys[HELD_KEYS];
+    Op1fSlotSet keys[HELD_KEYS];                        // R20 (base 42): set and taken masked only
     volatile u32 down[MOST], up[MOST];                  // downs watched, ups told, since the start
     u32 seen[MOST];                                     // the display thread's: down + up at the last period
 } watch;
@@ -1329,10 +1338,11 @@ static OP1F_APART const char* verdict(const Op1fCardSlot* slot, u32* a, u32* b) 
 // R3: the check's verdict on one slot of the list: 0 when the base uses its card, 1 when it does not (no card there,
 // or a card not in order). It reads and writes nothing else and says no line: from any thread.
 extern "C" int op1f_cards_verdict(unsigned slot) {
-    u32 count = op1f_cards.count, a = 0, b = 0;
+    op1f_cards_lists();                                                             // R20 (base 42): before the second list is read
+    u32 count = op1f_cards_2.count, a = 0, b = 0;
     u32 seen = count > (u32)MOST ? (u32)MOST : count;
     if (slot >= seen) return 1;
-    return verdict(&op1f_cards.slots[slot], &a, &b) != 0 ? 1 : 0;
+    return verdict(&op1f_cards_2.slots[slot], &a, &b) != 0 ? 1 : 0;
 }
 
 static u32 pictures_of(const Op1fCard* card) {
@@ -1381,7 +1391,7 @@ static OP1F_APART int lfo_named(const Op1fCard* card, u32 good, const char* name
 static OP1F_APART int lfo_taken(u32 slot, const char* name) {
     for (u32 s = 0; s <= slot; ++s) {
         u32 good = lfos.good[s];
-        if (((state.used >> s) & 1u) != 0 && good != 0 && lfo_named(op1f_cards.slots[s].card, good, name)) return 1;
+        if (op1f_slot_test(&state.used, s) && good != 0 && lfo_named(op1f_cards_2.slots[s].card, good, name)) return 1;
     }
     return 0;
 }
@@ -1392,7 +1402,7 @@ static OP1F_APART int lfo_taken(u32 slot, const char* name) {
 // LFO layer's taken before it; no flag but OP1F_LFO_DRUM; its `shown` 0 or a function of its pack on an even address; and
 // no more than OP1F_LFOS_MOST in all.
 static OP1F_APART const char* lfo_verdict(u32 slot, const Op1fAsk* ask) {
-    const Op1fCardSlot* in = &op1f_cards.slots[slot];
+    const Op1fCardSlot* in = &op1f_cards_2.slots[slot];
     const Op1fKindHead* head = (const Op1fKindHead*)ask->what;
     if (head == 0 || ask->bytes < (u32)LFO_BYTES || head->bytes != ask->bytes) return "its table is not in order";
     u32 n = 0;
@@ -1425,7 +1435,7 @@ static OP1F_APART void lfo_look(const Op1fCard* card, u32 ask) {
     STOCK_LOG(2, LOG_FILE, 49, "cards: '%s' asks for an LFO layer (its ask %u) that is left aside: %s", card->name, ask, why);
 }
 
-// R18 (base 40): an ask of kind OP1F_ASK_DRUM_ENGINE, from the line of the kinds this base knows: held by the first card
+// R21 (base 43): an ask of kind OP1F_ASK_DRUM_ENGINE, from the line of the kinds this base knows: held by the first card
 // whose ask has a head's table, or left aside with line 51.
 static OP1F_APART void drum_look(const Op1fCard* card, u32 ask) {
     int slot = slot_of(card);
@@ -1437,7 +1447,7 @@ static OP1F_APART void drum_look(const Op1fCard* card, u32 ask) {
     }
     if (drumpage.slot1 != 0) {
         STOCK_LOG(2, LOG_FILE, 51, "cards: '%s' asks for a drum engine (its ask %u) that is left aside: '%s' holds it", card->name, ask,
-                  op1f_cards.slots[drumpage.slot1 - 1u].card->name);
+                  op1f_cards_2.slots[drumpage.slot1 - 1u].card->name);
         return;
     }
     drumpage.slot1 = (u32)slot + 1u;
@@ -1458,7 +1468,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (six && kind == (u32)OP1F_ASK_OPTIONS) continue;                         // R8 (base 32): the options unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
-        if (kind == (u32)OP1F_ASK_DRUM_ENGINE && level_8(card)) {                  // R18 (base 40): the drum engine, the first card's
+        if (kind == (u32)OP1F_ASK_DRUM_ENGINE && level_8(card)) {                  // R21 (base 43): the drum engine, the first card's
             drum_look(card, i);
             continue;
         }
@@ -1479,15 +1489,16 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
 // order.
 static OP1F_APART void check() {
     u32 count = op1f_cards.count;
-    u32 seen = count > (u32)MOST ? (u32)MOST : count;                               // the list holds thirty-two: a count above that names slots that are not there
-    u32 more = op1f_cards.more + (count - seen);
-    u32 used = 0, framed = 0, inputs = 0, in_use = 0, a = 0, b = 0;
+    u32 seen = count > (u32)MOST ? (u32)MOST : count;                               // the list holds 128 (R20): a count above that names slots that are not there
+    u32 more = op1f_cards_2.more + (count - seen);
+    u32 in_use = 0, a = 0, b = 0;
+    Op1fSlotSet used = {{0, 0, 0, 0}}, framed = {{0, 0, 0, 0}}, inputs = {{0, 0, 0, 0}};
     for (u32 i = 0; i < seen; ++i) {
-        if (verdict(&op1f_cards.slots[i], &a, &b) != 0) continue;
-        used |= 1u << i;
+        if (verdict(&op1f_cards_2.slots[i], &a, &b) != 0) continue;
+        op1f_slot_set(&used, i);
         ++in_use;
-        if (op1f_cards.slots[i].card->frame != 0) framed |= 1u << i;
-        if (input_of(op1f_cards.slots[i].card) != 0) inputs |= 1u << i;
+        if (op1f_cards_2.slots[i].card->frame != 0) op1f_slot_set(&framed, i);
+        if (input_of(op1f_cards_2.slots[i].card) != 0) op1f_slot_set(&inputs, i);
     }
     state.seen = seen;
     state.more = more;
@@ -1502,7 +1513,7 @@ static OP1F_APART void check() {
     state.said = 1;
     STOCK_LOG(3, LOG_FILE, 1, "cards: %u card(s) from the loader, %u in use, %u not used, %u more than the list holds", seen, in_use, seen - in_use, more);
     for (u32 i = 0; i < seen; ++i) {
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const char* why = verdict(slot, &a, &b);
         if (why != 0) {
             STOCK_LOG(1, LOG_FILE, 2, "cards: the card of the pack at 0x%08x is not used: %s (%u, %u)", slot->first, why, a, b);
@@ -1515,8 +1526,51 @@ static OP1F_APART void check() {
     }
 }
 
+// R20 (base 42): the base serves its cards from the second list alone, every one of its 128 slots. Under N2 (the
+// loader's word not 0) the loader filled it; under N1 the first list's count, `more` and slots (the first
+// thirty-two at most, the rest counted as more, as the check of base 41 read them) are copied into it, once, in one
+// masked instant, by whichever reader comes first: every name of this unit's that reads it calls this first, and so
+// does every other unit before its first read. The first list stays as the loader wrote it. Judged by the word, never
+// by a count: an N2 start with no card leaves 0 too. From any thread; no line.
+static volatile u32 lists_ready;
+extern "C" void op1f_cards_lists() {
+    if (lists_ready != 0) {
+        BARRIER();                                                                  // no read of the list above the word, even inlined
+        return;
+    }
+    u32 mask;
+    MASK_OFF(mask);
+    if (lists_ready == 0) {
+        if (r18_loader_2_record == 0) {
+            u32 count = op1f_cards.count;
+            u32 seen = count > (u32)OP1F_CARDS_MOST ? (u32)OP1F_CARDS_MOST : count;
+            for (u32 i = 0; i < seen; ++i) op1f_cards_2.slots[i] = op1f_cards.slots[i];
+            op1f_cards_2.more = op1f_cards.more + (count - seen);
+            op1f_cards_2.count = seen;
+        }
+        BARRIER();                                                                  // the list whole before the word that says so
+        lists_ready = 1;
+    }
+    MASK_ON(mask);
+}
+
+// R18 (base 40), R20 (base 42): line 51, once, before the check's lines, under N2 alone: what the second list holds.
+static u32 second_taken;
+static OP1F_APART void second_list() {
+    op1f_cards_lists();
+    if (r18_loader_2_record == 0 || second_taken != 0) return;
+    u32 count = op1f_cards.count;
+    u32 seen = count > (u32)MOST ? (u32)MOST : count;
+    second_taken = 1;
+    STOCK_LOG(3, LOG_FILE, 51, "cards: served from the loader's second list: %u card(s) in it, %u served, %u more than it holds", count, seen,
+              op1f_cards_2.more + (count - seen));
+}
+
 static inline void ready() {
-    if (!state.checked) check();
+    if (!state.checked) {
+        second_list();                                                              // R18 (base 40)
+        check();
+    }
 }
 
 // Has the check been made? For the threads that hand keys in, which never make it (it writes lines): past this,
@@ -1533,7 +1587,7 @@ static inline int checked() {
 static int slot_of(const Op1fCard* card) {
     if (card == 0 || !checked()) return -1;
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.used >> i) & 1u) != 0 && op1f_cards.slots[i].card == card) return (int)i;
+        if (op1f_slot_test(&state.used, i) && op1f_cards_2.slots[i].card == card) return (int)i;
     }
     return -1;
 }
@@ -1576,7 +1630,7 @@ extern "C" int op1f_cards_document(const void* document) OP1F_NAMED("op1f_cards_
 extern "C" int op1f_cards_document(const void* document) {
     if (document == 0 || !checked()) return -1;
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.used >> i) & 1u) != 0 && made_by(i, document)) return (int)i;
+        if (op1f_slot_test(&state.used, i) && made_by(i, document)) return (int)i;
     }
     return -1;
 }
@@ -1585,7 +1639,12 @@ extern "C" int op1f_cards_document(const void* document) {
 // use, or -1; the slot + 1 whose frame function the base is calling now, 0 between the calls.
 extern "C" u32 op1f_cards_used() OP1F_NAMED("op1f_cards_used");
 extern "C" u32 op1f_cards_used() {
-    return checked() ? state.used : 0u;
+    return checked() ? state.used.w[0] : 0u;                                        // R20 (base 42): the first thirty-two slots
+}
+
+// R20 (base 42): whether the card of a slot, any of the 128, is in use (module/build_r3_base.h).
+extern "C" int op1f_cards_in_use(unsigned slot) {
+    return checked() && op1f_slot_test(&state.used, slot) ? 1 : 0;
 }
 
 extern "C" int op1f_cards_slot(const Op1fCard* card) OP1F_NAMED("op1f_cards_slot");
@@ -1887,7 +1946,7 @@ extern "C" void op1f_page_close(const Op1fCard* card) {
     u32 mask;
     MASK_OFF(mask);                                                                 // looked at and cleared with nothing between
     if ((page_asked & 0xffu) == (u32)(slot + 1)) page_asked = 0;
-    pages.closing |= 1u << slot;                                                    // R1: out from under another page too
+    op1f_slot_set(&pages.closing, (u32)slot);                                       // R1: out from under another page too
     if (away.slot1 == (u32)slot + 1u) op1f_page_aside_mode = 0;                     // R4c: its page set aside, the word cleared at once
     if (stand.on != (u32)STAND_TOP) {                                               // R3: a stand-in shown is the base's: the card's close leaves it
         if (page_asked == 0 && state.shown == (u32)slot + 1u && pages.count == 0 && !top.wanted && !top.shown)
@@ -1898,7 +1957,7 @@ extern "C" void op1f_page_close(const Op1fCard* card) {
 
 // A page closed, said by its pack's name.
 static OP1F_APART void said_closed(u32 slot, u32 why) {
-    STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards.slots[slot].card->name, closed_why(why), state.opened);
+    STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards_2.slots[slot].card->name, closed_why(why), state.opened);
 }
 
 // The page kept at `at` under the shown one taken out; those above it move down. Out of line, as the loops of the
@@ -1925,7 +1984,7 @@ static inline u32 pair_of(u32 mode) {
 // R11 (base 35): an LFO layer's its own too (entry 3).
 static inline u32 pair_for(u32 mode, u32 engine) {
     if (engine == (u32)BY_LFOS) return (u32)STAND_LFO;                              // R11 (base 35)
-    if (engine == (u32)BY_DRUM) return (u32)OP1F_STAND_ENGINE;                      // R18 (base 40): the drum's, in the drum's mode
+    if (engine == (u32)BY_DRUM) return (u32)OP1F_STAND_ENGINE;                      // R21 (base 43): the drum's, in the drum's mode
     return engine ? (u32)OP1F_STAND_ENGINE : pair_of(mode);
 }
 
@@ -1985,7 +2044,7 @@ static OP1F_APART void stand_said_gone(u32 why) {
     }
     if (stand.said_off >= (u32)STAND_SAID) return;
     ++stand.said_off;
-    STOCK_LOG(3, LOG_FILE, 24, "page: '%s' no longer stands in: %s", op1f_cards.slots[stand.slot].card->name, gone_why(why, effect));
+    STOCK_LOG(3, LOG_FILE, 24, "page: '%s' no longer stands in: %s", op1f_cards_2.slots[stand.slot].card->name, gone_why(why, effect));
 }
 
 // The card's page taken out from under the shown one, where it lies there.
@@ -2013,12 +2072,13 @@ static OP1F_APART void under_ready() {
 // The pages kept under the shown one closed: all of them for `all` (CLOSED_BY_MODE), else those
 // whose packs closed them since the last frame (a bit a slot in `closing`). One line each, the lowest first.
 // R3: the stand-in, lowest, is closed here only with all of them: its card's close is not its own.
-static OP1F_APART void under_closed(u32 closing, u32 all) {
+static const Op1fSlotSet NO_SLOTS = {{0, 0, 0, 0}};                              // R20 (base 42): with `all` the set is not read
+static OP1F_APART void under_closed(const Op1fSlotSet* closing, u32 all) {
     u32 i = 0;
     while (i < pages.count) {
         u32 slot = pages.slot[i];
         u32 standing = i == 0 && stand.on == (u32)STAND_UNDER ? 1u : 0u;
-        if (all == 0 && (standing || ((closing >> slot) & 1u) == 0)) {
+        if (all == 0 && (standing || !op1f_slot_test(closing, slot))) {
             ++i;
             continue;
         }
@@ -2042,7 +2102,7 @@ static OP1F_APART void drop_lowest(u32 mode) {
     take_out(at);
     ++pages.dropped;
     ++state.closes;
-    STOCK_LOG(3, LOG_FILE, 18, "page: '%s' dropped from under the pages of mode %u: more than %u lie over one another", op1f_cards.slots[lowest].card->name, mode,
+    STOCK_LOG(3, LOG_FILE, 18, "page: '%s' dropped from under the pages of mode %u: more than %u lie over one another", op1f_cards_2.slots[lowest].card->name, mode,
               (u32)UNDER_MOST);
 }
 
@@ -2057,8 +2117,8 @@ static OP1F_APART void cover(u32 mode, u32 over) {
     pages.count = n + 1u;
     if (stand.on == (u32)STAND_TOP) stand.on = STAND_UNDER;                         // R3: nothing lay under it: it is pages.slot[0]
     ++pages.covered;
-    STOCK_LOG(3, LOG_FILE, 16, "page: '%s' covered by '%s' in mode %u: it shows again when that page closes", op1f_cards.slots[slot].card->name,
-              op1f_cards.slots[over - 1u].card->name, mode);
+    STOCK_LOG(3, LOG_FILE, 16, "page: '%s' covered by '%s' in mode %u: it shows again when that page closes", op1f_cards_2.slots[slot].card->name,
+              op1f_cards_2.slots[over - 1u].card->name, mode);
 }
 
 // The page on top closed by its pack, with pages kept under it: the highest of them shows again in its place at this
@@ -2092,7 +2152,7 @@ static OP1F_APART int uncover(u32 mode) {
     ++state.closes;
     ++pages.uncovered;
     said_closed(was - 1u, CLOSED_BY_PACK);
-    STOCK_LOG(3, LOG_FILE, 17, "page: '%s' shown again in mode %u, its document at 0x%08x under screen %u", op1f_cards.slots[slot].card->name, mode, (u32)document,
+    STOCK_LOG(3, LOG_FILE, 17, "page: '%s' shown again in mode %u, its document at 0x%08x under screen %u", op1f_cards_2.slots[slot].card->name, mode, (u32)document,
               (u32)PAGE_SCREEN);
     return 1;
 }
@@ -2158,7 +2218,7 @@ static OP1F_APART int stay_look(u32 asked, u32 mode) {
     if ((asked >> 8) == mode) {
         if (was == slot1 && op1f_page_screen_mode == mode + 1u) {
             ++stay.back;
-            STOCK_LOG(3, LOG_FILE, 30, "page: '%s' shown again in mode %u, as it stayed; %u time(s) since the start", op1f_cards.slots[slot1 - 1u].card->name, mode,
+            STOCK_LOG(3, LOG_FILE, 30, "page: '%s' shown again in mode %u, as it stayed; %u time(s) since the start", op1f_cards_2.slots[slot1 - 1u].card->name, mode,
                       stay.back);
         }
         return 0;
@@ -2171,7 +2231,7 @@ static OP1F_APART int stay_look(u32 asked, u32 mode) {
     if (was == slot1) return 1;
     ++stay.kept;
     STOCK_LOG(3, LOG_FILE, 29, "page: '%s' stays with mode %u while the unit is in mode %u: shown again when the unit comes back; %u time(s) since the start",
-              op1f_cards.slots[slot1 - 1u].card->name, asked >> 8, mode, stay.kept);
+              op1f_cards_2.slots[slot1 - 1u].card->name, asked >> 8, mode, stay.kept);
     return 1;
 }
 
@@ -2213,7 +2273,7 @@ static OP1F_APART void away_store(const Away* y, u32 mode) {
     away_word(y->slot1, y->mode + 1u);
     ++away_set;
     STOCK_LOG(3, LOG_FILE, 34, "page: '%s' set aside while another page takes the screen in mode %u: it waits for mode %u again when that page goes; %u time(s) since the start",
-              op1f_cards.slots[y->slot1 - 1u].card->name, mode, y->mode, away_set);
+              op1f_cards_2.slots[y->slot1 - 1u].card->name, mode, y->mode, away_set);
 }
 
 // The page shown, which waits for its mode, as it would be kept aside.
@@ -2279,7 +2339,7 @@ static OP1F_APART void away_put(const Away* x, u32 mode) {
     stay.instrument = x->instrument;
     BARRIER();                                                                      // the document is in place before our call answers 77 by this word
     op1f_page_screen_mode = x->mode + 1u;
-    const char* name = op1f_cards.slots[x->slot1 - 1u].card->name;
+    const char* name = op1f_cards_2.slots[x->slot1 - 1u].card->name;
     if (x->mode == mode) {
         stay.waiting = 0;
         ++stay.back;
@@ -2347,13 +2407,14 @@ static OP1F_APART void away_first(u32 frame, u32 mode) {
 // dropped for its mode in its place, and the instrument changed close it with their own reasons.
 static OP1F_APART void page_frame(u32 frame, u32 mode) {
     if (top.shown) return;                                                          // S1: a pack's page waits under the base's top page
-    u32 mask, closing;
+    u32 mask;
+    Op1fSlotSet closing;
     MASK_OFF(mask);                                                                 // R1: the closes since the last frame, taken
     closing = pages.closing;
-    pages.closing = 0;
+    op1f_slot_none(&pages.closing);
     MASK_ON(mask);
-    if (pages.count != 0) under_closed(closing, pages.mode != mode ? (u32)CLOSED_BY_MODE : 0u);   // R1: pages kept in another mode, or closed by their packs
-    if (away.slot1 != 0 && ((closing >> (away.slot1 - 1u)) & 1u) != 0) away_close(CLOSED_BY_PACK, mode);   // R4c: the page set aside closed by its pack
+    if (pages.count != 0) under_closed(&closing, pages.mode != mode ? (u32)CLOSED_BY_MODE : 0u);   // R1: pages kept in another mode, or closed by their packs
+    if (away.slot1 != 0 && op1f_slot_test(&closing, away.slot1 - 1u)) away_close(CLOSED_BY_PACK, mode);   // R4c: the page set aside closed by its pack
     u32 asked = page_asked;
     u32 want = 0, why = CLOSED_BY_PACK;
     void* document = 0;
@@ -2368,7 +2429,7 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
         if ((asked >> 8) != mode) {
             close_asked(asked);
             why = stay.lost ? (u32)CLOSED_BY_INSTRUMENT : taken ? (u32)CLOSED_BY_TAKEN : (u32)CLOSED_BY_MODE;   // R4b
-        } else if (slot < state.seen && ((state.used >> slot) & 1u) != 0) {
+        } else if (slot < state.seen && op1f_slot_test(&state.used, slot)) {
             document = asked_document(slot);                                        // R1: the blank page made here, once
             if (document == 0) {
                 ask_again_shown(asked);                                             // R1: no blank page: the request dropped, what was shown stays
@@ -2390,7 +2451,7 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
         pages.mode = mode;                                                          // R1
         stay_shown();                                                               // R4b
         request_screen();
-        STOCK_LOG(3, LOG_FILE, 7, "page: '%s' opened in mode %u, its document at 0x%08x under screen %u, %s", op1f_cards.slots[want - 1].card->name, mode,
+        STOCK_LOG(3, LOG_FILE, 7, "page: '%s' opened in mode %u, its document at 0x%08x under screen %u, %s", op1f_cards_2.slots[want - 1].card->name, mode,
                   (u32)document, (u32)PAGE_SCREEN, state.own_made ? "the base's own" : "another unit's");
         return;
     }
@@ -2402,7 +2463,7 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
         if (state.shown == 0) {
             state.screen = screen;
             state.kept = (void*)screen[SCREEN_DOCUMENT];
-        } else if (pages.shown_how != (u32)HOW_OPEN && pages.mode == mode && (stand.on == (u32)STAND_TOP || ((closing >> (state.shown - 1u)) & 1u) == 0)) {
+        } else if (pages.shown_how != (u32)HOW_OPEN && pages.mode == mode && (stand.on == (u32)STAND_TOP || !op1f_slot_test(&closing, state.shown - 1u))) {
             cover(mode, want);                                                      // R1: a page shown with op1f_page_show is kept under the one that comes over it
         } else if (stand.on == (u32)STAND_TOP) {
             if (fx.placed && fx.held != 0 && &op1f_effects_ahead != 0) under_ready();   // R6b: a ride's page: its entry held by its mode across the visit
@@ -2411,7 +2472,7 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
             away_keep(mode);                                                        // R4c: the page that waited is set aside, not closed
         } else {
             u32 how = pages.shown_how == (u32)HOW_OPEN ? (u32)CLOSED_BY_OTHER : pages.mode != mode ? (u32)CLOSED_BY_MODE : (u32)CLOSED_BY_PACK;
-            STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards.slots[state.shown - 1].card->name, closed_why(how), state.opened);
+            STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards_2.slots[state.shown - 1].card->name, closed_why(how), state.opened);
         }
         screen[SCREEN_DOCUMENT] = (u32)document;
         state.shown = want;
@@ -2423,13 +2484,13 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
         BARRIER();                                                                  // the document is in place before our call in the request answers 77
         op1f_page_screen_mode = mode + 1u;
         request_screen();
-        STOCK_LOG(3, LOG_FILE, 7, "page: '%s' opened in mode %u, its document at 0x%08x under screen %u, %s", op1f_cards.slots[want - 1].card->name, mode,
+        STOCK_LOG(3, LOG_FILE, 7, "page: '%s' opened in mode %u, its document at 0x%08x under screen %u, %s", op1f_cards_2.slots[want - 1].card->name, mode,
                   (u32)document, (u32)PAGE_SCREEN, state.own_made ? "the base's own" : "another unit's");
         return;
     }
     if (pages.count != 0) {                                                         // R1: the pages kept under the one that closes
         if (why == CLOSED_BY_PACK && uncover(mode)) return;
-        if (why != CLOSED_BY_PACK) under_closed(0, why);
+        if (why != CLOSED_BY_PACK) under_closed(&NO_SLOTS, why);
     }
     op1f_page_screen_mode = 0;                                                      // our call answers the firmware's screen again
     BARRIER();
@@ -2438,7 +2499,7 @@ static OP1F_APART void page_frame(u32 frame, u32 mode) {
     state.shown = 0;
     ++state.closes;
     request_screen();
-    STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards.slots[was - 1].card->name, closed_why(why), state.opened);
+    STOCK_LOG(3, LOG_FILE, 8, "page: '%s' closed: %s; %u opened since the start", op1f_cards_2.slots[was - 1].card->name, closed_why(why), state.opened);
 }
 
 // The slot + 1 whose page the GUI shows now, 0 for none.
@@ -2452,19 +2513,19 @@ static inline u32 page_on_screen(u32 screen) {
 // its list, of that kind, with a table at least a head's size (the check held it to lie in its pack with its bytes).
 // R5: or an effect's, of a card of level 8.
 static const Op1fKindHead* head_of(u32 slot, u32 ask) {
-    if (slot >= state.seen || ((state.used >> slot) & 1u) == 0) return 0;
+    if (slot >= state.seen || !op1f_slot_test(&state.used, slot)) return 0;
     u32 count = 0;
-    const Op1fAsk* asks = (const Op1fAsk*)asks_of(op1f_cards.slots[slot].card, &count);
-    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_EFFECT && level_8(op1f_cards.slots[slot].card) && asks[ask].what != 0 &&
+    const Op1fAsk* asks = (const Op1fAsk*)asks_of(op1f_cards_2.slots[slot].card, &count);
+    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_EFFECT && level_8(op1f_cards_2.slots[slot].card) && asks[ask].what != 0 &&
         asks[ask].bytes >= (u32)sizeof(Op1fKindHead))
         return (const Op1fKindHead*)asks[ask].what;                                 // R5
-    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_ENGINE && level_9(op1f_cards.slots[slot].card) && asks[ask].what != 0 &&
+    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_ENGINE && level_9(op1f_cards_2.slots[slot].card) && asks[ask].what != 0 &&
         asks[ask].bytes >= (u32)sizeof(Op1fKindHead))
         return (const Op1fKindHead*)asks[ask].what;                                 // R6
-    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_LFO && level_8(op1f_cards.slots[slot].card) && ((lfos.good[slot] >> ask) & 1u) != 0)
+    if (ask < count && asks[ask].kind == (u32)OP1F_ASK_LFO && level_8(op1f_cards_2.slots[slot].card) && ((lfos.good[slot] >> ask) & 1u) != 0)
         return (const Op1fKindHead*)asks[ask].what;                                 // R11 (base 35): an LFO layer's, held to its form
     if (drumpage.slot1 == slot + 1u && ask == drumpage.ask && ask < count)
-        return (const Op1fKindHead*)asks[ask].what;                                 // R18 (base 40): the drum engine's page, held
+        return (const Op1fKindHead*)asks[ask].what;                                 // R21 (base 43): the drum engine's page, held
     if (ask >= count || asks[ask].kind != (u32)OP1F_ASK_SEQUENCER || asks[ask].what == 0 || asks[ask].bytes < (u32)sizeof(Op1fKindHead)) return 0;
     return (const Op1fKindHead*)asks[ask].what;
 }
@@ -2521,7 +2582,7 @@ static OP1F_APART void stand_off_top() {
 
 // ---------------------------------------------------------------- R5: an effect's page standing in
 
-// R18 (base 40): does the drum engine's page stand in, while the drum's controller asked for the drum sampler's screen
+// R21 (base 43): does the drum engine's page stand in, while the drum's controller asked for the drum sampler's screen
 // (`asked` 1), or whatever screen it asked (`asked` 0)? In the drum's mode, the sound the owner sees there riding the
 // pack's drum engine (on the drum sampler, as the drum unit answers), a card holding the page. `where` is the drum's
 // place (OP1F_PLACE_DRUM + slot), `how` OP1F_SHOWN_UP.
@@ -2570,7 +2631,7 @@ static inline int lfo_ask(u32 slot, u32 ask) {
 // stand_frame, as an effect's is, with entry 3 for it.
 static OP1F_APART int lfo_standing(Op1fStanding* s) {
     u32 mode = 0, screen = 0;
-    if (&op1f_lfos_standing == 0 || !op1f_lfos_standing(s, &mode, &screen) || !lfo_ask(s->slot, s->ask)) return drum_standing(s);   // R18 (base 40)
+    if (&op1f_lfos_standing == 0 || !op1f_lfos_standing(s, &mode, &screen) || !lfo_ask(s->slot, s->ask)) return drum_standing(s);   // R21 (base 43)
     fx.asked_engine = BY_LFOS;
     fx.asked = 1;
     fx.asked_mode = mode;
@@ -2581,7 +2642,7 @@ static OP1F_APART int lfo_standing(Op1fStanding* s) {
 // R11 (base 35): else an LFO layer's page whatever screen is asked, as ahead_of asks the effects unit.
 static OP1F_APART int lfo_ahead(u32 mode, Op1fStanding* out, u32* screen) {
     u32 m = 0;
-    if (&op1f_lfos_ahead == 0 || !op1f_lfos_ahead(out, &m, screen) || !lfo_ask(out->slot, out->ask)) return drum_ahead(mode, out, screen);   // R18 (base 40)
+    if (&op1f_lfos_ahead == 0 || !op1f_lfos_ahead(out, &m, screen) || !lfo_ask(out->slot, out->ask)) return drum_ahead(mode, out, screen);   // R21 (base 43)
     fx.ahead_engine = BY_LFOS;
     return m == mode ? 1 : 0;
 }
@@ -2594,7 +2655,7 @@ static OP1F_APART int effect_standing(Op1fStanding* s) {
     fx.asked_engine = 0;                                                            // R6
     if (&op1f_effects_standing == 0 || !op1f_effects_standing(s, &mode, &screen)) {
         const char* name = 0;                                                       // R6: else an engine's page, of a card (an engine away has none)
-        if (&op1f_engines_standing == 0 || !op1f_engines_standing(s, &mode, &screen, &name) || s->slot >= (u32)OP1F_CARDS_MOST) return lfo_standing(s);   // R11 (base 35)
+        if (&op1f_engines_standing == 0 || !op1f_engines_standing(s, &mode, &screen, &name) || s->slot >= (u32)OP1F_SLOTS_MOST) return lfo_standing(s);   // R11 (base 35)
         fx.asked_engine = 1;
     }
     fx.asked = 1;
@@ -2620,7 +2681,7 @@ static OP1F_APART int ahead_of(u32 mode, Op1fStanding* out, u32* screen) {
             out->ask = 0;
             return m == mode ? 1 : 0;
         }
-        if (out->slot >= (u32)OP1F_CARDS_MOST) return 0;
+        if (out->slot >= (u32)OP1F_SLOTS_MOST) return 0;
         fx.ahead_engine = 1;
     }
     return m == mode && head_of(out->slot, out->ask) != 0 ? 1 : 0;
@@ -2678,13 +2739,13 @@ static const char PLACES_SAID[(u32)OP1F_PLACE_MASTER + 1u][12] = {"synth 1", "sy
                                                                   "drum 1", "drum 2", "drum 3", "drum 4", "drum 5", "drum 6", "drum 7", "drum 8", "the master"};
 
 static OP1F_APART void said_effect(u32 slot, u32 where, const void* document) {
-    STOCK_LOG(3, LOG_FILE, 39, "page: '%s' stands in for the effect's page of %s, its document at 0x%08x", op1f_cards.slots[slot].card->name,
+    STOCK_LOG(3, LOG_FILE, 39, "page: '%s' stands in for the effect's page of %s, its document at 0x%08x", op1f_cards_2.slots[slot].card->name,
               where <= (u32)OP1F_PLACE_MASTER ? PLACES_SAID[where] : "a place", (u32)document);
 }
 
 // R11 (base 35): an LFO layer's page placed, line 48.
 static OP1F_APART void said_lfo(u32 slot, u32 where, const void* document) {
-    STOCK_LOG(3, LOG_FILE, 48, "page: '%s' stands in for the LFO's page of %s, its document at 0x%08x", op1f_cards.slots[slot].card->name,
+    STOCK_LOG(3, LOG_FILE, 48, "page: '%s' stands in for the LFO's page of %s, its document at 0x%08x", op1f_cards_2.slots[slot].card->name,
               where < (u32)OP1F_PLACE_MASTER ? PLACES_SAID[where] : "a place", (u32)document);
 }
 
@@ -2827,8 +2888,8 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
     if (fx.asked) fx.ready = 0;                                                     // R5: an entry kept ready is the stand-in's now
     if (stand.said_up >= (u32)STAND_SAID) return;
     ++stand.said_up;
-    if (fx.placed && fx.placed_engine == (u32)BY_DRUM) {                            // R18 (base 40): the drum engine's page, line 52
-        STOCK_LOG(3, LOG_FILE, 52, "page: '%s' stands in for the drum engine's page of drum %u, its document at 0x%08x", op1f_cards.slots[s->slot].card->name,
+    if (fx.placed && fx.placed_engine == (u32)BY_DRUM) {                            // R21 (base 43): the drum engine's page, line 52
+        STOCK_LOG(3, LOG_FILE, 52, "page: '%s' stands in for the drum engine's page of drum %u, its document at 0x%08x", op1f_cards_2.slots[s->slot].card->name,
                   (s->where & 7u) + 1u, (u32)document);
         return;
     }
@@ -2837,7 +2898,7 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
         return;
     }
     if (fx.placed && fx.placed_engine) {                                            // R6
-        STOCK_LOG(3, LOG_FILE, 40, "page: '%s' stands in for the engine's page of synth %u, its document at 0x%08x", op1f_cards.slots[s->slot].card->name,
+        STOCK_LOG(3, LOG_FILE, 40, "page: '%s' stands in for the engine's page of synth %u, its document at 0x%08x", op1f_cards_2.slots[s->slot].card->name,
                   (s->where & 7u) + 1u, (u32)document);
         return;
     }
@@ -2845,7 +2906,7 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
         said_effect(s->slot, s->where, document);
         return;
     }
-    STOCK_LOG(3, LOG_FILE, 23, "page: '%s' stands in for the sequencer's screen of the %s, its document at 0x%08x", op1f_cards.slots[s->slot].card->name,
+    STOCK_LOG(3, LOG_FILE, 23, "page: '%s' stands in for the sequencer's screen of the %s, its document at 0x%08x", op1f_cards_2.slots[s->slot].card->name,
               s->where == 1u ? "drum" : "synth", (u32)document);
 }
 
@@ -2855,7 +2916,7 @@ static OP1F_APART void tell_shown(u32 slot, u32 ask, u32 where, u32 how) {
     const Op1fKindHead* head = head_of(slot, ask);
     if (head == 0) return;
     u32 shown = (u32)head->shown;
-    const Op1fCardSlot* in = &op1f_cards.slots[slot];
+    const Op1fCardSlot* in = &op1f_cards_2.slots[slot];
     if (shown == 0 || shown < in->first || shown >= in->end || (shown & 1u) != 0) return;
     Op1fCallKept kept;
     op1f_cards_call_in(OP1F_CALL_SHOWN, slot, &kept);
@@ -2934,14 +2995,14 @@ static inline __attribute__((always_inline)) int input_call(u32 i, const Op1fCar
 }
 
 static inline __attribute__((always_inline)) int taken(u32 i, Op1fInput* e) {
-    const Op1fCard* card = op1f_cards.slots[i].card;
+    const Op1fCard* card = op1f_cards_2.slots[i].card;
     int answer = input_call(i, card, e);                                            // R3: inside a record
     if (answer == 0) return 0;
     if (answer != (int)OP1F_SEEN || !level_4(card)) return 1;
     if (e->what != (u32)OP1F_TURN && e->key < (u32)HELD_KEYS) {
         u32 mask;
         MASK_OFF(mask);
-        watch.keys[e->key] = watch.keys[e->key] | (1u << i);
+        op1f_slot_set(&watch.keys[e->key], i);
         watch.down[i] = watch.down[i] + 1u;
         MASK_ON(mask);
     }
@@ -2950,12 +3011,12 @@ static inline __attribute__((always_inline)) int taken(u32 i, Op1fInput* e) {
 
 static OP1F_APART u32 offer(Op1fInput* e) {
     u32 page = page_on_screen(e->screen);
-    if (page != 0 && ((state.inputs >> (page - 1)) & 1u) != 0) {
+    if (page != 0 && op1f_slot_test(&state.inputs, (page - 1))) {
         e->mine = 1;
         if (taken(page - 1, e)) return page;
     }
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.inputs >> i) & 1u) == 0 || i + 1 == page) continue;
+        if (!op1f_slot_test(&state.inputs, i) || i + 1 == page) continue;
         e->mine = 0;
         if (taken(i, e)) return i + 1;
     }
@@ -2965,17 +3026,18 @@ static OP1F_APART u32 offer(Op1fInput* e) {
 // R1: a key's up told to every card that watched its down, in the list's order, what it answers not looked at; the
 // bits taken with interrupts masked. The card that took the down, if one did, is told as before, after these.
 static inline __attribute__((always_inline)) void tell_watchers(u32 key, u32 who) {
-    u32 mask, bits;
+    u32 mask;
+    Op1fSlotSet bits;
     MASK_OFF(mask);
     bits = watch.keys[key];
-    watch.keys[key] = 0;
+    op1f_slot_none(&watch.keys[key]);
     MASK_ON(mask);
-    for (u32 i = 0; bits != 0 && i < state.seen; ++i) {
-        if (((bits >> i) & 1u) == 0 || i + 1 == who || ((state.inputs >> i) & 1u) == 0) continue;
+    for (u32 i = 0; op1f_slot_any(&bits) && i < state.seen; ++i) {
+        if (!op1f_slot_test(&bits, i) || i + 1 == who || !op1f_slot_test(&state.inputs, i)) continue;
         Op1fInput e;
         event_of(&e, OP1F_UP, key, 0, 0);
         e.mine = page_on_screen(e.screen) == i + 1 ? 1u : 0u;
-        input_call(i, op1f_cards.slots[i].card, &e);                                // R3: inside a record
+        input_call(i, op1f_cards_2.slots[i].card, &e);                                // R3: inside a record
         count(&watch.up[i]);
     }
 }
@@ -3004,7 +3066,7 @@ extern "C" int op1f_input_down(const u32* record, int shifted) {
     count(&input.down);                                                             // M3: masked for the instant
     if (top_input(shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record)) return 1;   // S1: the base's top page
     if (&op1f_options_down != 0 && op1f_options_down(key)) return 1;               // R8 (base 32): T1 back to the list of packs
-    if (!checked() || state.inputs == 0) return 0;
+    if (!checked() || !op1f_slot_any(&state.inputs)) return 0;
     Op1fInput e;
     event_of(&e, shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record);
     u32 who = offer(&e);
@@ -3027,11 +3089,11 @@ extern "C" int op1f_input_up(int key) {
     tell_watchers((u32)key, who);                                                   // R1: those that watched its down first
     if (who == 0) return 0;                                                         // the firmware had the down
     input.held[key] = 0;
-    if (who <= state.seen && ((state.inputs >> (who - 1)) & 1u) != 0) {
+    if (who <= state.seen && op1f_slot_test(&state.inputs, (who - 1))) {
         Op1fInput e;
         event_of(&e, OP1F_UP, (u32)key, 0, 0);
         e.mine = page_on_screen(e.screen) == who ? 1u : 0u;
-        input_call(who - 1, op1f_cards.slots[who - 1].card, &e);                    // told; what it answers does not matter (R3: inside a record)
+        input_call(who - 1, op1f_cards_2.slots[who - 1].card, &e);                    // told; what it answers does not matter (R3: inside a record)
     }
     count(&input.took_up[who - 1]);
     count(&input.taken);
@@ -3043,7 +3105,7 @@ extern "C" int op1f_input_turn(int knob, int turn) OP1F_NAMED("op1f_input_turn")
 extern "C" int op1f_input_turn(int knob, int turn) {
     count(&input.turns);                                                            // M3: masked for the instant
     if (top_input(OP1F_TURN, (u32)knob, turn, 0)) return 1;                         // S1: the base's top page
-    if (!checked() || state.inputs == 0) return 0;
+    if (!checked() || !op1f_slot_any(&state.inputs)) return 0;
     Op1fInput e;
     event_of(&e, OP1F_TURN, (u32)knob, turn, 0);
     u32 who = offer(&e);
@@ -3101,7 +3163,7 @@ static OP1F_APART void popup_said(u32 which, u32 on, u32 page) {
     if (popups.said[which] >= (u32)POPUP_SAID) return;
     ++popups.said[which];
     STOCK_LOG(3, LOG_FILE, 35, "page: the unit's own notice drawn over the page of '%s', the page darkened under it; %u time(s) since the start",
-              op1f_cards.slots[page - 1u].card->name, popups.began[0]);
+              op1f_cards_2.slots[page - 1u].card->name, popups.began[0]);
 }
 
 // R6b: the render of one of the unit's own screens, handed over by the firmware's render loop at its call of the render
@@ -3222,7 +3284,7 @@ static OP1F_APART u32 held_draw(u32 page) {
         if (held.said[k] >= (u32)HELD_SAID) continue;
         ++held.said[k];
         STOCK_LOG(3, LOG_FILE, 36, "page: the unit's own popup of screen %u drawn over the page of '%s'; %u time(s) since the start", k + (u32)HELD_FIRST,
-                  page != 0 ? op1f_cards.slots[page - 1u].card->name : "base", held.began[k]);
+                  page != 0 ? op1f_cards_2.slots[page - 1u].card->name : "base", held.began[k]);
     }
     return n != 0 ? 2u : 0u;
 }
@@ -3425,7 +3487,7 @@ static OP1F_APART void parts_frame(u32 page, u32 asks, u32 out, u32 document, u3
     parts.failures += failed;
     if (parts.saying == 0 || state.ms - parts.start < parts.next) return;
     STOCK_LOG(3, LOG_FILE, 50, "page: '%s' parts, second %u: %u frames, %u held, %u rectangles drawn, %u hidden, %u us in all, %u most; %u refused, %u plans failed",
-              op1f_cards.slots[page - 1u].card->name, parts.second, parts.frames, parts.held, parts.drawn, parts.hides, parts.sum, parts.most,
+              op1f_cards_2.slots[page - 1u].card->name, parts.second, parts.frames, parts.held, parts.drawn, parts.hides, parts.sum, parts.most,
               parts.refusals, parts.failures);
     parts.frames = parts.held = parts.drawn = parts.hides = parts.sum = parts.most = parts.refusals = parts.failures = 0;
     parts.next += (u32)PARTS_SECOND;
@@ -3460,7 +3522,7 @@ static OP1F_APART void hold_frame(u32 page, u32 held_now, u32 over) {
     parts_frame(page, asks, out, seen.document, held_now);                     // R12: the plan for the next loop, and line 50
     if ((out & (u32)OP1F_HOLD_ENDED) != 0 && hold.slot != 0) {
         STOCK_LOG(3, LOG_FILE, 47, "page: '%s' stopped holding its picture: %u frame(s) held, %u drawn whole since it began",
-                  op1f_cards.slots[hold.slot - 1u].card->name, hold.rule.held, hold.rule.drawn);
+                  op1f_cards_2.slots[hold.slot - 1u].card->name, hold.rule.held, hold.rule.drawn);
         hold.slot = 0;
     }
     if ((out & (u32)OP1F_HOLD_BEGAN) != 0) {
@@ -3469,7 +3531,7 @@ static OP1F_APART void hold_frame(u32 page, u32 held_now, u32 over) {
         ++hold.said;
         hold.slot = page;
         STOCK_LOG(3, LOG_FILE, 46, "page: '%s' holds its picture from frame to frame; %u time(s) since the start",
-                  op1f_cards.slots[page - 1u].card->name, hold.began);
+                  op1f_cards_2.slots[page - 1u].card->name, hold.began);
     }
 }
 
@@ -3488,20 +3550,20 @@ static OP1F_APART void clear_measures() {
 // an input function; and how long the gate was shut.
 static OP1F_APART void say(int why) {
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.framed >> i) & 1u) == 0) continue;
+        if (!op1f_slot_test(&state.framed, i)) continue;
         const Measure* m = &state.measure[i];
-        STOCK_LOG(3, LOG_FILE, 4, "cards: '%s' frame call: %u calls, %u us in all, %u least, %u most", op1f_cards.slots[i].card->name, m->calls, m->sum, m->least, m->most);
+        STOCK_LOG(3, LOG_FILE, 4, "cards: '%s' frame call: %u calls, %u us in all, %u least, %u most", op1f_cards_2.slots[i].card->name, m->calls, m->sum, m->least, m->most);
     }
-    if (state.inputs != 0) {
+    if (op1f_slot_any(&state.inputs)) {
         u32 down = input.down, up = input.up, turns = input.turns, taken = input.taken;
         STOCK_LOG(3, LOG_FILE, 10, "input: %u down, %u up, %u turns this period, %u taken by packs; since the start %u down, %u up, %u turns, %u taken; %u pages opened",
                   down - state.seen_down, up - state.seen_up, turns - state.seen_turns, taken - state.seen_taken, down, up, turns, taken, state.opened);
         for (u32 i = 0; i < state.seen; ++i) {
-            if (((state.inputs >> i) & 1u) == 0) continue;
+            if (!op1f_slot_test(&state.inputs, i)) continue;
             u32 all = input.took_down[i] + input.took_up[i] + input.took_turn[i];
             if (all == state.seen_took[i]) continue;                                // nothing taken by this pack this period
             STOCK_LOG(3, LOG_FILE, 11, "input: '%s' took %u down, %u up, %u turns since the start",
-                      op1f_cards.slots[i].card->name, input.took_down[i], input.took_up[i], input.took_turn[i]);
+                      op1f_cards_2.slots[i].card->name, input.took_down[i], input.took_up[i], input.took_turn[i]);
         }
     }
     if (state.quiet.silent_before)
@@ -3522,7 +3584,7 @@ static OP1F_APART u32 paint_taken() {
     u32 any = 0;
     for (u32 i = 0; i < state.seen; ++i) {
         u32 painted = 0, refused = 0;
-        if (((state.framed >> i) & 1u) != 0 && &op1f_paint_take != 0) op1f_paint_take(i, &painted, &refused);
+        if (op1f_slot_test(&state.framed, i) && &op1f_paint_take != 0) op1f_paint_take(i, &painted, &refused);
         paint.painted[i] = painted;
         paint.refused[i] = refused;
         any |= refused;
@@ -3534,12 +3596,12 @@ static OP1F_APART u32 paint_taken() {
 // a card whose painting was refused in it.
 static OP1F_APART void say_level_4(int period) {
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.used >> i) & 1u) == 0) continue;
+        if (!op1f_slot_test(&state.used, i)) continue;
         if (watch.down[i] + watch.up[i] != watch.seen[i])
-            STOCK_LOG(3, LOG_FILE, 21, "input: '%s' watched %u down, told %u up since the start", op1f_cards.slots[i].card->name, watch.down[i], watch.up[i]);
+            STOCK_LOG(3, LOG_FILE, 21, "input: '%s' watched %u down, told %u up since the start", op1f_cards_2.slots[i].card->name, watch.down[i], watch.up[i]);
         if (period && paint.refused[i] != 0)
             STOCK_LOG(3, LOG_FILE, 22, "paint: '%s' painted %u time(s) this period, %u refused (not from its frame function, or not this frame's picture)",
-                      op1f_cards.slots[i].card->name, paint.painted[i], paint.refused[i]);
+                      op1f_cards_2.slots[i].card->name, paint.painted[i], paint.refused[i]);
     }
 }
 
@@ -3587,13 +3649,13 @@ extern "C" void op1f_cards_frame() {
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     if (&op1f_sample_frame != 0) op1f_sample_frame();       // R17 (base 39): the sample unit's, behind the engines unit's
-    if (&op1f_drum_frame != 0) op1f_drum_frame();           // R18 (base 40): the drum unit's, behind the sample unit's
+    if (&op1f_drum_frame != 0) op1f_drum_frame();           // R21 (base 43): the drum unit's, behind the sample unit's
     said_passed();                                         // R4: the pictures a card of level 6 carries and a screen was not served
     Op1fStanding standing;
     int stands = op1f_seq_standing(&standing);              // R3: does a pack's page stand in for the sequencer's screen now
     fx.asked = 0;                                           // R5
     if (!stands) stands = effect_standing(&standing);       // R5: else for an effect's screen
-    if (state.framed == 0 && state.inputs == 0 && !stands && stand.on == (u32)STAND_NONE && stand.told == 0 && away.slot1 == 0) {   // R3: and no stand-in to place, keep or close (R4c: nor a page set aside)
+    if (!op1f_slot_any(&state.framed) && !op1f_slot_any(&state.inputs) && !stands && stand.on == (u32)STAND_NONE && stand.told == 0 && away.slot1 == 0) {   // R3: and no stand-in to place, keep or close (R4c: nor a page set aside)
         op1f_cards_stand_in_shown = 0;
         stand_on_screen = 0;                                                        // R4c
         if (fx.held != 0 || &op1f_effects_ahead != 0 || &op1f_engines_ahead != 0) ready_frame(RD32(CURRENT_MODE), RD32(CURRENT_SCREEN));   // R5: the entry kept ready, in such a frame too (R6: an engine's too)
@@ -3618,11 +3680,11 @@ extern "C" void op1f_cards_frame() {
     stand_told(now.screen);                                 // R3: its `shown`, and the word of the sequencer's notice
     u32 page = page_on_screen(now.screen);
     if (page != 0 && top.shown && stand.on == (u32)STAND_TOP && page == stand.slot + 1u) page = 0;   // R3: the stand-in under the base's top page: `shown` said 0, and `page` says it too
-    now.page =page != 0 ? op1f_cards.slots[page - 1].card : 0;
+    now.page =page != 0 ? op1f_cards_2.slots[page - 1].card : 0;
     now.disk = RD32(DISK_OPEN) != 0 ? 1u : 0u;              // M3
     now.canvas = (void*)RD32(FRAME_BUFFER);                 // R1: this frame's picture, already drawn
     if (CANVAS_ON_BLANK_ONLY && (page == 0 || pages.shown_how != (u32)HOW_BLANK)) now.canvas = 0;
-    if (state.inputs != 0 && now.screen != state.last_screen && state.started > 1) {   // the line that places a screen among the keys
+    if (op1f_slot_any(&state.inputs) && now.screen != state.last_screen && state.started > 1) {   // the line that places a screen among the keys
         u32 down_ms = input.last_down_ms, up_ms = input.last_up_ms;
         STOCK_LOG(3, LOG_FILE, 12, "input: screen %u is shown; %u keys down so far, the last %u, %u ms before; %u up, the last %u, %u ms before",
                   now.screen, input.down, input.last_down, state.ms - down_ms, input.up, input.last_up, state.ms - up_ms);
@@ -3637,8 +3699,8 @@ extern "C" void op1f_cards_frame() {
     if (stand.named && stand_on_screen) paint_name(now.canvas);                 // R3: the ask's name on the blank page, while the stand-in is on the screen (R4c: the base's flag)
     away_paint(now.screen);                                                   // R6b: the base's page for an engine away
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.framed >> i) & 1u) == 0) continue;
-        const Op1fCard* card = op1f_cards.slots[i].card;
+        if (!op1f_slot_test(&state.framed, i)) continue;
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
         Measure* m = &state.measure[i];
         u32 before = stamp();
         state.calling_sp = stack_here();                    // M3: where this thread's stack stands at the call
@@ -3661,7 +3723,7 @@ extern "C" void op1f_cards_frame() {
         state.countdown = PERIOD_FRAMES;
         u32 s = quiet_mix(quiet_start(), state.in_use);     // what the lines state: how many cards, and which of them had a call of a millisecond
         for (u32 i = 0; i < state.seen; ++i) {
-            if ((state.used >> i) & 1u) s = quiet_mix(s, state.measure[i].most >= (u32)SLOW_US ? 1u : 0u);
+            if (op1f_slot_test(&state.used, i)) s = quiet_mix(s, state.measure[i].most >= (u32)SLOW_US ? 1u : 0u);
         }
         s = quiet_mix(s, state.opened);                     // and how many pages were opened
         s = quiet_mix(s, popups.calls != 0 ? 1u : 0u);      // R4c: and whether the base drew one of the unit's own popups
@@ -3749,7 +3811,7 @@ static_assert((u32)PLACE_NAME == (u32)ART_NAME,"a name of the list has a directo
 // that says so, and read only past it.
 static struct {
     u32 made, said;                                     // looked at; the lines said
-    u32 bound;                                          // a bit a slot: its card is of level 6, held to the rule
+    Op1fSlotSet bound;                                  // a bit a slot: its card is of level 6, held to the rule
     const char (*names[MOST])[PLACE_NAME];              // the list each such card's ask names, 0 for none (no ask, or one left aside)
     u32 count[MOST];                                    // and how many names it holds
     const char (*yields[MOST])[PLACE_NAME];             // R6h (base 31): the list each such card gives way for, 0 for none
@@ -3872,21 +3934,21 @@ static int places_take(u32 kinds, int why, const Op1fAsk* ask, int firm) {
 // R6h (base 31): each slot's lists worked out into locals and only their final values stored, so that a second thread
 // that looks as well writes again what a reader may be reading, never a 0 before it; the list that gives way beside.
 static OP1F_APART void places_look() {
-    u32 bound = 0;
+    Op1fSlotSet bound = {{0, 0, 0, 0}};
     for (u32 i = 0; i < state.seen; ++i) {
         const char (*names)[PLACE_NAME] = 0;
         const char (*yields)[PLACE_NAME] = 0;
         u32 count = 0, yield_count = 0;
-        const Op1fCard* card = op1f_cards.slots[i].card;
-        if (((state.used >> i) & 1u) != 0 && card->level >= 6u) {                  // the rule binds a card by its level alone, whatever its size
-            bound |= 1u << i;
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
+        if (op1f_slot_test(&state.used, i) && card->level >= 6u) {                  // the rule binds a card by its level alone, whatever its size
+            op1f_slot_set(&bound, i);
             u32 asked = 0, kinds = 0;
             int firm = 0;
             const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
             for (u32 k = 0; k < asked && kinds < 2u; ++k) {                         // the first ask of the kind is the card's; a second may give way; a later one is left aside
                 if (asks[k].kind != (u32)OP1F_ASK_PLACES) continue;
                 u32 a = 0, b = 0;
-                int plain = 0, took = places_take(kinds, places_refused(&asks[k], &op1f_cards.slots[i], &a, &b, &plain), &asks[k], firm);
+                int plain = 0, took = places_take(kinds, places_refused(&asks[k], &op1f_cards_2.slots[i], &a, &b, &plain), &asks[k], firm);
                 const Op1fPlaces* table = (const Op1fPlaces*)asks[k].what;
                 if (took == ASK_FIRM) {
                     names = table->names;
@@ -3911,15 +3973,15 @@ static OP1F_APART void places_look() {
     if (places.said) return;
     places.said = 1;
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((bound >> i) & 1u) == 0) continue;
-        const Op1fCard* card = op1f_cards.slots[i].card;
+        if (!op1f_slot_test(&bound, i)) continue;
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
         u32 asked = 0, kinds = 0;
         int firm = 0;                                                               // R6h (base 31)
         const Op1fAsk* asks = (const Op1fAsk*)asks_of(card, &asked);
         for (u32 k = 0; k < asked; ++k) {
             if (asks[k].kind != (u32)OP1F_ASK_PLACES) continue;
             u32 a = 0, b = 0;
-            int plain = 0, why = places_refused(&asks[k], &op1f_cards.slots[i], &a, &b, &plain);
+            int plain = 0, why = places_refused(&asks[k], &op1f_cards_2.slots[i], &a, &b, &plain);
             const char* name = plain ? ((const Op1fPlaces*)asks[k].what)->head.name : "?";
             int took = places_take(kinds, why, &asks[k], firm);                    // R6h (base 31)
             if (kinds == 0) firm = took == ASK_FIRM;
@@ -4017,12 +4079,12 @@ static OP1F_APART void said_passed() {
     for (; passed.said < n; ++passed.said) {
         u32 k = passed.said;
         STOCK_LOG(3, LOG_FILE, 28, "cards: '%s' carries a picture named %s and does not take its place: the unit's own is shown",
-                  op1f_cards.slots[passed.slot[k]].card->name, passed.name[k]);
+                  op1f_cards_2.slots[passed.slot[k]].card->name, passed.name[k]);
     }
     for (; gave.said < g; ++gave.said) {                                            // R6h (base 31)
         u32 k = gave.said;
-        STOCK_LOG(3, LOG_FILE, 45, "cards: '%s' gives way to '%s' for the picture %s", op1f_cards.slots[gave.slot[k]].card->name,
-                  op1f_cards.slots[gave.over[k]].card->name, gave.name[k]);
+        STOCK_LOG(3, LOG_FILE, 45, "cards: '%s' gives way to '%s' for the picture %s", op1f_cards_2.slots[gave.slot[k]].card->name,
+                  op1f_cards_2.slots[gave.over[k]].card->name, gave.name[k]);
     }
 }
 
@@ -4041,7 +4103,7 @@ static OP1F_APART int stand_by(Stand* stand, u32 i, const char* name, int open) 
     if (!gives_way(i, name)) return 0;
     if (stand->slot == 0 || (open && stand->second == 0)) {
         int own = 0;                                        // its own: `carried` writes it even when it finds nothing
-        const ArtEntry* e = carried(op1f_cards.slots[i].card, name, &own);
+        const ArtEntry* e = carried(op1f_cards_2.slots[i].card, name, &own);
         if (e != 0 && stand->slot == 0) {
             stand->slot = i + 1u;
             stand->entry = e;
@@ -4057,14 +4119,14 @@ static OP1F_APART int stand_by(Stand* stand, u32 i, const char* name, int open) 
 // the stand-in had the picture), else the stand-in's (a second card that gives way and has it: said by `twice`).
 static OP1F_APART int stand_in(const Stand* stand, int found, const char* name, const ArtDir** dir, const ArtEntry** entry) {
     if (stand->slot == 0) return found;
-    const Op1fCard* card = op1f_cards.slots[stand->slot - 1u].card;
+    const Op1fCard* card = op1f_cards_2.slots[stand->slot - 1u].card;
     if (found != 0) {
         note_gave_way(stand->slot - 1u, stand->served - 1u, name);                 // a firm card served it: the line at the next frame
         return found;
     }
     *dir = (const ArtDir*)card->pictures;
     *entry = stand->entry;
-    if (stand->second != 0) twice(name, card->name, op1f_cards.slots[stand->second - 1u].card->name);
+    if (stand->second != 0) twice(name, card->name, op1f_cards_2.slots[stand->second - 1u].card->name);
     return stand->found;
 }
 
@@ -4089,8 +4151,8 @@ extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const 
     Stand stand = {0, 0, 0, 0, 0};                          // R6h (base 31)
     if (name == 0) return 0;
     for (u32 i = 0; i < state.seen; ++i) {
-        if (((state.used >> i) & 1u) == 0) continue;
-        const Op1fCard* card = op1f_cards.slots[i].card;
+        if (!op1f_slot_test(&state.used, i)) continue;
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
         if (only != 0) {
             if (card != only) continue;
             const ArtEntry* own = card->pictures ? entry_of((const ArtDir*)card->pictures, name) : 0;
@@ -4099,7 +4161,7 @@ extern "C" int op1f_cards_picture(const char* name, const Op1fCard* only, const 
             *entry = own;
             return FOUND;
         }
-        if (((places.bound >> i) & 1u) != 0 && !listed(i, name)) {                // R4: a card of level 6 serves a screen only the names it lists
+        if (op1f_slot_test(&places.bound, i) && !listed(i, name)) {                // R4: a card of level 6 serves a screen only the names it lists
             if (stand_by(&stand, i, name, server == 0)) continue;                  // R6h (base 31): a card that gives way for the name
             if (passer == 0 && card->pictures != 0 && entry_of((const ArtDir*)card->pictures, name) != 0) passer = i + 1u;
             continue;

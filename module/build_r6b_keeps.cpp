@@ -314,7 +314,7 @@ static void (*const r11_none_lfos_changed)(unsigned where, unsigned which, unsig
 extern "C" void op1f_lfos_changed(unsigned where, unsigned which, unsigned how) OP1F_NAMED("op1f_lfos_changed") __attribute__((weak));
 #endif
 
-// R18 (base 40): the drum unit's (module/build_r18_drum.cpp), told what changed of the member op1f_engine at a drum
+// R21 (base 43): the drum unit's (module/build_r18_drum.cpp), told what changed of the member op1f_engine at a drum
 // slot, as the engines unit is at a synth slot. Weak: away, nothing is told.
 #if defined(OP1F_HOST)
 static void (*const r18_none_drum_changed)(unsigned where, unsigned which, unsigned how) = 0;
@@ -330,7 +330,8 @@ static const u32 CALLER_SYNTH_TYPE = 0x8d4ec6f0u, CALLER_DRUM_TYPE = 0x8d4eba60u
 
 // ---- from the cards unit and the folders unit ----
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 extern "C" int op1f_cards_verdict(unsigned slot) OP1F_NAMED("op1f_cards_verdict");
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
@@ -349,12 +350,12 @@ enum {
     HOLDER_BYTES = 4096, VALUE_MOST = OP1F_VALUE_MOST, DEPTH_MOST = 4, NAMES_MOST = 64, NAME = OP1F_KEY_BYTES,
     // R5: the base's own name first in the list, beside the sixty-four the packs may keep; its owner, which no card's
     // slot + 1 is; the places a key of a card of level 8 may name; a holder's bits of the names, one for each
-    NAMES_ROOM = NAMES_MOST + 3, BASE_NAME = 0, BASE_ENGINE = 1, BASE_LFO = 2, OWNER_BASE = OP1F_CARDS_MOST + 1,   // R6: two names of the base's own
+    NAMES_ROOM = NAMES_MOST + 3, BASE_NAME = 0, BASE_ENGINE = 1, BASE_LFO = 2, OWNER_BASE = OP1F_SLOTS_MOST + 1,   // R6: two names of the base's own
     KEEP_PLACES = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM | OP1F_KEEP_TAPE,
     KEEP_ALL = KEEP_PLACES | OP1F_KEEP_MASTER, BITS = (NAMES_ROOM + 31) >> 5,
-    KEYS = OP1F_KEYS_MOST, TABLE_BYTES = 324, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, CARDS = OP1F_CARDS_MOST,
+    KEYS = OP1F_KEYS_MOST, TABLE_BYTES = 324, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, CARDS = OP1F_SLOTS_MOST,
     MARK = 48, STORE_MOST = 48 << 10, STORE_ROOM = STORE_MOST + 16, KIND_NAME = OP1F_KIND_NAME, TAPE_DB = 2,
-    WRITTEN_SAID = 16, QUEUE = 16, KEEPS_MOST = OP1F_CARDS_MOST,
+    WRITTEN_SAID = 16, QUEUE = 16, KEEPS_MOST = OP1F_SLOTS_MOST,
     // the walk of an object's members, as the library lays them out: the object's word -> its tree; the tree's head
     // at +4; a node's left +0, parent +4, right +8, its name's characters at +0xc, its value at +0x14, its "is the
     // head" byte at +0x21
@@ -1186,7 +1187,7 @@ static const char* where_words(u32 files) {
 }
 
 static const char* pack_name(u32 owner) {
-    return owner == (u32)OWNER_BASE ? "the base" : owner ? op1f_cards.slots[owner - 1u].card->name : "a pack that is away";
+    return owner == (u32)OWNER_BASE ? "the base" : owner ? op1f_cards_2.slots[owner - 1u].card->name : "a pack that is away";
 }
 
 // The asks of this kind of every card in use, at the first frame, in the cards' order and each card's. R5: the base's
@@ -1198,17 +1199,18 @@ static void enrol() {
     own->owner = OWNER_BASE;
     Name* engine = &names[BASE_ENGINE];                                            // R6: the engine a synth sound rides
     copy_text(engine->name, ENGINE_KEY, NAME);
-    engine->files = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM;                              // R18 (base 40): and the drum engine a drum sound rides
+    engine->files = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM;                              // R21 (base 43): and the drum engine a drum sound rides
     engine->owner = OWNER_BASE;
     Name* lfo = &names[BASE_LFO];                                                  // R11: the LFO layer of a synth or drum sound
     copy_text(lfo->name, LFO_KEY, NAME);
     lfo->files = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM;                                 // never the master
     lfo->owner = OWNER_BASE;
     names_count = BASE_LFO + 1u;
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 7u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
@@ -2066,7 +2068,7 @@ static void tell_cards(u32 index, u32 how) {
     u32 which = which_of_holder(index);
     if ((names[BASE_NAME].files & where) != 0 && EFFECTS_CHANGED) EFFECTS_CHANGED(where, which, how);
     if ((names[BASE_ENGINE].files & where) != 0 && &op1f_engines_changed != 0) op1f_engines_changed(where, which, how);   // R6
-    if (where == (u32)OP1F_KEEP_DRUM && (names[BASE_ENGINE].files & where) != 0 && &op1f_drum_changed != 0) op1f_drum_changed(where, which, how);   // R18 (base 40)
+    if (where == (u32)OP1F_KEEP_DRUM && (names[BASE_ENGINE].files & where) != 0 && &op1f_drum_changed != 0) op1f_drum_changed(where, which, how);   // R21 (base 43)
     if ((names[BASE_LFO].files & where) != 0 && &op1f_lfos_changed != 0) op1f_lfos_changed(where, which, how);   // R11
     for (u32 k = 0; k < keeps_count; ++k) {
         if ((keeps[k].files & where) == 0 || keeps[k].table->changed == 0) continue;
@@ -2176,10 +2178,11 @@ extern "C" void op1f_keeps_frame() {
 // ---------------------------------------------------------------- the helpers, from a pack's frame function
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -2345,7 +2348,7 @@ extern "C" int op1f_keeps_engine_set(unsigned slot, const char* text) {
     return value_set_at(index, BASE_ENGINE, text, SET_BASE);
 }
 
-// R18 (base 40): the same member at a drum slot, the drum engine a drum sound rides (module/build_r18_drum.cpp), from
+// R21 (base 43): the same member at a drum slot, the drum engine a drum sound rides (module/build_r18_drum.cpp), from
 // the display thread: as op1f_keeps_engine_get and op1f_keeps_engine_set, with the drum's holder.
 extern "C" int op1f_keeps_drum_engine_get(unsigned slot, char* out, unsigned room) OP1F_NAMED("op1f_keeps_drum_engine_get");
 extern "C" int op1f_keeps_drum_engine_set(unsigned slot, const char* text) OP1F_NAMED("op1f_keeps_drum_engine_set");

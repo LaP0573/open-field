@@ -41,7 +41,7 @@
 #include "build_r6d_base.h"                            // base 29's words, the base's shared names, level 10's
 #include "build_r17_sample.h"                          // R17: the checks as plain code
 
-// R18 (base 40): a drum place too. op1f_sample_drop takes a drum place (OP1F_PLACE_DRUM + slot) when the ask is the
+// R21 (base 43): a drum place too. op1f_sample_drop takes a drum place (OP1F_PLACE_DRUM + slot) when the ask is the
 // card's drum engine (kind 12, module/build_r18_drum.cpp) and that drum sound rides it: the drum sampler page's own post
 // (0x8f00c4e0, the drum's twin of the synth's) and, in the unit's turn, DD, the head of the worker's drum drop job
 // (0x8f00ba38, request 10; the stub and its room are module/build_r17_sample.s), where the base's job makes the same
@@ -90,13 +90,14 @@ extern "C" volatile unsigned op1f_sample_sd_passes OP1F_NAMED("op1f_sample_sd_pa
 // SD's room: the job's first eight bytes, which the loader copies from the running firmware, and a jump back behind
 // them. A call of it is stock's job as it always was.
 extern "C" u8 op1f_sample_sd_room[] OP1F_NAMED("op1f_sample_sd_room");
-// R18: DD's twins of the three, for the drum's job.
+// R21: DD's twins of the three, for the drum's job.
 extern "C" volatile unsigned op1f_sample_dd_armed OP1F_NAMED("op1f_sample_dd_armed");
 extern "C" volatile unsigned op1f_sample_dd_passes OP1F_NAMED("op1f_sample_dd_passes");
 extern "C" u8 op1f_sample_dd_room[] OP1F_NAMED("op1f_sample_dd_room");
 
 // ---- from the cards unit ----
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 // 1 when the nearest of the base's calls into packs around the caller is an input call of this card, for an event on
@@ -107,7 +108,7 @@ extern "C" int op1f_cards_input_keyed(const Op1fCard* card) OP1F_NAMED("op1f_car
 // Synth slot `slot`'s ride: 0 none; 1 with `card` (the card's slot) and `ask`; 2 the same while a sound loaded there is
 // not told yet. `loads`: the sounds loaded onto the slot since the start.
 extern "C" unsigned op1f_engines_ride(unsigned slot, unsigned* card, unsigned* ask, unsigned* loads) OP1F_NAMED("op1f_engines_ride") __attribute__((weak));
-// R18: drum slot `slot`'s ride, the drum unit's, in the same words. Weak: away, no drum sound rides an engine.
+// R21: drum slot `slot`'s ride, the drum unit's, in the same words. Weak: away, no drum sound rides an engine.
 extern "C" unsigned op1f_drum_ride(unsigned slot, unsigned* card, unsigned* ask, unsigned* loads) OP1F_NAMED("op1f_drum_ride") __attribute__((weak));
 
 // ---- for the restore, weak: away, nothing is kept ----
@@ -137,7 +138,7 @@ enum : u32 {
     SYNTH_POOLS = 0x840b0becu,          // synth slot 0's pool; slot i's SYNTH_STRIDE x i further
     DRUM_POOLS = 0x8d518598u,           // drum slot 0's pool
     SYNTH_RECORDS = 0x080235dcu,        // a synth slot's record, 52 bytes a slot: its table at +0, method 6 the table's +0x18
-    DRUM_RECORDS = 0x0802377cu,         // R18: a drum slot's, the same form
+    DRUM_RECORDS = 0x0802377cu,         // R21: a drum slot's, the same form
     IMPORT_ENTRY = 0x8f004204u          // the clipboard's import into an object: its entry, `8 tracks`' place too
 };
 enum : u32 {
@@ -162,14 +163,14 @@ typedef void (*JobFn)(u32 slot, u32 clip);             // SD's room: stock's job
 #define STOCK_IMPORT ((ImportFn)IMPORT_ENTRY)
 #define STOCK_MARK ((MarkFn)0x8d4eb6b2u)
 #define ROOM_JOB ((JobFn)(void*)op1f_sample_sd_room)
-#define STOCK_DRUM_POST ((PostFn)0x8f00c4e0u)              // R18: the drum page's post of the drum's drop, for the slot
-#define STOCK_DRUM_HOLDER ((HolderFn)0x8f014848u)          // R18: a drum slot's holder
-#define STOCK_DRUM_MARK ((MarkFn)0x8d4eb68au)              // R18: the drum slot's mark
+#define STOCK_DRUM_POST ((PostFn)0x8f00c4e0u)              // R21: the drum page's post of the drum's drop, for the slot
+#define STOCK_DRUM_HOLDER ((HolderFn)0x8f014848u)          // R21: a drum slot's holder
+#define STOCK_DRUM_MARK ((MarkFn)0x8d4eb68au)              // R21: the drum slot's mark
 #define ROOM_DRUM_JOB ((JobFn)(void*)op1f_sample_dd_room)
 
 static const char LOG_FILE[] = "../src/main/op1f_sample.cpp";
 
-enum { SLOTS = 8, NAME = OP1F_KIND_NAME, CARD_NAME = 16, CARDS = OP1F_CARDS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES };
+enum { SLOTS = 8, NAME = OP1F_KIND_NAME, CARD_NAME = 16, CARDS = OP1F_SLOTS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES };
 enum { FREE = 0, QUEUED = 1, RUNNING = 2, ENDED = 3 };
 enum { REFUSALS = 8, REFUSAL_LINES = 32, AGAIN_FRAMES = 256 };
 static const u32 TICKET_MOST = 0x7fffffffu;            // a ticket is answered as a positive int
@@ -177,7 +178,7 @@ static const u32 TICKET_MOST = 0x7fffffffu;            // a ticket is answered a
 // The stub's words, zeroed at the load.
 volatile unsigned op1f_sample_sd_armed;
 volatile unsigned op1f_sample_sd_passes;
-volatile unsigned op1f_sample_dd_armed;                // R18
+volatile unsigned op1f_sample_dd_armed;                // R21
 volatile unsigned op1f_sample_dd_passes;
 
 // The mark of a base whose packs may drop a lifted cut into their engine's sound and read any sound's sample.
@@ -189,8 +190,8 @@ static struct {
     volatile u32 state;                                // FREE, QUEUED, RUNNING, ENDED
     volatile u32 number;                               // the ticket
     volatile u32 slot, card, ask;                      // the slot (0 to 7), the card's slot, the ask's number
-    volatile u32 drum;                                 // R18: 1 a drum slot
-    volatile u32 mark;                                 // R18: 1 the mark alone (op1f_sample_changed), no import
+    volatile u32 drum;                                 // R21: 1 a drum slot
+    volatile u32 mark;                                 // R21: 1 the mark alone (op1f_sample_changed), no import
     volatile u32 at_frame;                             // the unit's frames counted here when it was queued
     volatile u32 said;                                 // the frame said its "queued" line
     volatile u32 why;                                  // the end: 0 rendered, else why the unit's turn refused it
@@ -211,7 +212,7 @@ struct Place {
     volatile int answer;                               // how it ended
     volatile u32 restoring;                            // the restore puts its sample back now
 };
-static Place places[2 * SLOTS];                         // R18: the synth's eight, then the drum's
+static Place places[2 * SLOTS];                         // R21: the synth's eight, then the drum's
 
 // The call's refusals, for the frame to say: a ring, its records counted from 1. A refusal like the newest record (the
 // same card, ask, place and why) is counted on it, not recorded again.
@@ -231,10 +232,11 @@ static struct {
 // ---------------------------------------------------------------- small helpers
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -259,7 +261,7 @@ static u32 pool_of(u32 drum, u32 slot) {
 // The slot's ride against the card's ask, as the checks take it; and the engines unit's count of its loads.
 static u32 ride_of(u32 slot, u32 card, u32 ask, u32* loads, u32 drum = 0) {
     u32 c = 0, a = 0, l = 0, r = 0;
-    if (drum) { if (&op1f_drum_ride != 0) r = op1f_drum_ride(slot, &c, &a, &l); }   // R18
+    if (drum) { if (&op1f_drum_ride != 0) r = op1f_drum_ride(slot, &c, &a, &l); }   // R21
     else if (&op1f_engines_ride != 0) r = op1f_engines_ride(slot, &c, &a, &l);
     if (loads) *loads = l;
     if (r == 0 || c != card || a != ask) return OP1F_SAMPLE_RIDES_NOT;
@@ -273,7 +275,7 @@ static const Op1fEngine* engine_ask(const Op1fCard* card, u32 ask) {
     return a->kind == (u32)OP1F_ASK_ENGINE ? (const Op1fEngine*)a->what : 0;
 }
 
-// R18: the card's ask of that number, when it is of kind drum engine: its head; else 0.
+// R21: the card's ask of that number, when it is of kind drum engine: its head; else 0.
 static const Op1fKindHead* drum_ask(const Op1fCard* card, u32 ask) {
     if (card->bytes < (u32)CARD_4_BYTES || card->asks == 0 || ask >= card->ask_count) return 0;
     const Op1fAsk* a = &card->asks[ask];
@@ -297,7 +299,7 @@ static void scene_of(Op1fSampleScene* s, u32 turn, u32 keyed, u32 place, u32 car
     s->keyed = keyed;
     s->place = place;
     s->engine = engine;
-    s->drums = 1;                                                                   // R18: base 40 drops into drum sounds too
+    s->drums = 1;                                                                   // R21: base 43 drops into drum sounds too
     s->disk = RD32(DISK_OPEN) != 0 ? 1u : 0u;
     if ((!turn && !keyed) || s->disk || place >= 2u * (u32)SLOTS) return;
     const u32 drum = place >= (u32)SLOTS ? 1u : 0u, slot = place & 7u;
@@ -350,12 +352,12 @@ static int refused(int slot, u32 ask, u32 place, u32 why, u32 a, u32 b) {
 extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask, unsigned place) {
     int slot = slot_of(card);
     u32 keyed = slot >= 0 && op1f_cards_input_keyed(card) ? 1u : 0u;
-    u32 engine = keyed && (place >= (u32)SLOTS && place < 2u * (u32)SLOTS ? drum_ask(card, ask) != 0 : engine_ask(card, ask) != 0) ? 1u : 0u;   // R18
+    u32 engine = keyed && (place >= (u32)SLOTS && place < 2u * (u32)SLOTS ? drum_ask(card, ask) != 0 : engine_ask(card, ask) != 0) ? 1u : 0u;   // R21
     Op1fSampleScene s;
     scene_of(&s, 0, keyed, place, (u32)slot, ask, engine);
     u32 why = op1f_sample_check(&s);
     if (why == (u32)OP1F_SAMPLE_LARGE) return refused(slot, ask, place, why, op1f_sample_frames(s.length, s.capacity),
-                                                        place >= (u32)SLOTS ? (u32)OP1F_SAMPLE_DRUM_POOL >> (s.stereo ? 1 : 0) : op1f_sample_room(s.stereo));   // R18
+                                                        place >= (u32)SLOTS ? (u32)OP1F_SAMPLE_DRUM_POOL >> (s.stereo ? 1 : 0) : op1f_sample_room(s.stereo));   // R21
     if (why != (u32)OP1F_SAMPLE_PASSED) return refused(slot, ask, place, why, 0, 0);
     u32 mask, number = 0, before = 0, busy = 0;
     MASK_OFF(mask);                                                                 // the ticket armed, the queue and the restore looked at again in the same instant
@@ -368,7 +370,7 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
         last_number = number;
         ticket.number = number;
         ticket.slot = place & 7u;
-        ticket.drum = place >= (u32)SLOTS ? 1u : 0u;                                // R18
+        ticket.drum = place >= (u32)SLOTS ? 1u : 0u;                                // R21
         ticket.mark = 0;
         ticket.card = (u32)slot;
         ticket.ask = ask;
@@ -379,20 +381,20 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
         ticket.stereo = s.stereo;
         ticket.state = QUEUED;
         posted = 0;                                                                 // not posted yet
-        if (place >= (u32)SLOTS) op1f_sample_dd_armed = (place & 7u) + 1u;           // R18: what DD's stub compares
+        if (place >= (u32)SLOTS) op1f_sample_dd_armed = (place & 7u) + 1u;           // R21: what DD's stub compares
         else op1f_sample_sd_armed = place + 1u;                                     // what the stub compares with the job's slot
         before = RD32(QUEUE_WRITE);
     }
     MASK_ON(mask);
     if (busy) return refused(slot, ask, place, busy, 0, 0);
-    if (place >= (u32)SLOTS) STOCK_DRUM_POST(place & 7u);                          // R18: the drum page's own post
+    if (place >= (u32)SLOTS) STOCK_DRUM_POST(place & 7u);                          // R21: the drum page's own post
     else STOCK_POST(place);                                                         // the unit's own post, out of the mask, on the key thread
     if (RD32(QUEUE_WRITE) == before) {                                              // nothing was posted: the ticket goes
         MASK_OFF(mask);
         if (ticket.state == (u32)QUEUED && ticket.number == number) {
             ticket.state = FREE;
             op1f_sample_sd_armed = 0;
-            op1f_sample_dd_armed = 0;                                               // R18
+            op1f_sample_dd_armed = 0;                                               // R21
         }
         MASK_ON(mask);
         return refused(slot, ask, place, OP1F_SAMPLE_POST, 0, 0);
@@ -401,7 +403,7 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
     return (int)number;
 }
 
-// R18 (base 40): the drum mark alone, for a pack that changed its drum sound's sample itself (op1f_sample_changed):
+// R21 (base 43): the drum mark alone, for a pack that changed its drum sound's sample itself (op1f_sample_changed):
 // from the card's frame function, or its input function for an event on the key thread; a drum place that rides the
 // card's drum engine of that ask. The same ticket, post and DD as a drop; in the unit's turn the drum job's mark
 // (0x8d4eb68a) and the record's method 6, and no import: the unit then keeps the drum sampler's sample as after a drop.
@@ -509,7 +511,7 @@ extern "C" SAMPLE_APART void op1f_sample_job(unsigned slot, unsigned clip) {
     MASK_ON(mask);
 }
 
-// R18: from DD's stub, on the worker, for a drum job whose slot a ticket was armed for: R0 the drum slot, R1 the
+// R21: from DD's stub, on the worker, for a drum job whose slot a ticket was armed for: R0 the drum slot, R1 the
 // clipboard. The checks again, then the firmware drum job's own four calls (0x8f00bac0 on), or a refusal.
 extern "C" SAMPLE_APART void op1f_sample_drum_job(unsigned slot, unsigned clip) {
     u32 mask, mine = 0, card = 0, ask = 0;
@@ -591,7 +593,7 @@ extern "C" SAMPLE_APART int op1f_sample_get(const Op1fCard* card, unsigned place
     out->capacity = RD32(object + (u32)CAPACITY_AT);
     u32 dropped = 0, number = 0, done = 0, loads = 0;
     int answer = 0;
-    {                                                                               // R18: a drum place's as a synth place's
+    {                                                                               // R21: a drum place's as a synth place's
         ride_of(s, 0, 0, &loads, drum);
         u32 mask;
         MASK_OFF(mask);
@@ -647,13 +649,15 @@ static void place_words(u32 place, const char** what, u32* number) {
 }
 
 static void card_name(u32 card, char* name) {
-    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards.count ? op1f_cards.slots[card].card : 0;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards_2.count ? op1f_cards_2.slots[card].card : 0;
     copy_name(name, c ? c->name : 0, (u32)CARD_NAME + 1u);
 }
 
 static void engine_name(u32 card, u32 ask, char* name, u32 drum) {
-    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards.count ? op1f_cards.slots[card].card : 0;
-    if (drum) {                                                                     // R18
+    op1f_cards_lists();                                                             // R20 (base 42)
+    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards_2.count ? op1f_cards_2.slots[card].card : 0;
+    if (drum) {                                                                     // R21
         const Op1fKindHead* h = c ? drum_ask(c, ask) : 0;
         copy_name(name, h ? h->name : 0, (u32)NAME + 1u);
         return;
@@ -768,7 +772,7 @@ static void say_ticket() {
     else
         op1f_log(2, LOG_FILE, 9, "sample: drop %u into %s %u refused in the unit's turn: %d, %s, after %u frame(s)", number, drum ? "drum" : "synth", slot + 1u,
                  op1f_sample_answer(why), op1f_sample_why_words(why), after);
-    if (why == (u32)OP1F_SAMPLE_PASSED && !drum && !mark && &op1f_sample_kept != 0) op1f_sample_kept(slot, frames, stereo);   // R18: the unit keeps a drum's itself
+    if (why == (u32)OP1F_SAMPLE_PASSED && !drum && !mark && &op1f_sample_kept != 0) op1f_sample_kept(slot, frames, stereo);   // R21: the unit keeps a drum's itself
     MASK_OFF(mask);
     if (ticket.state == (u32)ENDED && ticket.number == number) ticket.state = FREE;
     MASK_ON(mask);
@@ -780,7 +784,7 @@ extern "C" SAMPLE_APART void op1f_sample_frame() {
     frames_seen = frame;
     say_refusals((frame & ((u32)AGAIN_FRAMES - 1u)) == 0 ? 1u : 0u);
     say_ticket();
-    u32 passes = op1f_sample_sd_passes + op1f_sample_dd_passes;                    // R18: the drum's too
+    u32 passes = op1f_sample_sd_passes + op1f_sample_dd_passes;                    // R21: the drum's too
     if (passes != unit.passes_said) {
         unit.passes_said = passes;
         op1f_log(3, LOG_FILE, 10, "sample: the unit's own drops into its samplers so far: %u", passes);

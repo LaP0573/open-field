@@ -141,7 +141,7 @@ static inline int add_held(int a, int b) {
 
 ## Working memory
 
-`state_bytes` is the memory one place needs, up to 8 MiB (`OP1F_EFFECT_STATE_MOST`). You don't ask it with a separate ask. The base takes it for you, from level 6's working memory and inside its limits (16 MiB for every pack's asks together, 8 MiB kept free for the unit):
+`state_bytes` is the memory one place needs, up to 8 MiB (`OP1F_EFFECT_STATE_MOST`). You don't ask it with a separate ask. The base takes it for you, from level 6's working memory and inside its limits (from base 41 the spare memory first, then up to 16 MiB of the unit's heap with 8 MiB kept free; before base 41, 16 MiB for every pack's asks together, 8 MiB kept free for the unit):
 
 - **One block for the sound that plays** (every synth and drum sound shares it, since only one plays at a time), and **one for the master**, each the first time your effect plays there.
 - **One for each place another pack runs your effect at** (below), the first time it asks. Once no place runs it any more, the base may hand it on to the next place that asks for your effect, cleared to 0 again first.
@@ -295,7 +295,7 @@ Places are said as `synth 1` to `synth 8`, `drum 1` to `drum 8` and `the master`
 | Declared cost | 1 to 84,000 cycles a call |
 | Switched off | Eight calls in one second over twice the declared cost and over the declared cost plus 20,000, or one call over 290,000 |
 | Stack | 1 KiB a call of `process`, with whatever it calls |
-| Working memory | Up to 8 MiB a place, from level 6's 16 MiB, 8 MiB kept free |
+| Working memory | Up to 8 MiB a place, from level 6's working memory and inside its limits ([level 6](level-6.md#limits-in-one-place)) |
 | Places that play at once | Two: the sound that plays and the master, besides those other packs run it at |
 | Your own places for other packs' effects | 8 (`which` 0 to 7) |
 

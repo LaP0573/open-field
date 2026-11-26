@@ -1,4 +1,4 @@
-/* Step R18, base 40: the entry at one function of the firmware for a pack's drum engine (OS 1.7.3+0). The logic is in
+/* Step R21, base 43: the entry at one function of the firmware for a pack's drum engine (OS 1.7.3+0). The logic is in
  * the drum unit (module/build_r18_drum.cpp). The base's table puts a JUMP.a to the entry over the first eight bytes of
  * the function, with a trampoline the loader makes in the room named beside it: those eight bytes copied from the
  * running firmware (whole instructions, none relative to its own place), and a jump back behind them. A jump to the

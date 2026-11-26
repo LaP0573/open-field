@@ -1,4 +1,4 @@
-// Step R18, base 40: a pack's drum engine. A unit of its own, new at base 40.
+// Step R21, base 43: a pack's drum engine. A unit of its own, new at base 43.
 //
 // A pack adds an engine to the drum's own engine list (shift and T1 in the drum's mode) through one ask of its card
 // (OP1F_ASK_DRUM_ENGINE, 12, its table a level-5 head, module/build_r6e_card.h). The engine rides the unit's drum
@@ -71,7 +71,7 @@ extern "C" u8 op1f_drum_pick_room[] OP1F_NAMED("op1f_drum_pick_room");
 #define STOCK_JSON_NUMBER ((JsonNumberFn)0x8c083b1cu)
 #define ROOM_PICK ((PickFn)(void*)op1f_drum_pick_room)
 
-// The kind of ask, as the header of base 40 (module/build_r6e_card.h) names it; this unit reads base 29's header.
+// The kind of ask, as the header of base 43 (module/build_r6e_card.h) names it; this unit reads base 29's header.
 #ifndef OP1F_BUILD_R18_DRUM_H
 enum { OP1F_ASK_DRUM_ENGINE = 12 };
 #endif
@@ -81,7 +81,7 @@ enum : u32 {
 };
 
 enum {
-    SLOTS = 8, DRUM_SAMPLER = 9, ID = 32, NAME = OP1F_KIND_NAME, HEAD_BYTES = 28, CARDS = OP1F_CARDS_MOST,
+    SLOTS = 8, DRUM_SAMPLER = 9, ID = 32, NAME = OP1F_KIND_NAME, HEAD_BYTES = 28, CARDS = OP1F_SLOTS_MOST,
     KIND_STRING = 4, KIND_ARRAY = 6, KIND_OBJECT = 7, KIND_AT = 4, MEMBER_ROOM = 64, RIDE_LINES = 32,
     GRACE_FRAMES = 150                 // frames after a pick of the engine in which the list's own load of a kit keeps the ride
 };
@@ -98,11 +98,11 @@ static const char DBOX_NAME[] = "dbox";
 // fields of 16 bytes; the empty name ends the list. The name is also held against every row of `drum_types`.
 static const char REFUSED_NAMES[][16] = {"dbox", "drum", "drums", "sampler", "drum sampler", "drum_sampler", "synth", ""};
 
-// The mark of a base of base 40's drum engine (a constant 1): a pack with an ask of kind OP1F_ASK_DRUM_ENGINE names it.
+// The mark of a base of base 43's drum engine (a constant 1): a pack with an ask of kind OP1F_ASK_DRUM_ENGINE names it.
 extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 const unsigned op1f_drum_engine_1 = 1;
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+#include "build_r3_base.h"                              // R20 (base 42): op1f_cards_2, op1f_cards_lists
 
 // The values unit's pair for the base's member op1f_engine at a drum slot (module/build_r6b_keeps.cpp): as
 // op1f_keeps_engine_get and op1f_keeps_engine_set for a synth slot. From the display thread only.
@@ -202,10 +202,11 @@ static const void* row_named(const void* list, const char* name) {
 // The holder: the first card the base uses, of level 8 or later, with an ask of this kind whose table is a head. The
 // cards unit holds the page by the same rule (module/build_r6d_cards.cpp, drum_look).
 static void find_holder() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;
-        const Op1fCard* card = op1f_cards.slots[i].card;
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
         if (card->bytes < (u32)OP1F_CARD_LEVEL_8_BYTES || card->level < 8u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
         for (u32 k = 0; k < asks; ++k) {
@@ -397,7 +398,7 @@ extern "C" void op1f_drum_frame() OP1F_NAMED("op1f_drum_frame");
 extern "C" void op1f_drum_frame() {
     frames = frames + 1u;
     if (unit.slot1 == 0) return;
-    const char* pack = op1f_cards.slots[unit.slot1 - 1u].card->name;
+    const char* pack = op1f_cards_2.slots[unit.slot1 - 1u].card->name;
     if (!unit.said) {
         unit.said = 1;
         if (unit.registered)

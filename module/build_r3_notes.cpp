@@ -60,13 +60,14 @@ typedef unsigned char u8;
 
 static const u32 INSTRUMENT = 0x84d21088u;             // the instrument the unit is on: 0 the synth, 1 the drum, another number on neither
 
-enum { MOST = OP1F_NOTES_MOST, CARDS = OP1F_CARDS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 32, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES,
+enum { MOST = OP1F_NOTES_MOST, CARDS = OP1F_SLOTS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 32, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES,
        NOTE_MOST = 127, VELOCITY_MOST = 127, PERIOD_FRAMES = 256 };
 static_assert(sizeof(Op1fNotes) == TABLE_BYTES, "the table of the notes heard is 32 bytes at level 5");
 
 static const char LOG_FILE[] = "../src/main/op1f_notes.cpp";
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 
 // How many listeners the table holds: 0 until the registration, then written once. The entries read it first.
 extern "C" volatile u32 op1f_notes_listening OP1F_NAMED("op1f_notes_listening");
@@ -179,11 +180,12 @@ static int refused(const Op1fAsk* ask, const Op1fCardSlot* slot, u32* a, u32* b,
 }
 
 static void enrol() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     u32 n = 0;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;                                   // a card the base does not use
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 4u || card->asks == 0) continue;
         for (u32 k = 0; k < card->ask_count; ++k) {

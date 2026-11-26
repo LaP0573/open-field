@@ -50,7 +50,7 @@ typedef unsigned char u8;
 enum { WIDE = 480, TALL = 224, COLUMN = 256, LAST_X = WIDE - 1 };
 enum { PEN_MOST = 16, SCALE_MOST = 8, TEXT_MOST = 128, BLOCK_MOST = 480, REACH = 32767 };
 enum { GLYPH_WIDE = 5, GLYPH_TALL = 7, ADVANCE = 6, FIRST_GLYPH = 0x20, LAST_GLYPH = 0x7e, GLYPHS = LAST_GLYPH - FIRST_GLYPH + 1 };
-enum { SLOTS = OP1F_CARDS_MOST, NONE = OP1F_CARDS_MOST };   // the counts of each slot, and one for a call from no frame function
+enum { SLOTS = 128, NONE = 128 };   // R20: OP1F_SLOTS_MOST (module/build_r3_base.h); the counts of each slot, and one for a call from no frame function
 
 // The cards unit's (base 19's cards unit): the slot + 1 whose frame function the base is calling on this thread, 0
 // otherwise; and this frame's canvas while a frame function runs, 0 otherwise.
@@ -59,7 +59,7 @@ extern "C" void* op1f_cards_canvas() OP1F_NAMED("op1f_cards_canvas");
 
 static u32 painted[SLOTS + 1], refused[SLOTS + 1];
 
-// The counts of a slot (0 to 31; 32: calls from no frame function) since the last time they were taken, and taken:
+// The counts of a slot (0 to 127; 128: calls from no frame function, R20) since the last time they were taken, and taken:
 // for the cards unit's line at the period, from the display thread. A count missed by a refusal on another thread
 // at that instant is lost; nothing else is.
 extern "C" void op1f_paint_take(u32 slot, u32* painted_now, u32* refused_now) OP1F_NAMED("op1f_paint_take");

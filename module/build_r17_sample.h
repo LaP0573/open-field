@@ -57,9 +57,9 @@ enum {
     OP1F_SAMPLE_NOT_INPUT = 1,     // not inside the card's own input function, for an event on the key thread
     OP1F_SAMPLE_DISK = 2,          // the disk mode is open
     OP1F_SAMPLE_NO_PLACE = 3,      // a place that is no sound's
-    OP1F_SAMPLE_DRUM = 4,          // a drum sound's place on a base that drops into synth sounds only (39); from base 40 a
+    OP1F_SAMPLE_DRUM = 4,          // a drum sound's place on a base that drops into synth sounds only (39); from base 43 a
                                    // drum place is taken when the ask is the card's drum engine (kind 12)
-    OP1F_SAMPLE_NO_ASK = 5,        // no ask of kind engine with that number (of kind drum engine for a drum place, base 40)
+    OP1F_SAMPLE_NO_ASK = 5,        // no ask of kind engine with that number (of kind drum engine for a drum place, base 43)
     OP1F_SAMPLE_RESTORING = 6,     // the place's sample is being put back after the start
     OP1F_SAMPLE_NOT_RIDING = 7,    // the place does not ride that engine now
     OP1F_SAMPLE_UNTOLD = 8,        // a sound loaded there is not told yet
@@ -98,7 +98,7 @@ enum { OP1F_SAMPLE_RIDES_NOT = 0, OP1F_SAMPLE_RIDES = 1, OP1F_SAMPLE_RIDES_UNTOL
 //   capacity     the object's frames (+0xd768)
 //   stereo       1 when its channels byte (+0xd770) is not 0, else 0
 //   length       the clipboard's length in frames
-//   drums        base 40: 1 when a drum place may be dropped into (the base has drum engines); `engine` and `ride` are
+//   drums        base 43: 1 when a drum place may be dropped into (the base has drum engines); `engine` and `ride` are
 //                then the drum engine's for a drum place (kind 12, the drum unit's ride), and the bound is the drum's pool
 struct Op1fSampleScene {
     unsigned turn, keyed, disk, place, engine, ride, restoring, ticket;
