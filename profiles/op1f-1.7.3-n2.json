@@ -382,6 +382,13 @@
    "name": "The entry of the function that puts an engine picked in the unit's list on a synth sound."
   },
   {
+   "address": "0x8d4eb160",
+   "length": 8,
+   "sum": "0x8e2c6a48",
+   "group": "base",
+   "name": "The entry of the function that puts an engine picked in the unit's list on a drum sound."
+  },
+  {
    "address": "0x8fc2688e",
    "length": 8,
    "sum": "0xa15b2423",
@@ -513,6 +520,13 @@
    "sum": "0xd0f0e34c",
    "group": "base",
    "name": "The entry of the function that puts what the tape has lifted into a synth sound's sample: the drop key on the sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work. Nothing else calls it."
+  },
+  {
+   "address": "0x8f00ba38",
+   "length": 8,
+   "sum": "0xd0f0e34c",
+   "group": "base",
+   "name": "The entry of the function that puts what the tape has lifted into a drum sound's sample: the drop key on the drum sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work."
   }
  ],
  "image": [
@@ -884,6 +898,14 @@
      "does": "A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline)."
     },
     {
+     "address": "0x8d4eb160",
+     "form": "jump",
+     "target": "op1f_drum_pick_entry",
+     "room": "op1f_drum_pick_room",
+     "copies": 8,
+     "does": "A jump to ours, which puts a pack's drum engine on a drum sound that plays the drum sampler (the sound stays as it is) or takes it off, and lets the firmware's function run (through a trampoline) for every other pick."
+    },
+    {
      "address": "0x8fc2688e",
      "form": "call",
      "target": "op1f_popups_place",
@@ -1006,6 +1028,14 @@
      "room": "op1f_sample_sd_room",
      "copies": 8,
      "does": "A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline."
+    },
+    {
+     "address": "0x8f00ba38",
+     "form": "jump",
+     "target": "op1f_sample_dd_stub",
+     "room": "op1f_sample_dd_room",
+     "copies": 8,
+     "does": "A jump to our stub. A drop a pack asked for into a drum sound that rides its drum engine (op1f_sample_drop) is done by ours, in the unit's turn; every other, the drum page's own drop key's among them, goes on in the firmware's function through a trampoline."
     }
    ]
   }
