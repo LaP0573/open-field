@@ -9,7 +9,7 @@
   "repository": "https://github.com/hasis/field-packs-releases",
   "path": "packs/tune.pack",
   "follow": "main",
-  "version": 28,
+  "version": 29,
   "firmware": "1.7.3",
   "needs": [],
   "folders": [],

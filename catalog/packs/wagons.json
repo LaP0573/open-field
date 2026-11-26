@@ -5,11 +5,11 @@
   "categories": [
     "effects"
   ],
-  "description": "Five effects in the unit's own effect lists: BOOST, GATE, FREEZE, TAPE and JUNEAUX.",
+  "description": "Six effects in the unit's own effect lists: BOOST, GATE, FREEZE, TAPE, JUNEAUX and ROTARY (a rotary speaker cabinet).",
   "repository": "https://github.com/hasis/field-packs-releases",
   "path": "packs/wagons.pack",
   "follow": "main",
-  "version": 13,
+  "version": 17,
   "firmware": "1.7.3",
   "needs": [],
   "folders": [],
