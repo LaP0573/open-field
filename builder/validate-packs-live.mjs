@@ -271,6 +271,19 @@ const row = (rows, key) => [rows.base, ...rows.listed, ...rows.others].find((r) 
   check("room: no manifest or no hello: no line", P.roomWords(n1Said, null) === null && P.roomWords(null, v2) === null);
   const v2b = { reserve: { pack_room: { base: "0x85000000", bytes: 33554432, files: 200 } } };
   check("room: the numbers come from the door and the manifest", P.roomWords({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "This unit's loader has a room of 3 MB for 40 pack files. Install again for 32 MB and 200.");
+  // the moment "loader": the page leads with the new loader exactly when roomWords has a line
+  check("loader: N1 said by the door, the page offers N2: offered", P.loaderOffered(n1Said, v2) === true);
+  check("loader: the unit on N2 already (generation 2): not offered", P.loaderOffered(n2, v2) === false);
+  check("loader: a door that says neither its loader nor its base: not offered", P.loaderOffered(n1Inferred, v2) === false && P.loaderOffered({ protocol: 3 }, v2) === false);
+  check("loader: a base older than 40 (it cannot say its loader): offered", P.loaderOffered({ loaderSaid: false, baseVersion: 39 }, v2) === true && P.loaderOffered({ baseVersion: 25 }, v2) === true);
+  check("loader: base 40 that says nothing of its loader: not offered", P.loaderOffered({ loaderSaid: false, baseVersion: 40 }, v2) === false);
+  check("loader: a base older than 40 while the page offers v1 (no pack_room): not offered", P.loaderOffered({ baseVersion: 39 }, v1) === false);
+  check("loader: the page offers N1 (no pack_room): not offered", P.loaderOffered(n1Said, v1) === false && P.loaderOffered(n1Said, null) === false && P.loaderOffered(null, v2) === false);
+  const PANEL = "Install again to get it: room for 128 pack files and 16 MB, and the new base with it. Your pack files stay where they are.";
+  check("loader: the panel's line", P.loaderLine(n1Said, v2) === PANEL, P.loaderLine(n1Said, v2));
+  check("loader: the panel's line from the door's and the manifest's numbers", P.loaderLine({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "Install again to get it: room for 200 pack files and 32 MB, and the new base with it. Your pack files stay where they are.");
+  check("loader: no panel line when not offered", P.loaderLine(n2, v2) === null && P.loaderLine(n1Inferred, v2) === null && P.loaderLine(n1Said, v1) === null);
+  check("loader: the panel's line for a base older than 40", P.loaderLine({ baseVersion: 39 }, v2) === PANEL, P.loaderLine({ baseVersion: 39 }, v2));
 }
 
 // ---------- 5. the plan's order, and the unit's files read from the door ----------

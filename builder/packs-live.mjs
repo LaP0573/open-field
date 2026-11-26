@@ -96,18 +96,48 @@ export function readRows({ listing, base, unit, known = new Map() }) {
   return { base: baseRow, listed, others, packsMost: most };
 }
 
-// The line for a unit whose loader has less room than the one the page offers: its door says generation 1 (or says
-// nothing, which is N1) and the page's loader manifest is of generation 2 (it carries reserve.pack_room). null otherwise.
+// The line for a unit whose loader has less room than the one the page offers: its door says generation 1, or its base
+// is older than 40 and so says nothing of its loader (N2 came out with base 42 and the page installs them together: such
+// a unit is on N1), and the page's loader manifest is of generation 2 (it carries reserve.pack_room). null otherwise.
 // hello: door.mjs's parseHello. manifest: the page's loader.json (or the version asked for beside it).
 export function roomWords(hello, manifest) {
-  const room = manifest && manifest.reserve ? manifest.reserve.pack_room : null;
-  // Only when the door says its loader is N1 (base 40 and later): an older base says nothing of the loader, and the
-  // unit may already be on N2 under it, so no advice is given then.
-  if (!hello || hello.loaderSaid !== true || !room || !Number.isFinite(room.bytes) || !Number.isInteger(room.files)) return null;
-  const generation = hello.loaderGeneration, bytes = hello.packRoom, files = hello.packsMost;
+  const f = roomFacts(hello, manifest);
+  return f && "This unit's loader has a room of " + f.mb + " MB for " + f.files + " pack files. Install again for " + f.offerMb + " MB and " + f.offerFiles + ".";
+}
+
+// The first base whose door says its loader (hello 04's tail).
+export const LOADER_SAYING_BASE = 40;
+
+// The numbers behind roomWords: { mb, files, offerMb, offerFiles }, or null when roomWords gives no line.
+function roomFacts(hello, manifest) {
+  const room = pageRoom(manifest);
+  if (!hello || !room) return null;
+  let generation, bytes, files;
+  if (hello.loaderSaid === true) ({ loaderGeneration: generation, packRoom: bytes, packsMost: files } = hello);
+  else if (Number.isInteger(hello.baseVersion) && hello.baseVersion < LOADER_SAYING_BASE)
+    ({ loaderGeneration: generation, packRoom: bytes, packsMost: files } = N1_LOADER);   // a base older than 40: N1
+  else return null;
   if (generation !== 1 || (room.bytes <= bytes && room.files <= files)) return null;
   const mb = (n) => Math.round(n / 1048576);
-  return "This unit's loader has a room of " + mb(bytes) + " MB for " + files + " pack files. Install again for " + mb(room.bytes) + " MB and " + room.files + ".";
+  return { mb: mb(bytes), files, offerMb: mb(room.bytes), offerFiles: room.files };
+}
+
+// The page's loader manifest's room for packs (reserve.pack_room, the loader N2 and later), or null.
+function pageRoom(manifest) {
+  const room = manifest && manifest.reserve ? manifest.reserve.pack_room : null;
+  return room && Number.isFinite(room.bytes) && Number.isInteger(room.files) ? room : null;
+}
+
+// Whether the page leads with the new loader (the moment "loader", before a base update: the install puts the page's
+// base.pack on with the firmware file): exactly when roomWords has a line.
+export function loaderOffered(hello, manifest) {
+  return roomFacts(hello, manifest) !== null;
+}
+
+// The moment "loader"'s line, from the same numbers as roomWords; null when the loader is not offered.
+export function loaderLine(hello, manifest) {
+  const f = roomFacts(hello, manifest);
+  return f && "Install again to get it: room for " + f.offerFiles + " pack files and " + f.offerMb + " MB, and the new base with it. Your pack files stay where they are.";
 }
 
 // The ticks as the page starts: every file on the unit ticked, no update asked.

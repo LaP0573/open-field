@@ -54,7 +54,8 @@
   /* the moments of the page: an element with data-m shows only in the moments it names */
   body[data-moment="connect"] [data-m]:not([data-m~="connect"]), body[data-moment="found"] [data-m]:not([data-m~="found"]),
   body[data-moment="other"] [data-m]:not([data-m~="other"]), body[data-moment="ours"] [data-m]:not([data-m~="ours"]),
-  body[data-moment="update"] [data-m]:not([data-m~="update"]), body[data-moment="packs"] [data-m]:not([data-m~="packs"]),
+  body[data-moment="update"] [data-m]:not([data-m~="update"]), body[data-moment="loader"] [data-m]:not([data-m~="loader"]),
+  body[data-moment="packs"] [data-m]:not([data-m~="packs"]),
   body[data-moment="asks"] [data-m]:not([data-m~="asks"]), body[data-moment="back"] [data-m]:not([data-m~="back"]),
   body[data-moment="install"] [data-m]:not([data-m~="install"]) { display: none !important; }
 
@@ -426,7 +427,7 @@
         <div class="sec-h">
           <span class="n">1</span><h2>your OP-1</h2>
           <span class="aside" data-m="connect"><span><span class="dot ring"></span><span id="linkWords">not connected</span></span></span>
-          <span class="aside" data-m="found other ours update packs asks back"><span><span class="dot" style="--c:var(--blue)"></span>connected over usb</span><button type="button" class="linkish" id="disconnect">disconnect</button><button type="button" class="linkish hidden" id="saveLogs" title="the log files of your OP-1's last three starts, in one .zip">save logs</button></span>
+          <span class="aside" data-m="found other ours update loader packs asks back"><span><span class="dot" style="--c:var(--blue)"></span>connected over usb</span><button type="button" class="linkish" id="disconnect">disconnect</button><button type="button" class="linkish hidden" id="saveLogs" title="the log files of your OP-1's last three starts, in one .zip">save logs</button></span>
         </div>
 
         <!-- large: when you have to look at your OP-1 -->
@@ -478,7 +479,7 @@
         </ol>
 
         <!-- small: open-field is on it, and you're here for the packs -->
-        <div class="ucompact" data-m="ours update packs">
+        <div class="ucompact" data-m="ours update loader packs">
           <svg class="dev" viewBox="0 0 974 348" role="img" aria-label="A line drawing of the OP-1 field">
             <use href="#unit-drawing" width="1000" height="348"/>
           </svg>
@@ -488,6 +489,11 @@
               <p>You're on <span class="releaseUnit">?</span>.</p>
               <div class="row" style="margin-top:14px"><button type="button" class="btn ochre" id="updateBase"><span>update to <span class="releaseHere">?</span></span></button></div>
             </div>
+            <div data-m="loader">
+              <h3>open-field <span class="releaseHere">?</span> is out</h3>
+              <p id="loaderLine"></p>
+              <div class="row" style="margin-top:14px"><button type="button" class="btn ochre" id="installAgain"><span>install again</span></button></div>
+            </div>
             <div data-m="ours packs">
               <h3 id="oursHead">you're up to date</h3>
             </div>
@@ -495,7 +501,7 @@
           </div>
           <div>
             <dl class="spec"><dt>OS</dt><dd id="specOs">1.7.3</dd><dt>open-field</dt><dd id="specRelease"></dd><dt>packs</dt><dd id="specPacks"></dd><dt>at its last start</dt><dd id="specStart"></dd></dl>
-            <p class="note hidden" id="roomNote"></p>
+            <p class="note hidden" id="roomNote" data-m="ours update packs"></p>
             <button type="button" class="linkish note" id="reinstall">reinstall or go back to the original firmware</button>
           </div>
         </div>
@@ -650,7 +656,7 @@
         <div class="sec-h">
           <span class="n">2</span><h2>packs</h2>
           <span class="aside" data-m="connect found other back asks install">new features, one file each · <span id="offerCount">none listed yet</span></span>
-          <span class="aside" data-m="ours update packs"><span><span class="dot" style="--c:var(--blue)"></span>on your OP-1</span><span><span class="dot" style="--c:var(--ochre)"></span>update out</span><span><span class="dot" style="--c:var(--grey)"></span>not on it</span><span><span class="dot" style="--c:var(--red)"></span>coming off</span></span>
+          <span class="aside" data-m="ours update loader packs"><span><span class="dot" style="--c:var(--blue)"></span>on your OP-1</span><span><span class="dot" style="--c:var(--ochre)"></span>update out</span><span><span class="dot" style="--c:var(--grey)"></span>not on it</span><span><span class="dot" style="--c:var(--red)"></span>coming off</span></span>
         </div>
         <div class="filters" id="filters"></div>
 
@@ -841,7 +847,7 @@
 
   // ---- the install steps, shown at the top of the page, in place ----
   // "install open-field" (when connect found no open-field, or one this page can't work with) and "reinstall or go back
-  // to the original firmware" (under the table, when it found one) show the steps where the OP-1's drawing was. The
+  // to the original firmware" (under the table, when it found one) and "install again" (the new loader's panel) show the steps where the OP-1's drawing was. The
   // address keeps #install, so that a reload in the middle of the install comes back to the steps.
   function openInstall(scroll = true) {
     if (window.openFieldLetGoOfMidi) window.openFieldLetGoOfMidi();   // the packs section's hold on the OP-1 given back: it will restart into its bootloader
@@ -854,7 +860,7 @@
     history.replaceState(null, "", location.pathname + location.search);
     document.body.dataset.moment = "connect";
   }
-  for (const id of ["goInstall", "otherInstall", "reinstall"]) $(id).addEventListener("click", () => { leaveGate(); openInstall(); });
+  for (const id of ["goInstall", "otherInstall", "reinstall", "installAgain"]) $(id).addEventListener("click", () => { leaveGate(); openInstall(); });
   $("closeInstall").addEventListener("click", closeInstall);
   // a link to a section takes #install out of the address, and a reload would come back with the steps closed
   window.addEventListener("hashchange", () => { if (document.body.dataset.moment === "install") history.replaceState(null, "", "#install"); });
@@ -1597,6 +1603,9 @@
   function momentFor() {
     if (!unit || !rowsNow) return client.hello ? "ours" : "connect";
     if (resolved && (resolved.plan.send.length || resolved.plan.remove.length)) return "packs";
+    // a unit with less room than the page's loader gives (a base older than 40, or a door that says so): the whole
+    // install, firmware file and base.pack together, comes first; a base update alone is for a unit on the page's loader
+    if (P.loaderOffered(unit.hello, files && files.manifest)) return "loader";
     if (P.updateOffered(rowsNow.base)) return "update";
     return "ours";
   }
@@ -1863,6 +1872,8 @@
     const room = P.roomWords(unit.hello, files && files.manifest);
     $("roomNote").textContent = room || "";
     $("roomNote").classList.toggle("hidden", !room);
+    // the moment "loader"'s line (the grey note above stays out of that moment)
+    $("loaderLine").textContent = P.loaderLine(unit.hello, files && files.manifest) || "";
     const waiting = resolved && (resolved.plan.send.length || resolved.plan.remove.length);
     $("oursHead").textContent = waiting ? "changes waiting" : "you're up to date";
   }
