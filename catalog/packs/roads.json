@@ -1,0 +1,25 @@
+{
+  "id": "roads",
+  "author": "Slow-Magic",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "Electric piano synth. Requires the separate roads.msb sample bank from the slowp1 GitHub release.",
+  "repository": "https://github.com/slowmagic222/slowp1",
+  "commit": "555873e50d1a9e626ce8a4ef281a76697bd46087",
+  "path": "roads.pack",
+  "sha256": "2a9038399cba6a45303687c879c758b86cab7f78cd8b49d03bff188ca341f83c",
+  "bytes": 66921,
+  "version": 9,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [
+    {
+      "name": "roads",
+      "place": "roads"
+    }
+  ]
+}
