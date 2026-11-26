@@ -233,6 +233,10 @@ Since R8 (base 32, module/build_r6e_card.h) a card of level 6 or later may carry
     choice (a switch: false or true) or the number it starts at, "category": "packs" (left out), "keyboard", "system"
     or "midi", "where": "unit" (left out) or "tape"}]}
 `card` and `check` print "options 'trial', 2 option(s): dot on/off from off in keyboard; cents -20..20 from 0, changed, open".
+Base 43 (hasis): an option may instead be {"name", "words": the symbol of the pack's function word(choice), "first": a choice
+from 0 to 31}: an option of words (OP1F_OPTION_WORDS), whose words the function names while the pack runs. Such options
+come last; the table's count holds only those before them, so a base 42 or earlier reads only those. `check` prints
+"look words of a function from 0".
 
 The readers are module/build_j_pack.cpp (format 1) and the bases (module/build_j5c_base.cpp for formats 2 and 3).
 A pack file holds the module's own code and whatever the module carries. Whether one holds anything of the firmware
@@ -430,9 +434,10 @@ OPTIONS_MOST, CHOICES_MOST, OPTION_NAME, CHOICE_NAME, OPTION_BYTES = 8, 8, 16, 8
 OPTION_NAME_FORM = re.compile(r"[A-Za-z0-9 .+#%/-]{1,15}")       # an option's name: the characters the unit's letters draw (no `_`)
 CHOICE_FORM = re.compile(r"[A-Za-z0-9 .+#%/-]{1,7}")             # a choice's word, the same characters
 OPTION_SWITCH, OPTION_LIST, OPTION_NUMBER = 0, 1, 2             # Op1fOption.kind
+OPTION_WORDS, WORDS_MOST = 3, 32                                 # base 43 (hasis): words the pack's function names while it runs, behind `count`
 OPTION_WHERE = {"unit": 0, "tape": 1}                           # Op1fOption.where, bits 0 to 3 (1 reserved: kept for the unit)
 OPTION_CATEGORY = {"packs": 0, "keyboard": 1, "system": 2, "midi": 3}     # Op1fOption.where, bits 4 to 7
-OPTION_KEYS = ("name", "choices", "low", "high", "first", "category", "where")
+OPTION_KEYS = ("name", "choices", "low", "high", "first", "category", "where", "words")
 # since R11 (base 35, module/build_r6e_card.h, "Base 35: layers"): an effect may be a layer (its head's flag
 # OP1F_EFFECT_LAYER, {"kind": "effect", ..., "layer": true}): it lies over whichever of the unit's own effects the place
 # holds, so it stands on none ("rides" left out or ""), has no values ("params" left out or []) and may have no process
@@ -1520,6 +1525,8 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
         held = []
         for place, o in enumerate(options, 1):
             held.append(option_of_card(said, place, o, [h[0] for h in held]))
+            if held[-1][1] != OPTION_WORDS and any(h[1] == OPTION_WORDS for h in held[:-1]):     # base 43
+                raise ValueError("%s: its option %d comes after an option of words: those stand behind the table's count, so they come last" % (said, place))
         functions = {"changed": ask.get("changed"), "open": ask.get("open")}
         extra = {"options": held}
     else:
@@ -1572,6 +1579,14 @@ def option_of_card(said, place, o, before):
                          % (said, place, o["name"]))
     if o["name"] in before:
         raise ValueError("%s: its option %d's name, %r, is there before" % (said, place, o["name"]))
+    if "words" in o:                                        # base 43: an option of words, its function the pack's
+        if set(o) - {"name", "words", "first"} or not a_symbol(o["words"]) or o["words"] is None:
+            raise ValueError('%s: its option %d is an option of words: {"name", "words": the symbol of the pack\'s function word(choice), "first": a choice from 0} '
+                             "and nothing else (it shows under PACKS and is kept for the unit)" % (said, place))
+        first = o.get("first", 0)
+        if not whole(first, 0, WORDS_MOST - 1):
+            raise ValueError("%s: its option %d's first is a choice from 0 to %d, not %r" % (said, place, WORDS_MOST - 1, first))
+        return (o["name"], OPTION_WORDS, 0, first, 0, o["words"])
     if "low" in o or "high" in o:                           # a number from low to high
         if "choices" in o:
             raise ValueError("%s: its option %d has low or high, a number, and choices too: a number has none (leave them out)" % (said, place))
@@ -1972,6 +1987,8 @@ def option_in_order(kind, count, first, choices):
         return 2 <= count <= CHOICES_MOST and first < count
     if kind == OPTION_NUMBER:
         return count == 0 and choices[1] > choices[0] and first <= choices[1] - choices[0]
+    if kind == OPTION_WORDS:                                # base 43: its function's address in choices
+        return count == 0 and first < WORDS_MOST and bool(choices)
     return False
 
 
@@ -1983,6 +2000,8 @@ def option_words(name, kind, first, choices, where=0):
     category = "" if not where >> 4 else " in %s" % categories.get(where >> 4, "category %d" % (where >> 4))
     if kind == OPTION_SWITCH:
         return "%s on/off from %s%s" % (name, ("off", "on")[first] if first < 2 else "?", category)
+    if kind == OPTION_WORDS:                                # base 43
+        return "%s words of %s from %d" % (name, choices if isinstance(choices, str) else "a function", first)
     if kind == OPTION_NUMBER:                               # its choices [low, high]
         low, high = choices
         return "%s %d..%d from %s%s" % (name, low, high, low + first if low + first <= high else "?", category)
@@ -2022,9 +2041,12 @@ def ask_table_words(ask, address_of=None):
     if what == 5:
         return [len(extra["names"]), address(extra["names_symbol"])]
     if what == OPTIONS:                                     # since R8 (base 32): each option its name, four bytes, its choices' words
-        words = [address(functions["changed"]), len(extra["options"])]
+        words = [address(functions["changed"]), sum(1 for o in extra["options"] if o[1] != OPTION_WORDS)]     # base 43: words behind the count
         for n, k, c, f, w, cs in extra["options"]:
             words += [n.encode("ascii").ljust(OPTION_NAME, b"\0"), k | c << 8 | f << 16 | w << 24]
+            if k == OPTION_WORDS:                           # base 43: its function in the choices' first four bytes
+                words += [address(cs), bytes(CHOICES_MOST * CHOICE_NAME - 4)]
+                continue
             if k == OPTION_NUMBER:                          # a number: low and high, signed bytes, in its first choice
                 words += [struct.pack("<bb", *cs).ljust(CHOICES_MOST * CHOICE_NAME, b"\0")]
                 continue
@@ -2396,20 +2418,26 @@ def ask_tables_6(data, level, layered=None):
             if size == OPTIONS_OPEN_BYTES:                   # since R8's design: the pack's own page, at +708
                 functions["open"] = struct.unpack_from("<I", body, at + TABLE_BYTES_6[OPTIONS])[0]
             held = []
-            for n in range(min(words[1], OPTIONS_MOST)):
+            static = min(words[1], OPTIONS_MOST)
+            words_behind = 0                                 # base 43: options of words behind the count
+            while static + words_behind < OPTIONS_MOST and body[at + 36 + OPTION_BYTES * (static + words_behind) + 16] == OPTION_WORDS:
+                words_behind += 1
+            for n in range(static + words_behind):
                 o = at + 36 + OPTION_BYTES * n
                 raw = bytes(body[o:o + OPTION_NAME])
                 k, c, f, w = body[o + 16], body[o + 17], body[o + 18], body[o + 19]
                 if k == OPTION_NUMBER:                       # a number: low and high, signed bytes, in its first choice
                     cs = list(struct.unpack_from("<bb", body, o + 20))
+                elif k == OPTION_WORDS:                      # base 43: its function's address
+                    cs = struct.unpack_from("<I", body, o + 20)[0]
                 else:
                     cs = [bytes(body[o + 20 + CHOICE_NAME * i:o + 20 + CHOICE_NAME * (i + 1)]).split(b"\0")[0].decode("latin-1")
                           for i in range(min(c, CHOICES_MOST))] if k == OPTION_LIST else []
                 held.append((raw.split(b"\0")[0].decode("latin-1"), k, c, f, w, cs))
             extra = {"options": held}
-            if not 1 <= words[1] <= OPTIONS_MOST:
+            if not 1 <= words[1] + words_behind <= OPTIONS_MOST or words[1] > OPTIONS_MOST:
                 wrong = "its count of options is not between 1 and %d" % OPTIONS_MOST
-            elif any(not option_in_order(k, c, f, cs) for _n, k, c, f, _w, cs in held):
+            elif any(not option_in_order(k, c, f, cs) or (i < static) == (k == OPTION_WORDS) for i, (_n, k, c, f, _w, cs) in enumerate(held)):
                 wrong = "an option that is not in order"
         else:
             functions["changed"] = words[0]
