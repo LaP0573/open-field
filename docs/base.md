@@ -54,7 +54,7 @@ python -I tools/pack_build.py card --recipe examples/wink/recipe.json --out <the
 | 4 | [What a page needs](level-4.md): pages that stack, a blank page to paint, painting, text placed and measured, a file deleted, a key watched, the thread an event came on; and the card's list of asks | 64 bytes | `op1f_level_4` |
 | 5 | [A sequencer of the pack's own](level-5.md) in the unit's list, and the notes heard | 64 bytes | `op1f_level_5` |
 | 6 | [A place in the sound](level-6.md), working memory, and pictures that take the place of the unit's own by name; from base 31, pictures that [give way](level-6.md#giving-way-base-31) to another pack's; from base 32, the pack's own [settings](level-6.md#settings-base-32) in the unit's settings | 64 bytes | `op1f_level_6` |
-| 7 | [Values kept in tapes and sounds](level-7.md), in the unit's own files | 64 bytes | `op1f_level_7` |
+| 7 | [Values kept in tapes and sounds](level-7.md), in the unit's own files; from base 43 (hasis), [files per tape](level-7.md#files-per-tape-base-43) | 64 bytes | `op1f_level_7` |
 | 8 | [An effect of the pack's own](level-8.md) in the unit's lists of effects, for the sounds and the master, and the list of every pack's effects, to run inside another pack | 64 bytes | `op1f_level_8` |
 | 9 | [A synth engine of the pack's own](level-9.md) in the unit's list of engines, with sounds of its own in the sound list | 64 bytes | `op1f_level_9` |
 | 10 | [The value as the sound plays it](level-10.md), with the LFOs' moves in it, for a page to draw | 64 bytes | `op1f_level_10` |
@@ -439,6 +439,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_memory` | `memory:` | Level 6: the working memory given, or refused |
 | `op1f_options` | `options:` | Level 6, from base 32: the packs with settings, how many values were read from the file, where each pack's settings show, a pack whose category was full, each write of the file, a pack's own settings page opened |
 | `op1f_keeps` | `keeps:` | Level 7: the values kept in the unit's files, written and read |
+| `op1f_tapes` | `tapes:` | Base 43: the files of a pack's folder carried along with a tape's copy, removed when a tape is made anew ([level 7](level-7.md#files-per-tape-base-43)) |
 | `op1f_effects` | `effect:` | Level 8: the packs' effects in the unit's lists, which place plays which, their memory and their period |
 | `op1f_lfos` | `lfo:` | Base 35: the packs' LFO layers in the unit's lists, which place rides which ([layers](layers.md#the-lines-the-base-writes)) |
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |

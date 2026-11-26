@@ -180,6 +180,14 @@ def asks_options(data):
     return any(kind == OPTIONS_KIND for kind, _size, _what, _ask, _wrong in pack_build.ask_tables(data))
 
 
+def asks_tapes(data):
+    """Whether the file's card asks for files per tape (an ask of kind OP1F_ASK_TAPES, base 43), on a card of level 7 or later."""
+    card = pack_build.card_in(data)
+    if card is None or card["level"] < 7:
+        return False
+    return any(kind == pack_build.TAPES for kind, _size, _what, _ask, _wrong in pack_build.ask_tables(data))
+
+
 # What a card may ask that a base serves only from one of its versions on, with no new level: (what, that version, how
 # it is read in a file). A base of the same level before that version leaves the ask aside, says so in its log and
 # runs the rest of the pack. A pack that asks it is listed only beside a base of that version or later for its
@@ -187,6 +195,7 @@ def asks_options(data):
 BASE_SINCE = (
     ("places that give way", 31, gives_way),
     ("options", 32, asks_options),
+    ("files per tape", 43, asks_tapes),
 )
 
 

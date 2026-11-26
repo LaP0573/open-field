@@ -189,6 +189,54 @@ The flag needs no mark. Our effect train shows its page this way, which is why i
 | `page: '<pack>' shown again in mode <n>, as it stayed` | It's back |
 | `page: '<pack>' set aside while another page takes the screen in mode <n>` | Another page took the screen while yours waited |
 
+## Files per tape (base 43)
+
+A value of level 7 is at most 2,048 bytes, and all the values of a tape at most 4 KiB. Some packs keep more for each tape: the notes of a tape's MIDI tracks, a tape's markers, a list of loops. Such a pack keeps them in **files of its own folder**, one file or several for each tape, named `tape<N>.<anything>`, `N` being the tape's number, 1 to 8. The unit knows nothing of these files: when it copies a tape, the copy would start with none; when it deletes one, a tape made later in its place would find the old ones. One ask has the base keep them with the tapes:
+
+```json
+{ "kind": "tapes", "name": "notes", "folder": 0, "changed": "notes_tapes" }
+```
+
+| Field | What |
+| --- | --- |
+| `name` | What the base's lines call the ask |
+| `folder` | The number of the card's folder ([level 3](base.md#folders-none-one-or-several), from 0) whose `tape<N>.*` files follow the tapes |
+| `changed` | Your function the base tells when it carried a copy or a delete into the folder, or null |
+
+One ask of this kind a card, on a card of level 7 or later. Its words are at the end of `module/build_r6e_card.h`: `OP1F_ASK_TAPES`, the table `Op1fTapes`, `OP1F_TAPES_COPIED` and `OP1F_TAPES_DELETED`, and the mark `op1f_tapes_1`.
+
+What the base does:
+
+- **The unit copies a tape** (shift and T3 in the tape list): every `tape<from>.<rest>` of the folder is copied to `tape<to>.<rest>`, and a `tape<to>.<rest>` the source has not is removed. A copy is written as a write is, to `tmp/op1f_tape.part` and renamed, so a file is whole or not there.
+- **The unit makes a tape anew** (T3 in the tape list on an empty slot, say after a delete, or a unit's first tape): every `tape<N>.<rest>` of the folder is removed, so the new tape never finds a deleted one's files. A delete itself leaves them until then; nothing reads them meanwhile, since no tape stands there.
+- Other names are left alone: `tape10.txt`, `song.mid`, a folder inside.
+
+The base does it on the display thread, at its frame, behind the values of level 7 and before any frame function, and never while the disk mode is open: a tape made while it is waits for it to close. A tape deleted from the computer has its files removed when a tape is next made in its place. A file of any size is copied, a piece of 4 KiB at a time, in that one frame.
+
+```cpp
+static volatile unsigned tapes_told;
+extern "C" void notes_tapes(unsigned how, unsigned from, unsigned to) { tapes_told = 1; }   // notes it, does nothing else
+```
+
+`changed` is called right after, before the frame functions of that frame, and outside your own: `how` is `OP1F_TAPES_COPIED` (tape `from` was copied to tape `to`) or `OP1F_TAPES_DELETED` (tape `from` was made anew, so whatever a deleted tape there had is gone; `to` is `from`), the tapes numbered 1 to 8. Like `changed` of the values, **it notes what it's told and does nothing else**. Your frame function then reads the mounted tape's file again, and drops what it holds unsaved for that tape: a write would bring its file back. The tape list takes the mounted tape out before it copies and loads the copy afterwards, so a pack that reads its file when the mounted tape changes finds the copy's files there.
+
+**Which to use.** A few numbers for each tape: a value of level 7, kept inside the tape's own file, which the unit copies itself. More than that: files per tape.
+
+**Under base 42 and earlier**, which does not know the kind, the ask is left aside with the base's line for kinds it does not know, and the card is used: the pack runs, and its files do not follow the tapes. A pack that must know imports `op1f_tapes_1` as optional (a weak name in its source): it is 0 under such a base.
+
+The lines:
+
+| Line begins | What it says |
+| --- | --- |
+| `tapes: '<pack>' tape <n> copied to tape <n>: <folder> <n> file(s) copied, <n> removed, <n> NOT done` | A copy carried into the folder |
+| `tapes: '<pack>' tape <n> deleted: <folder> <n> file(s) removed, <n> NOT done` | A tape made anew: its slot's old files removed from the folder |
+| `tapes: '<pack>' asks for its folder <n>, which it does not have: left aside` | The ask names a folder the card has not, or one the base did not give it |
+| `tapes: <n> tape event(s) passed over` | More than sixteen copies and tapes made between two frames |
+
+The base finds the copy at the entry of the unit's own function, through one place of its table ([the change list](changes.md)), and a tape made anew from the tape load the values of this level already watch, with no place of its own. The copy of tracks 5 to 8 by `8 tracks` stands at another place, the tape list's call of the copy, and both work together.
+
+Why one place and not two: a base's door judges a new `base.pack` against every pack whose file sorts before it (`8 tracks.pack`), and the door of bases 33 to 36 reads at most 64 places of a base. A base it cannot read whole it holds to clash, and refuses the pack: "it clashes with the base, so the base would be left out at the start". Base 42 has 64 of its own, so a base with this one has 65: a unit on base 36 or older gets it with the install page's whole install, as it gets base 40 and later, and not through its door.
+
 ## Limits, in one place
 
 | | |
@@ -199,3 +247,4 @@ The flag needs no mark. Our effect train shows its page this way, which is why i
 | A value | 2,048 bytes of JSON text, nested up to four deep, whole numbers only |
 | The values of one slot or of the tape | 4 KiB |
 | Pages that stay | One at a time |
+| Asks of files per tape (base 43) | One a card, one folder each, files `tape1.*` to `tape8.*` |

@@ -1612,10 +1612,13 @@ static u32 entries_of(const Holder* h) {
     return n;
 }
 
+extern "C" void __attribute__((weak)) op1f_tapes_made() OP1F_NAMED("op1f_tapes_made");   // base 43: files per tape
+
 static void tape_take(Holder* c, u32 flag) {
     take_from(c, STOCK_TAPE_ROOT(), OP1F_KEEP_TAPE, 1);
     for (u32 i = 0; i < (u32)BITS; ++i) tape_written[i] = 0;
     if (flag != 0) say_later(Q_TAPE_LOADED, entries_of(c), TAPE, flag, 0);
+    if (flag != 0 && &op1f_tapes_made != 0) op1f_tapes_made();   // a tape made anew or a copy (module/build_r7_tapes.cpp)
     put_in(TAPE, c, flag != 0 ? (u32)OP1F_KEPT_MADE : (u32)OP1F_KEPT_LOADED, 0);
 }
 

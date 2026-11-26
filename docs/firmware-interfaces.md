@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 116 functions bound in the sources. 116 are described below, by subject. The other 0 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 117 functions bound in the sources. 117 are described below, by subject. The other 0 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -187,6 +187,7 @@ The firmware keeps the tape's settings as one JSON document, read from the tape'
 | `0x8d4f2b80` | `void* tape_root(void)` | The tape's document: a JSON value at a fixed place, the same every call. The unit stops when the document is null. | Not the audio thread. Ours: the firmware's background worker, the key thread, the main task. |
 | `0x8d4f24dc` | `int tape_set(int db, const char* key, const void* value)` | Sets a member of one of the firmware's documents to a copy of `value`, under the documents' lock, and marks that document changed. `db` picks the document: 2 is the tape's, the one `tape_root` gives. `key` is the member's name. It waits for the lock as long as it takes, so it waits while a tape's file is read or written. Gives back 1. | Not the audio thread. Ours: the firmware's background worker, in the tape's save. |
 | `0x8c0c1dd0` | `void* tape_saver(void)` | The tape's saver: an object of the firmware's, made at the first call and the same at every call after. Hand it to `notify` to have the tape saved. | Ours: the display thread. |
+| `0x8fc219a8` | `int mounted_tape(void)` | The number of the mounted tape, 0 to 7, or -1 when none is. Read after a tape's load has returned, it is the tape just loaded. | Ours: the display thread. |
 | `0x8fca1ed2` | `void notify(void* saver)` | Marks a saver to save and wakes the background worker, which then saves. It does not wait. | Ours: the display thread. |
 
 ## The disk mode

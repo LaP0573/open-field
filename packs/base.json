@@ -37,6 +37,7 @@
     "module/build_r17_restore.cpp",
     "module/build_r6d_popups.s",
     "module/build_r6b_keeps.cpp",
+    "module/build_r7_tapes.cpp",
     "module/build_r4_keeps.s",
     "module/build_r6b_keeps.s",
     "module/build_r4c_door.cpp",
@@ -129,7 +130,8 @@
     "op1f_sample_get",
     "op1f_sample_1",
     "op1f_cards_2",
-    "op1f_memory_2"
+    "op1f_memory_2",
+    "op1f_tapes_1"
   ],
   "pictures": [
     {
