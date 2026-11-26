@@ -247,6 +247,15 @@ int main() {
             out = subprocess.run([exe], check=True, capture_output=True, text=True).stdout.split()
         self.assertEqual(out, ["0", "15", "4", "7", "15"])          # passed; too large; base 39; not riding; a synth pool's bound
 
+    def test_the_base_offers_the_drum_mark_for_a_sample_a_pack_wrote(self):
+        """Base 40: op1f_sample_changed is offered, declared in the header and said on the drum engine's page."""
+        self.assertIn("op1f_sample_changed", load("packs", "base.json")["exports"])
+        self.assertIn('int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place)', text("module", "build_r6e_card.h"))
+        self.assertIn("op1f_sample_changed", text("docs", "drum-engine.md"))
+        source = text("module", "build_r17_sample.cpp")
+        self.assertIn("ticket.mark = 1", source)
+        self.assertIn("STOCK_DRUM_MARK(slot)", source)
+
     def test_a_drum_engine_s_ask_is_read_from_a_recipe_as_the_base_holds_it(self):
         pb = tool("pack_build")
         ask = pb.drum_page_of_card(1, {"kind": "drum engine", "name": "chop", "shown": "chop_shown"}, [])

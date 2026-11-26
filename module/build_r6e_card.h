@@ -2025,6 +2025,16 @@ enum { OP1F_ASK_DRUM_ENGINE = 12 };   // after OP1F_ASK_LFO (11); 9 stays propos
 // as the drum sampler's page does, with the synth's checks and answers; `dropped`, `ticket`, `done` and `answer` of
 // op1f_sample_get are a drum place's too. The unit keeps the drum sampler's sample over a restart itself. The 24 keys'
 // points are not changed by a drop.
+//
+// A pack that writes into its drum sound's sample itself (a cut pasted behind the kit's material, say) asks the unit
+// to keep it, as the unit keeps a dropped cut: op1f_sample_changed(card, ask, place), with the drum engine's ask and
+// the drum place, from the card's frame function or its input function (an event on the key thread). In the unit's
+// turn the base marks the drum sound changed (what the drum's own drop does after its import); nothing is imported.
+// It answers a ticket, 1 or more (watch op1f_sample_get's `done`; `answer` 0 when marked), or less than 0, with nothing
+// asked of the unit: OP1F_NOT_NOW (not from those functions; the disk mode open), OP1F_BAD_NAME (not a drum place, or
+// not the card's drum engine ask), OP1F_NOT_HERE (the sound does not ride it now), OP1F_BUSY (a drop or mark under
+// way, or clipboard work waiting), OP1F_FAILED (the unit took nothing).
+extern "C" int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_changed");
 struct Op1fDrumEngine { Op1fKindHead head; };   // 28 bytes at base 40
 static_assert(sizeof(Op1fDrumEngine) == 28, "a drum engine's table is the head, 28 bytes at base 40");
 

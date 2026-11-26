@@ -129,7 +129,8 @@
     "op1f_sample_drop",
     "op1f_sample_get",
     "op1f_sample_1",
-    "op1f_drum_engine_1"
+    "op1f_drum_engine_1",
+    "op1f_sample_changed"
   ],
   "pictures": [
     {

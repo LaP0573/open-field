@@ -74,6 +74,7 @@ static_assert((int)Op1fSampleAnswer::NOT_NOW == (int)OP1F_NOT_NOW && (int)Op1fSa
 
 extern "C" int op1f_sample_drop(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_drop");
 extern "C" int op1f_sample_get(const Op1fCard* card, unsigned place, Op1fSample* out) OP1F_NAMED("op1f_sample_get");
+extern "C" int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_changed");
 extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
 extern "C" void op1f_sample_job(unsigned slot, unsigned clip) OP1F_NAMED("op1f_sample_job");
 extern "C" void op1f_sample_drum_job(unsigned slot, unsigned clip) OP1F_NAMED("op1f_sample_drum_job");
@@ -189,6 +190,7 @@ static struct {
     volatile u32 number;                               // the ticket
     volatile u32 slot, card, ask;                      // the slot (0 to 7), the card's slot, the ask's number
     volatile u32 drum;                                 // R18: 1 a drum slot
+    volatile u32 mark;                                 // R18: 1 the mark alone (op1f_sample_changed), no import
     volatile u32 at_frame;                             // the unit's frames counted here when it was queued
     volatile u32 said;                                 // the frame said its "queued" line
     volatile u32 why;                                  // the end: 0 rendered, else why the unit's turn refused it
@@ -367,6 +369,7 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
         ticket.number = number;
         ticket.slot = place & 7u;
         ticket.drum = place >= (u32)SLOTS ? 1u : 0u;                                // R18
+        ticket.mark = 0;
         ticket.card = (u32)slot;
         ticket.ask = ask;
         ticket.at_frame = frames_seen;
@@ -395,6 +398,65 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
         return refused(slot, ask, place, OP1F_SAMPLE_POST, 0, 0);
     }
     posted = number;                                                                // the queue took it; from here the frame watches for its loss
+    return (int)number;
+}
+
+// R18 (base 40): the drum mark alone, for a pack that changed its drum sound's sample itself (op1f_sample_changed):
+// from the card's frame function, or its input function for an event on the key thread; a drum place that rides the
+// card's drum engine of that ask. The same ticket, post and DD as a drop; in the unit's turn the drum job's mark
+// (0x8d4eb68a) and the record's method 6, and no import: the unit then keeps the drum sampler's sample as after a drop.
+extern "C" SAMPLE_APART int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) {
+    int slot = slot_of(card);
+    u32 why = 0;
+    if (slot < 0) return OP1F_BAD_NAME;
+    u32 calling = op1f_cards_calling() == (u32)slot + 1u || op1f_cards_input_keyed(card) ? 1u : 0u;
+    if (!calling) why = OP1F_SAMPLE_NOT_INPUT;
+    else if (RD32(DISK_OPEN) != 0) why = OP1F_SAMPLE_DISK;
+    else if (place < (u32)SLOTS || place >= 2u * (u32)SLOTS) why = OP1F_SAMPLE_NO_PLACE;
+    else if (drum_ask(card, ask) == 0) why = OP1F_SAMPLE_NO_ASK;
+    else {
+        u32 r = ride_of(place & 7u, (u32)slot, ask, 0, 1);
+        if (r == (u32)OP1F_SAMPLE_RIDES_UNTOLD) why = OP1F_SAMPLE_UNTOLD;
+        else if (r != (u32)OP1F_SAMPLE_RIDES) why = OP1F_SAMPLE_NOT_RIDING;
+    }
+    if (why) return refused(slot, ask, place, why, 0, 0);
+    u32 mask, number = 0, before = 0, busy = 0;
+    MASK_OFF(mask);
+    if (ticket.state != (u32)FREE) busy = OP1F_SAMPLE_TICKET;
+    else if (RD32(QUEUE_READ) != RD32(QUEUE_WRITE)) busy = OP1F_SAMPLE_QUEUE;
+    else {
+        number = last_number + 1u;
+        if (number > TICKET_MOST) number = 1u;
+        last_number = number;
+        ticket.number = number;
+        ticket.slot = place & 7u;
+        ticket.drum = 1;
+        ticket.mark = 1;
+        ticket.card = (u32)slot;
+        ticket.ask = ask;
+        ticket.at_frame = frames_seen;
+        ticket.said = 0;
+        ticket.why = 0;
+        ticket.frames = 0;
+        ticket.stereo = 0;
+        ticket.state = QUEUED;
+        posted = 0;
+        op1f_sample_dd_armed = (place & 7u) + 1u;
+        before = RD32(QUEUE_WRITE);
+    }
+    MASK_ON(mask);
+    if (busy) return refused(slot, ask, place, busy, 0, 0);
+    STOCK_DRUM_POST(place & 7u);                                                    // the drum page's own post: DD takes it
+    if (RD32(QUEUE_WRITE) == before) {
+        MASK_OFF(mask);
+        if (ticket.state == (u32)QUEUED && ticket.number == number) {
+            ticket.state = FREE;
+            op1f_sample_dd_armed = 0;
+        }
+        MASK_ON(mask);
+        return refused(slot, ask, place, OP1F_SAMPLE_POST, 0, 0);
+    }
+    posted = number;
     return (int)number;
 }
 
@@ -463,6 +525,23 @@ extern "C" SAMPLE_APART void op1f_sample_drum_job(unsigned slot, unsigned clip) 
     if (!mine) {                                                                    // not the ticket's: stock's drum job
         op1f_sample_dd_passes = op1f_sample_dd_passes + 1u;
         ROOM_DRUM_JOB(slot, clip);
+        return;
+    }
+    if (ticket.mark) {                                                              // the mark alone: the sample changed by the pack
+        u32 why = ride_of(slot, card, ask, 0, 1) == (u32)OP1F_SAMPLE_RIDES ? (u32)OP1F_SAMPLE_PASSED : (u32)OP1F_SAMPLE_NOT_RIDING;
+        if (why == (u32)OP1F_SAMPLE_PASSED) {
+            STOCK_DRUM_MARK(slot);
+            u32 record = (u32)DRUM_RECORDS + (u32)RECORD_BYTES * slot;
+            ((MethodFn)RD32(RD32(record) + (u32)METHOD_6))(record);
+        }
+        MASK_OFF(mask);
+        Place* p = &places[slot + (u32)SLOTS];
+        p->answer = why == (u32)OP1F_SAMPLE_PASSED ? 0 : op1f_sample_answer(why);
+        p->done = ticket.number;
+        ticket.why = why;
+        ticket.frames = 0;
+        ticket.state = ENDED;
+        MASK_ON(mask);
         return;
     }
     Op1fSampleScene s;
@@ -640,7 +719,7 @@ static void say_refusals(u32 tick) {
 // A request the queue lost (op1f_sample_lost) is ended here, in the masked instant it is read in:
 // SD disarmed, the slot's `answer` OP1F_FAILED and `done` the ticket, the ticket freed; its line said once.
 static void say_ticket() {
-    u32 mask, state, number, slot, card, ask, at, said, why, frames, stereo, was_posted, read, write, lost, drum;
+    u32 mask, state, number, slot, card, ask, at, said, why, frames, stereo, was_posted, read, write, lost, drum, mark;
     MASK_OFF(mask);
     was_posted = posted;                                                            // in this order: posted, the queue's places, the state
     read = RD32(QUEUE_READ);
@@ -649,6 +728,7 @@ static void say_ticket() {
     number = ticket.number;
     slot = ticket.slot;
     drum = ticket.drum;
+    mark = ticket.mark;
     card = ticket.card;
     ask = ticket.ask;
     at = ticket.at_frame;
@@ -669,7 +749,7 @@ static void say_ticket() {
     if (!said) {
         char name[NAME + 1];
         engine_name(card, ask, name, drum);
-        op1f_log(3, LOG_FILE, 7, "sample: drop %u into %s %u for '%s': queued", number, drum ? "drum" : "synth", slot + 1u, name);
+        op1f_log(3, LOG_FILE, 7, "sample: %s %u into %s %u for '%s': queued", mark ? "mark" : "drop", number, drum ? "drum" : "synth", slot + 1u, name);
         MASK_OFF(mask);
         if (ticket.number == number) ticket.said = 1;
         MASK_ON(mask);
@@ -680,13 +760,15 @@ static void say_ticket() {
     }
     if (state != (u32)ENDED) return;
     u32 after = frames_seen - at;
-    if (why == (u32)OP1F_SAMPLE_PASSED)
+    if (why == (u32)OP1F_SAMPLE_PASSED && mark)
+        op1f_log(3, LOG_FILE, 12, "sample: mark %u: drum %u marked changed after %u frame(s): the unit keeps its sample", number, slot + 1u, after);
+    else if (why == (u32)OP1F_SAMPLE_PASSED)
         op1f_log(3, LOG_FILE, 8, "sample: drop %u: %u frames rendered (stereo %u, room %u) after %u frame(s)", number, frames, stereo,
                  drum ? (u32)OP1F_SAMPLE_DRUM_POOL >> (stereo ? 1 : 0) : op1f_sample_room(stereo), after);
     else
         op1f_log(2, LOG_FILE, 9, "sample: drop %u into %s %u refused in the unit's turn: %d, %s, after %u frame(s)", number, drum ? "drum" : "synth", slot + 1u,
                  op1f_sample_answer(why), op1f_sample_why_words(why), after);
-    if (why == (u32)OP1F_SAMPLE_PASSED && !drum && &op1f_sample_kept != 0) op1f_sample_kept(slot, frames, stereo);   // R18: the unit keeps a drum's itself
+    if (why == (u32)OP1F_SAMPLE_PASSED && !drum && !mark && &op1f_sample_kept != 0) op1f_sample_kept(slot, frames, stereo);   // R18: the unit keeps a drum's itself
     MASK_OFF(mask);
     if (ticket.state == (u32)ENDED && ticket.number == number) ticket.state = FREE;
     MASK_ON(mask);
