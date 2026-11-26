@@ -9,6 +9,7 @@ One page that leads an owner through the install, the helpers that do the file w
 | `open-field-helper.py` | The helper for Mac and Linux: the same work through the same files in the folder, `user/pkin` emptied too. It needs Python 3 with nothing added, and libusb, through which it reaches the unit over USB |
 | `door.mjs` | The page's side of the door: the messages the base answers over USB MIDI to list the unit's packs, check each by its SHA-256, send files into the waiting folder, mark files for removal and ask the unit, which shows its own question and changes nothing before T1 |
 | `packs-live.mjs` | What the packs section shows: each file on the unit held to the listing (on your OP-1, an update out, a different file, not listed, coming off), and the ticks turned into the change the page sends, `base.pack` last |
+| `room.mjs` | The room for packs, as the packs section counts it: what each pack file takes of the loader's room, where the loader would place the unit's files now and after the change waiting, and the pack files, engines and effects against what the unit takes |
 | `after.html` | The page the browser waits on while the unit restarts: it uses no MIDI, then goes back and checks every file |
 | `install.mjs` | The plan the page makes from the helper's listing: what goes on the unit, and the whole listing the disk must show afterwards |
 | `catalog.mjs` | The listing of packs as the page reads it, and the download of a ticked pack from its author's repository, held to the listing's size and SHA-256 ([docs/catalog.md](../docs/catalog.md)) |
@@ -24,6 +25,7 @@ One page that leads an owner through the install, the helpers that do the file w
 | `write-manifest.mjs` | Writes a new version of the loader's file and its manifest, from a build and your own firmware file. For a change to the loader |
 | `validate-builder.mjs`, `validate-devmode.mjs`, `validate-install.mjs` | Checks of the builder, of the unit's check over USB MIDI, and of the install's plan |
 | `validate-door.mjs`, `validate-packs-live.mjs` | Checks of the door's messages against a model of the unit, and of what the packs section shows and sends |
+| `validate-room.mjs` | Checks of the count of the room for packs, on made-up pack files and the page's own `base.pack` |
 | `ferret.LICENSE`, `open-xy.LICENSE` | The licences of the two projects whose code is reused here |
 
 ## Opening the page
@@ -38,7 +40,7 @@ On a Mac or Linux the command's first word is `python3`. Then open `http://local
 
 ## What the page shows
 
-At first, the top of the page and the list of packs. After **connect**, the top says what it found: an OP-1 with no open-field gets one **install open-field** button, which shows the install's eight steps there, in place; an OP-1 with open-field gets a small table (its OS, its open-field, its packs, its last start), and the packs section adds and takes off packs over USB MIDI. Under the table, **reinstall or go back to the original firmware** shows the same steps; in step 5, **my backup of the original firmware** is the way back. The address keeps `#install` while the steps are open, so a reload comes back to them. The page holds the OP-1's MIDI ports only while it talks to the unit, and gives every port back before step 1 talks to the bootloader.
+At first, the top of the page and the list of packs. After **connect**, the top says what it found: an OP-1 with no open-field gets one **install open-field** button, which shows the install's eight steps there, in place; an OP-1 with open-field gets a small table (its OS, its open-field, its packs, its last start), and the packs section adds and takes off packs over USB MIDI. Above the packs, the room window shows the loader's room for packs as a bar, each pack where the loader would place it, now and after the change waiting, with the pack files, engines and effects against what the unit takes. It shows only while the page talks to the unit. Under the table, **reinstall or go back to the original firmware** shows the same steps; in step 5, **my backup of the original firmware** is the way back. The address keeps `#install` while the steps are open, so a reload comes back to them. The page holds the OP-1's MIDI ports only while it talks to the unit, and gives every port back before step 1 talks to the bootloader.
 
 ## How the page and the helper share the work
 
@@ -60,7 +62,11 @@ node builder/validate-builder.mjs --stock <your own os.ldr>
 node builder/validate-install.mjs
 ```
 
-The first runs the unit's check against a made-up bootloader; no MIDI port of the computer is touched. The second builds the image from your own firmware file and holds its SHA-256 to the manifest's; without `--stock` it makes only the checks that need no firmware file. The third holds the install's plan to the placement on made-up disks; it needs no firmware file.
+```bash
+node builder/validate-room.mjs
+```
+
+The first runs the unit's check against a made-up bootloader; no MIDI port of the computer is touched. The second builds the image from your own firmware file and holds its SHA-256 to the manifest's; without `--stock` it makes only the checks that need no firmware file. The third holds the install's plan to the placement on made-up disks; it needs no firmware file. The fourth holds the count of the room for packs to made-up pack files, and the numbers it keeps to the files that give them; it needs no firmware file either.
 
 A helper can be run whole without a unit: `-Source` (the `.ps1`) or `--source` (the `.py`) names a folder of the computer that stands for the unit's disk, and `node builder/validate-install.mjs --play <folder> --bootloader <version> --stock <your own os.ldr>` plays the page's part on the helper's folder.
 
@@ -93,7 +99,7 @@ A version's name works wherever its manifest lies: beside `loader.json`, or as `
 
 The page can be served from any web address over HTTPS: the unit's check uses USB MIDI, and the folder the page and the helper share uses the browser's folder access, and a browser offers both only to a page served over HTTPS or from the computer itself. The workflow `.github/workflows/pages.yml` publishes this folder, `builder/`, on the host's pages, once the checks have passed on `main`. What that needs:
 
-- **This folder alone is served**, as it stands on `main`, with the listing of packs beside it: the workflow joins the files of `catalog/` into it as `packs.json` before it publishes. The page loads only files beside it, by relative paths, and one thing from another site: the file of a pack the owner ticks, from its author's repository at the commit the listing names (`raw.githubusercontent.com`), held to the listing's size and SHA-256 before it is used. `tools/tests/test_tree.py` holds that (`ThePagesOnAHost`). Its one link to another site is a link the owner may follow, not a load.
+- **This folder alone is served**, as it stands on `main`, with the listing of packs beside it: the workflow joins the files of `catalog/` into it as `packs.json` before it publishes. The page loads only files beside it, by relative paths, and one thing from another site: the file of a listed pack, from its author's repository at the commit the listing names (`raw.githubusercontent.com`), held to the listing's size and SHA-256 before it is used. It downloads a file when the owner ticks it, and, to count the room for packs, a listed file that is on the unit. `tools/tests/test_tree.py` holds that (`ThePagesOnAHost`). Its one link to another site is a link the owner may follow, not a load.
 - **Script files ending in `.mjs` are served as scripts.** A browser runs a module only when the server says it is JavaScript.
 - **`open-field-helper.ps1` is served as text or as a download.** PowerShell reads it either way. So is `open-field-helper.py`, which `curl` fetches and hands to `python3`. The line the page shows for either is made from the page's own address, so it names the host's address there.
 - **`base.pack` and the loader's file are served as they are**, byte for byte: the page holds each to its SHA-256 and refuses one that is not.

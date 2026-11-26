@@ -148,6 +148,8 @@ When an owner ticks a pack, the page downloads its file from `https://raw.github
 
 A followed entry's file is downloaded once, when the page has read the listing: from `https://raw.githubusercontent.com/<owner>/<name>/refs/heads/<branch>/<path>`, the head of the entry's branch. The page holds it to the entry as [following a branch](#following-a-branch) says, and offers it only if it passes. Its size, SHA-256, version, places and level are then the file's own. When the owner ticks it, the page puts on the unit the very bytes it checked, with no second download. A file that cannot be downloaded or fails a check is not offered, and the page's log names the pack and the reason.
 
+To count the room for packs, the page also downloads a listed file that is on the unit (found by its SHA-256), from the same address and held to the entry in the same way. It reads how much room the file takes and keeps nothing else of it. A followed file is not downloaded again: the page reads the bytes it checked when it opened.
+
 These downloads are the only things the page loads from another site, and the tree's own test holds that (`tools/tests/test_tree.py`, `ThePagesOnAHost`).
 
 A pack goes on from the page's packs section, once open-field is on the unit: the page sends the file over USB, the unit asks on its own screen, and T1 confirms ([the guide](guide.md#adding-a-feature)). The install itself puts no pack on but `base.pack`.

@@ -157,6 +157,8 @@ loader: the folder user/pk listed: 8 pack(s) of the new kind and 0 of the old in
 
 **4. It places the packs.** Packs stand one behind the other in a room of 16 MiB that begins at `0x85000000` (under N1, 2,031,616 bytes from `0x8d2f4234`), in the order of their files' names. Each pack is read from its file straight into its place, body and lists. Its CRC-32 is taken there and held against the header's.
 
+What a pack takes of the room is its body and the larger of its lists and its zeroed data. The next pack stands behind that, rounded up to a word. What follows the lists in the file, the pictures, takes no room. The base's door counts the same way before it lets a change from the install page go, and the install page shows the count (`builder/room.mjs`).
+
 A pack is linked for `0x8d2f4234`, the first byte of N1's room, under either loader, and stands somewhere else. So the loader **moves** it: at every place of the pack's own, it writes the address the pack was linked with, further on by the distance. A pack stands at the next address that is a multiple of 32 bytes away from where it was linked.
 
 ```

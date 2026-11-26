@@ -129,6 +129,12 @@ The loader in your firmware file decides how many pack files the unit reads. The
 
 N2 needs base 40 or later. The page puts base 42 on with it, so a unit installed from the page has a base that fits.
 
+**How full the room is.** When you connect, the packs section shows it above the list. A bar stands for the room, with each pack where the loader would place it. The line above the bar says how much is used and how much is free. With changes waiting, a second bar shows the room after them. If they would not fit, its line turns red: your OP-1 would refuse that change, so untick a pack or two before you send. Below the bars come each pack's room, the largest first, and the pack files, engines and effects against what your OP-1 takes. The base takes 8 engines and 16 effects of all packs together.
+
+A pack's room is not the size of its file. It counts the pack's code and data, and the memory the loader clears for it at the start. It does not count the pictures in the file.
+
+The page counts only the files it can read: its own `base.pack`, the files of the list, and the files you pick on your computer. It finds each one on your OP-1 by its SHA-256. Any other file shows `room not known`, and the figures then say `at least`.
+
 **If you installed open-field before 0.24**, do the install again to get the new room: build the firmware file on the page again and write it from the bootloader's menu, the same steps as [the first time](#the-install-once), with the same warnings. This write carries the same risk as the first one. Your pack files stay on the unit, and the new base goes on with the firmware file. When you connect, the page says so at the top, with an "install again" button that opens these steps.
 
 **If the page refuses every change and you have more than 32 pack files**, your base is older than base 40, which counts to 32 whatever the loader. Open the disk mode and delete files in `packs` until 32 are left, or copy the new `base.pack` in there yourself. Switch the unit off and on, and the page works again.
