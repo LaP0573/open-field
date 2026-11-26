@@ -142,6 +142,23 @@ Each is one JSON object as the unit writes a synth sound, with `"type": "dsynth"
 
 `knobs` are the knob words as the unit keeps them: 0 is your value's `low` and 32767 its `high`. So `pluck`'s tone at 45 of 0 to 100 is 14745.
 
+**`adsr` is the sound's envelope and four more settings**, eight whole numbers. The unit refuses a sound with one of them outside its range (its log says `invalid json patch`, and the sound that was there stays), so hold each to its range:
+
+| | What | Range | Notes |
+| --- | --- | --- | --- |
+| 0 | attack | 64 to 16320 | Larger is slower, and the rise is a straight line: 64 is at once, 4096 about 20 ms, 8192 about a quarter second, 12288 about 4 s, 16320 about 13 s |
+| 1 | decay | 64 to 16320 | Larger is longer. With a sustain of 0 the note has faded by 60 dB after 0.1 s at 64, 0.6 s at 4096, 1.4 s at 8192, 3.7 s at 12288, and about 23 s at 16320 |
+| 2 | sustain | 0 to 32767 | The level a held note settles at. 0 ends the voice while the key is still down |
+| 3 | release | 64 to 16320 | **Larger is shorter**, the decay's scale read from the other end: 64 fades for about 24 s, 4096 for 3.6 s, 8192 for 1.4 s, 12288 for 0.6 s, 15040 for 0.2 s, 16320 for a few hundredths |
+| 4 | play mode | 2048 to 14336 | The number divided by 4096: 0 poly, 1 mono, 2 legato, 3 unison. 4000 is poly |
+| 5 | portamento | 64 to 16448 | The glide between notes. Up to 4800, as the examples have it, none that can be measured; 8192 about 35 ms for an octave, 12288 about 0.2 s, 16448 over a second |
+| 6 | bend range | 2048 to 18432 | The number divided by 4096: 0 one semitone, 1 two, 2 four, 3 seven, 4 an octave |
+| 7 | volume | 3276 to 32767 | The sound's own volume, linear: half the number is 6 dB less. The unit's own sounds hold about 12600 to 32767 |
+
+The release works on your engine's output after a key-up, on top of whatever your engine does itself at `OP1F_VOICE_ENDS`. A voice stays in use, and `render` keeps being called, until the release has run out: a long release keeps all six voices busy long after the keys are up. If your engine damps the note itself, give the sound a release a little longer than that and no more.
+
+The volume is where an engine's loudness is matched to the unit's other sounds: `pluck`'s sounds carry 23909 and `fold`'s, whose engine is louder, 4000.
+
 **When they're written:**
 
 - Once for each version of your pack. The base remembers, in a small file of its own, which version's sounds it wrote. A sound the owner deletes comes back only with your pack's next version, and a folder he deletes likewise.
