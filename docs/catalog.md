@@ -106,6 +106,8 @@ The listing's check downloads it from raw.githubusercontent.com at the entry's c
 | --- | --- |
 | `tape` | tape |
 | `effects` | effects |
+| `synths` | synths |
+| `drums` | drums |
 | `modulation` | modulation |
 | `sequencing` | sequencing |
 | `mixer` | mixer |
