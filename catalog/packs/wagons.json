@@ -3,16 +3,22 @@
   "author": "hasis",
   "status": "listed",
   "categories": [
-    "effects"
+    "effects",
+    "mixer"
   ],
-  "description": "Six effects in the unit's own effect lists: BOOST, GATE, FREEZE, TAPE, JUNEAUX and ROTARY (a rotary speaker cabinet).",
+  "description": "Seven effects in TE's effect lists: BOOST, GATE, FREEZE, TAPE, JUNEAUX, ROTARY, and BEIGNET, a mastering sweetener for the master.",
   "repository": "https://github.com/hasis/field-packs-releases",
   "path": "packs/wagons.pack",
   "follow": "main",
-  "version": 17,
+  "version": 18,
   "firmware": "1.7.3",
   "needs": [],
-  "folders": [],
+  "folders": [
+    {
+      "name": "beignet",
+      "place": "beignet"
+    }
+  ],
   "picture": {
     "path": "packs/wagons/picture.png"
   }
