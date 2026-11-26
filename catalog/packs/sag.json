@@ -1,7 +1,7 @@
 {
   "id": "sag",
   "author": "midnightops94",
-  "status": "listed",
+  "status": "retired",
   "categories": [
     "effects"
   ],
@@ -16,10 +16,5 @@
   "places": 0,
   "needs": [],
   "level": 10,
-  "folders": [],
-  "picture": {
-    "path": "thumbs/sag.png",
-    "sha256": "1fbc835ed8a92aa7c55536d4120d126a7a2c1a920190982c759e716ef1076f8c",
-    "bytes": 17969
-  }
+  "folders": []
 }
