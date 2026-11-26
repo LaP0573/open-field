@@ -1,0 +1,25 @@
+{
+  "id": "vu",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks",
+    "mixer"
+  ],
+  "description": "vu: audio visualizers on the mixer, of the master mix. Tap the mixer key for the next look; knobs turn TE's master EQ. Needs a look pack.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu.pack",
+  "follow": "main",
+  "version": 34,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [
+    {
+      "name": "vu",
+      "place": "vu"
+    }
+  ],
+  "picture": {
+    "path": "packs/vu/picture.png"
+  }
+}

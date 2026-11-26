@@ -1,0 +1,19 @@
+{
+  "id": "vu_console",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: CONSOLE, an old film-and-TV audio console: pill bars, a sweep with blips, hex columns, readouts, lamps on beats.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_console.pack",
+  "follow": "main",
+  "version": 4,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_console/picture.png"
+  }
+}

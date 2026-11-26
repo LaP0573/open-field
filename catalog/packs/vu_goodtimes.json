@@ -1,0 +1,19 @@
+{
+  "id": "vu_goodtimes",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: GOOD TIMES, a feedback picture warped, faded and kicked by the beats, four presets (tunnel, swirl, ripple, bloom).",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_goodtimes.pack",
+  "follow": "main",
+  "version": 3,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_goodtimes/picture.png"
+  }
+}

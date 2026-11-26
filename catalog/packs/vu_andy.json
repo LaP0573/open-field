@@ -1,0 +1,19 @@
+{
+  "id": "vu_andy",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: ANDY, an orange tabby in a red 26 jersey who does the Griddy on an LED pitch, plops when it goes quiet and MEOWs.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_andy.pack",
+  "follow": "main",
+  "version": 8,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_andy/picture.png"
+  }
+}

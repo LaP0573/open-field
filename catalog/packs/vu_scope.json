@@ -1,0 +1,19 @@
+{
+  "id": "vu_scope",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: SCOPE, the mix's wave, a stereo goniometer and a phase bar on phosphor screens.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_scope.pack",
+  "follow": "main",
+  "version": 3,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_scope/picture.png"
+  }
+}

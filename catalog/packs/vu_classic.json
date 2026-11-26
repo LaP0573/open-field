@@ -1,0 +1,19 @@
+{
+  "id": "vu_classic",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: CLASSIC, 64 thin bars with falling peak caps; the wave as dots or lines too on bases with option words.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_classic.pack",
+  "follow": "main",
+  "version": 4,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_classic/picture.png"
+  }
+}
