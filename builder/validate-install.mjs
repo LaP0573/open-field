@@ -28,7 +28,7 @@ import { analyzeListing, fileTnodes, placement, recommendPad, mountEndFor, plain
 import { RAW, NOTICE, readListing, rawLink, fileName, withNeeds, neededBy, download, knownVersions, packFacts, checkFollowed, resolveFollowed, pictureOf, pictureLink, downloadPicture, checkPickedFile } from "./catalog.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const IMAGE_BYTES = 2104908;      // the size of the firmware file the page builds today (loader.json's output, image N1 for OS 1.7.3; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
+const IMAGE_BYTES = 2104908;      // the size of image N1's firmware file for OS 1.7.3, the page's own until 2026-11-26 (v1's output; v2's, image N2, is 2103304; image M4's for 1.7.0 was 2096140, image L5's 2217628 until 2026-11-18)
 const STOCK_BYTES = 2079016;      // the size of the original OS 1.7.3 file (OS 1.7.0's was 2070248)
 
 // A folder of this computer, as install.mjs wants one.

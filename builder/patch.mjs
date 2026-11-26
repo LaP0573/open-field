@@ -64,12 +64,41 @@ function callAbs(target, length, call) {
   return out;
 }
 
+// A manifest of a loader that has the room to itself (since loader v2, the loader N2) names where the loader puts
+// the packs, reserve.pack_room {base, bytes, files}, and the end of the loader with its zeroed data, loader.end (its
+// __module_end). The three refusals of tools/ldr_build.py for such a loader: the heap ends at the loader's first
+// byte (heap_fill_base + the imm32 edit's new heap size = module_base), the loader's reservation lies inside the
+// zero-filled heap record (the room for packs, pack_room, is not in the heap and is only read for its numbers), and the loader with its zeroed data fits the room. A manifest without pack_room is not looked at here.
+function checkOwnRoom(manifest, our, loader) {
+  const reserve = manifest.reserve;
+  if (!reserve || typeof reserve !== "object" || !("pack_room" in reserve)) return;
+  const room = reserve.pack_room;
+  req(room && typeof room === "object" && !Array.isArray(room), "the manifest's pack_room is not {base, bytes, files}");
+  hexInt(room.base);
+  for (const field of ["bytes", "files"])
+    req(Number.isInteger(room[field]) && room[field] > 0 && room[field] <= 0xffffffff, "the manifest's pack_room." + field + " is not a count above 0");
+  req(our.end !== undefined, "the manifest has a pack_room and names no loader.end");
+  const end = hexInt(our.end);
+  const low = hexInt(reserve.module_base), fillLow = hexInt(reserve.heap_fill_base);
+  const reserved = reserve.reserved_bytes, fillBytes = reserve.heap_fill_bytes;
+  req(Number.isInteger(reserved) && reserved > 0 && Number.isInteger(fillBytes) && fillBytes > 0, "the manifest's reservation sizes are not counts");
+  const heaps = (manifest.edits || []).filter((edit) => edit.kind === "imm32");
+  req(heaps.length === 1, "a loader with its own room needs exactly one heap (imm32) edit");
+  const heapEnd = fillLow + hexInt(heaps[0].new_imm);
+  req(heapEnd === low, "the heap does not end at the loader's first byte: it ends at 0x" + heapEnd.toString(16) +
+      ", module_base is 0x" + low.toString(16));
+  req(fillLow <= low && low + reserved <= fillLow + fillBytes, "the reservation is not inside the heap fill");
+  req(end >= low + loader.length, "the loader's end (loader.end) lies before the end of its file");
+  req(end - low <= reserved, "the loader with its zeroed data (to loader.end) does not fit its reservation");
+}
+
 // Put the image together and check its structure, without a look at manifest.output. Returns the image.
 // Not for a page: nothing has held this image to a known hash yet. It is here for write-manifest.mjs, the
 // tool that writes a manifest, which needs the image this code gives before its size and hash stand in
 // one; and for buildImage below, which adds the gate.
 export async function assembleImage(stock, manifest, loader) {
   const our = ours(manifest);
+  checkOwnRoom(manifest, our, loader);
   req((await sha256hex(stock)) === manifest.stock.sha256 && stock.length === manifest.stock.bytes,
       "this is not the exact stock " + manifest.os + " os.ldr (hash or size differs)");
   req((await sha256hex(loader)) === our.sha256 && loader.length === our.bytes,

@@ -61,7 +61,7 @@ const EX = [
   ["commit 01 refused: nothing to apply", "F0 7D 4F 46 28 12 00 01 F7", "F0 7D 4F 46 68 12 05 00 03 F7"],
 ];
 const built = {
-  "hello": D.buildMessage(D.CMD.hello, 1, D.payloads.hello()),
+  "hello": D.buildMessage(D.CMD.hello, 1, D.payloads.hello(3)),
   "remove wink": D.buildMessage(D.CMD.remove, 2, D.payloads.removeNote("wink.pack")),
   "take wink back": D.buildMessage(D.CMD.remove, 3, D.payloads.removeTakeBack("wink.pack")),
   "remove wink again": D.buildMessage(D.CMD.remove, 4, D.payloads.removeNote("wink.pack")),
@@ -114,6 +114,20 @@ for (const [name, to, from] of EX) {
   check("commit refused: another firmware, named", f.reason === 2 && f.name === "lfo.pack" && /another OS version/.test(f.words), f.words);
   const n = D.commitRefusal(answers["commit 01 refused: 33 files"].status, answers["commit 01 refused: 33 files"].payload);
   check("commit refused: 33 pack files", n.count === 33 && /32 at most/.test(n.words), n.words);
+  const n128 = D.commitRefusal(D.STATUS.noRoom, [6, 0x81], 128);
+  check("commit refused: 129 pack files on a door that takes 128, its number named", n128.count === 129 && /takes 128 at most/.test(n128.words) && !/32/.test(n128.words), n128.words);
+  // hello 04 and its tail (door build 7): [68] the generation, [69] 0, [70..71] the most files, [72..75] the room's bytes
+  check("hello: the page asks 04 (F0 7D 4F 46 20 01 00 04 F7)", same(D.buildMessage(D.CMD.hello, 1, D.payloads.hello()), hex("F0 7D 4F 46 20 01 00 04 F7")) && D.checkMessage(D.buildMessage(D.CMD.hello, 1, D.payloads.hello()), {}) === null);
+  check("hello 03's 68 bytes read as before, the loader N1's numbers", h.loaderSaid === false && h.loaderGeneration === 1 && h.packsMost === 32 && h.packRoom === 2031616 && h.maxRemovals === 32);
+  const p68 = Array.from(answers["hello"].payload);
+  const p76 = Uint8Array.from([...p68, 2, 0, 128, 0, ...le32(16777216)]);
+  const h76 = D.parseHello(p76);
+  check("hello's 76 bytes: protocol 3's fields and the tail read", h76.loaderSaid === true && h76.loaderGeneration === 2 && h76.packsMost === 128 && h76.packRoom === 16777216 && h76.protocol === 3 && h76.maxRemovals === 32 && h76.build === 4 && h76.baseVersion === 23);
+  const h44 = D.parseHello(Uint8Array.from(p68.slice(0, 44))), h60 = D.parseHello(Uint8Array.from(p68.slice(0, 60)));
+  check("hello's 44 and 60 bytes: the loader N1's numbers", [h44, h60].every((x) => x.loaderGeneration === 1 && x.packsMost === 32 && x.packRoom === 2031616));
+  const refuses = (bytes) => { try { D.parseHello(Uint8Array.from(bytes)); return false; } catch (e) { return e.kind === "protocol"; } };
+  check("hello: any other length refused (43, 67, 69, 72, 75, 77, 84)", [43, 67, 69, 72, 75, 77, 84].every((n) => refuses([...p68, ...new Array(16).fill(0)].slice(0, n))));
+  check("hello: 76 bytes that say protocol 2 refused", refuses([2, ...p76.slice(1)]));
   check("commit refused: the room", /too big/.test(D.commitRefusal(answers["commit 01 refused: the room"].status, answers["commit 01 refused: the room"].payload).words));
   check("commit refused: nothing to apply", /nothing to change/.test(D.commitRefusal(answers["commit 01 refused: nothing to apply"].status, answers["commit 01 refused: nothing to apply"].payload).words));
 }
@@ -181,6 +195,7 @@ class UnitModel {
     this.hashing = null; this.restartAsked = false; this.messages = 0; this.answers = 0;
     this.noDoor = !!options.noDoor; this.noUnit = !!options.noUnit;
     this.build = options.build ?? 5;       // the door's build, hello's field 58
+    this.tail = options.tail ?? null;      // door build 7: { generation, most, room }, hello's tail of 8 to hello 04 (none: a door before build 7)
     this.logs = options.logs ?? [];        // the log files, newest first: { name, data }
     this.logsNotReady = 0;                 // logs and logread answer 13 this many times
     this.logReads = [];                    // every logread: { name, offset, want }
@@ -240,6 +255,7 @@ class UnitModel {
       const rel = [...bytesOf("0.7")]; while (rel.length < 16) rel.push(0);
       const payload = [3, 1, this.base & 255, this.base >> 8, ...rel, ...le32(this.osId), ...le32(131072), ...le32(114681), ...le32(128), ...le32(16384), 8, this.state, 0, 0,
         ...le32(16384), ...le32(4194304), ...le32(8388608), 32, [...this.pkin.values()].filter((f) => f.checked).length, this.build, 0, 32, this.removals.size, 0xDC, 0x05, 0, 0, 0, 0];
+      if (this.tail && p.length === 1 && p[0] >= 4) payload.push(this.tail.generation, 0, this.tail.most & 255, this.tail.most >> 8, ...le32(this.tail.room));
       return A(this.state === 2 ? 7 : this.state === 6 ? 14 : 0, payload);
     }
     if (cmd === D.CMD.status) {
@@ -249,8 +265,11 @@ class UnitModel {
     if (this.state === 2 && cmd !== D.CMD.abort) return A(7);
     if ((cmd === D.CMD.list || cmd === D.CMD.hash) && this.notReady > 0) { this.notReady--; return A(13); }
     if (cmd === D.CMD.list) {
-      const all = this.listOf(p.length >= 2 ? p[1] : 0), first = p[0], page = all.slice(first, first + 8);
-      const payload = [all.length, 0, first, page.length];
+      const whole = this.listOf(p.length >= 2 ? p[1] : 0), cap = (this.build ?? 0) >= 8 ? 192 : 64, all = whole.slice(0, cap), first = p[0];
+      (this.listFirsts ??= []).push(first);
+      if (first > cap - 1) return A(2);
+      const page = all.slice(first, first + 8);
+      const payload = [all.length, whole.length - all.length, first, page.length];
       for (const e of page) { const nb = bytesOf(e.name); payload.push(e.flags, ...le32(e.size), nb.length, ...nb); }
       return A(0, payload);
     }
@@ -377,6 +396,40 @@ function pack3(name, size, seed) {
   return d;
 }
 
+// ---------- 4b. the loader's room from hello: a door of build 7 says it, an older one answers 04 as 03 ----------
+
+{
+  const files = { "base.pack": pack3("base", 1000, 1) };
+  const seven = new UnitModel(files, { build: 7, tail: { generation: 2, most: 128, room: 16777216 } });
+  const c7 = new D.DoorClient(bench(seven).io);
+  const r7 = await c7.connect();
+  const sent7 = seven.received.find((m) => m[4] === D.CMD.hello);
+  check("a door of build 7: hello 04 sent, its tail taken into the limits", r7.kind === "door" && sent7 && sent7[7] === 4 && c7.hello.loaderGeneration === 2 && c7.limits.packsMost === 128 && c7.limits.packRoom === 16777216 && c7.protocol === 3,
+    JSON.stringify(c7.limits));
+  const six = new UnitModel(files, { build: 6 });
+  const c6 = new D.DoorClient(bench(six).io);
+  const r6 = await c6.connect();
+  check("a door before build 7: hello 04 answered with 68 bytes, the loader N1's numbers", r6.kind === "door" && c6.protocol === 3 && c6.hello.loaderSaid === false && c6.limits.packsMost === 32 && c6.limits.packRoom === 2031616);
+}
+
+// ---------- 4c. a folder of more than 64 files: door build 8 lists 192, an older door 64 and says the rest ----------
+
+{
+  const files = {};
+  for (let i = 0; i < 100; i++) files["p" + String(i).padStart(3, "0") + ".pack"] = pack3("p" + i, 64, i + 1);
+  const eight = new UnitModel(files, { build: 8, tail: { generation: 2, most: 128, room: 16777216 } });
+  const c8 = new D.DoorClient(bench(eight).io);
+  await c8.connect();
+  const L8 = await c8.listPacks(0);
+  check("door build 8: all 100 files listed, past index 63", L8.total === 100 && L8.beyond === 0 && L8.entries.length === 100, L8.total + " " + L8.entries.length);
+  const seven = new UnitModel(files, { build: 7, tail: { generation: 2, most: 128, room: 16777216 } });
+  const c7 = new D.DoorClient(bench(seven).io);
+  await c7.connect();
+  const L7 = await c7.listPacks(0);
+  check("door build 7: 64 files listed, the other 36 said as beyond, no index past 63 asked", L7.total === 64 && L7.beyond === 36 && L7.entries.length === 64 &&
+    Math.max(...seven.listFirsts) <= 63 && Math.max(...eight.listFirsts) > 63, L7.total + " " + L7.beyond + " " + L7.entries.length);
+}
+
 // ---------- 5. the whole change against the model ----------
 
 {
@@ -393,6 +446,10 @@ function pack3(name, size, seed) {
   for (const e of L.entries) hashes.push(await client.hashPack(e.name));
   check("hash of every file, slice by slice, each the file's SHA-256", hashes.every((h) => h.sha256 === sha(files[h.name]).toString("hex")));
   const newLfo = pack3("lfo-new", 381000, 9), sidechain = pack3("sidechain", 104062, 5);
+  const many = { files: Array.from({ length: 33 }, (_, i) => { const d = pack3("m" + i, 64, 100 + i); return { name: "m" + String(i).padStart(2, "0") + ".pack", data: d, sha256: sha(d) }; }), remove: [] };
+  const before = unit.received.length;
+  const tooMany = await client.changePacks(many, { firmware: "1.7.3", saveRecord: () => true });
+  check("33 packs to go on: refused before anything is sent, with the door's 32", tooMany.stage === "refused" && tooMany.words === "At most 32 packs can go on in one go. Untick a few, send, and then send the rest." && unit.received.length === before, tooMany.words);
   const plan = { files: [{ name: "lfo.pack", data: newLfo, sha256: sha(newLfo) }, { name: "sidechain.pack", data: sidechain, sha256: sha(sidechain) }], remove: ["wink.pack"] };
   let kept = null, asked = null;
   const out = await client.changePacks(plan, { firmware: "1.7.3", saveRecord: (r) => { kept = JSON.parse(JSON.stringify(r)); return true; }, onAsked: (x) => { asked = x; } });

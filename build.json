@@ -1,6 +1,7 @@
 {
-  "about": "What tools/build_all.py builds. The loader, our small piece inside the firmware file, is linked by itself from its sources; its binary is the file the installer's builder adds to an owner's firmware file, named under `blob`. The base (base.pack), which every unit with open-field needs, is built from its recipe in packs/. No feature is built here: a feature is a pack in a repository of its own, Faust's four in open-field-packs. Each example is a pack in a folder of its own, with its own recipe, built into out/examples/; the one that changes places of the firmware has a profile of its own. The sizes and hashes of the results are kept in packs/built.json.",
+  "about": "What tools/build_all.py builds. The loader, our small piece inside the firmware file, is linked by itself from its sources; its binary is the file the installer's builder adds to an owner's firmware file, named under `blob`. The builder's second loader, v2, is linked the same way from the sources under `loader_2`, with its own profile, linker script and `blob`: the same sources, but for two files of two lines that set OP1F_LOADER_GENERATION to 2 and take in the source they stand for. The base (base.pack), which every unit with open-field needs, is built from its recipe in packs/. No feature is built here: a feature is a pack in a repository of its own, Faust's four in open-field-packs. Each example is a pack in a folder of its own, with its own recipe, built into out/examples/; the one that changes places of the firmware has a profile of its own. The sizes and hashes of the results are kept in packs/built.json. The change list, docs/changes.md, is made from the profile under `change_list`: the profile of the loader the install page offers by itself, v2's.",
   "profile": "profiles/op1f-1.7.3.json",
+  "change_list": "profiles/op1f-1.7.3-n2.json",
   "loader": {
     "name": "build_m4_loader",
     "linker": "linker/op1f-1.7.3-base.ld",
@@ -14,6 +15,22 @@
       "module/build_j5b_base.s",
       "module/build_l1_base_text_table.s"
     ]
+  },
+  "loader_2": {
+    "name": "build_n2_loader",
+    "profile": "profiles/op1f-1.7.3-n2.json",
+    "linker": "linker/op1f-1.7.3-base-n2.ld",
+    "sources": [
+      "module/build_j_boot.s",
+      "module/build_j_base.s",
+      "module/build_n2_loader.cpp",
+      "module/build_k6_base_disk.s",
+      "module/build_n2_loader_disk.cpp",
+      "module/build_l1_base_table.s",
+      "module/build_j5b_base.s",
+      "module/build_l1_base_text_table.s"
+    ],
+    "blob": "loader-1.7.3-v2.bin"
   },
   "packs": [
     "base"

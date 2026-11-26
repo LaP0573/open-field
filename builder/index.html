@@ -495,6 +495,7 @@
           </div>
           <div>
             <dl class="spec"><dt>OS</dt><dd id="specOs">1.7.3</dd><dt>open-field</dt><dd id="specRelease"></dd><dt>packs</dt><dd id="specPacks"></dd><dt>at its last start</dt><dd id="specStart"></dd></dl>
+            <p class="note hidden" id="roomNote"></p>
             <button type="button" class="linkish note" id="reinstall">reinstall or go back to the original firmware</button>
           </div>
         </div>
@@ -1858,6 +1859,10 @@
     $("specRelease").textContent = rowsNow.base.unitRelease || "?";
     $("specPacks").textContent = n + (n === 1 ? " pack file" : " pack files");
     for (const r of [...document.querySelectorAll(".releaseUnit")]) r.textContent = rowsNow.base.unitRelease || "?";
+    // a unit on the loader N1 while the page offers N2 (its manifest carries reserve.pack_room): the room a reinstall gives
+    const room = P.roomWords(unit.hello, files && files.manifest);
+    $("roomNote").textContent = room || "";
+    $("roomNote").classList.toggle("hidden", !room);
     const waiting = resolved && (resolved.plan.send.length || resolved.plan.remove.length);
     $("oursHead").textContent = waiting ? "changes waiting" : "you're up to date";
   }
