@@ -6,20 +6,5 @@
     "effects",
     "mixer"
   ],
-  "description": "BEIGNET, a mastering sweetener for the master slot: glue, tone, width, loud and a -1 dBFS limiter; presets.",
-  "repository": "https://github.com/hasis/field-packs-releases",
-  "path": "packs/beignet.pack",
-  "follow": "main",
-  "version": 2,
-  "firmware": "1.7.3",
-  "needs": [],
-  "folders": [
-    {
-      "name": "beignet",
-      "place": "beignet"
-    }
-  ],
-  "picture": {
-    "path": "packs/beignet/picture.png"
-  }
+  "description": "BEIGNET, the mastering sweetener, now lives in wagons (wagons 18)."
 }
