@@ -1,0 +1,20 @@
+{
+  "id": "gangsa",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "A synth engine: struck metal and wood. Gamelan bars and gongs, kalimba, bells and bowls, with ten sounds.",
+  "repository": "https://github.com/hooligan333/open-field-gangsa-kotekan",
+  "commit": "f2f59baae5158a150ae23c692785afbe187a0b2c",
+  "path": "gangsa.pack",
+  "sha256": "45cb58d0d6416336c9ca6fca5fb6d0b543fa079e8bde0f06a10896b4b61d8636",
+  "bytes": 54960,
+  "version": 6,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 9,
+  "folders": []
+}

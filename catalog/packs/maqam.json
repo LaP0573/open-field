@@ -1,0 +1,20 @@
+{
+  "id": "maqam",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "A sequencer for the synth that tunes as you play: each key sounds a maqam's own pitch, quarter tones and all.",
+  "repository": "https://github.com/hooligan333/open-field-oud-maqam",
+  "commit": "9b0e815bd7cf4d463236ade815725db9647fcea3",
+  "path": "maqam.pack",
+  "sha256": "ba24da0500d2218b4b7656f2d0295bbe9a9f3922a83dc77fa9cb61f2d9113585",
+  "bytes": 65599,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 7,
+  "folders": []
+}
