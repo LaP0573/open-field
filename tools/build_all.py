@@ -9,16 +9,18 @@ file and reads none: what it builds is our own code.
 
 What it does, from `build.json`:
 
-  1. holds the files that are made from others to what they are made from: the table sources and the change list to
-     the profile (tools/table_build.py, tools/change_list.py), the page of the firmware's functions to the sources
+  1. holds the files that are made from others to what they are made from: the table sources to the profile
+     (tools/table_build.py), the change list to the profile of the loader the install page offers by itself, which
+     `build.json` names under `change_list` (tools/change_list.py), the page of the firmware's functions to the sources
      (tools/interfaces.py), and each example's table to the example's own profile;
   2. builds the base from its recipe (tools/pack_build.py build3) into <out>/packs: base.pack, which every unit with
      open-field needs. A feature is built in the repository it lives in;
   3. builds each example pack from its own recipe into <out>/examples;
-  4. builds the loader, our small piece inside the firmware file (tools/module_build.py), into build/;
-  5. copies the loader's binary into <out> under the name `build.json` gives it under `blob`,
+  4. builds the loader, our small piece inside the firmware file (tools/module_build.py), into build/; and the
+     builder's second loader, which `build.json` names under `loader_2` with a profile and a linker script of its own;
+  5. copies each loader's binary into <out> under the name `build.json` gives it under `blob`,
      loader-<os>-<version>.bin: the file the installer's builder adds to an owner's firmware file;
-  6. holds each result to packs/built.json; the file of step 5, byte for byte, to the file of that name in builder/;
+  6. holds each result to packs/built.json; each file of step 5, byte for byte, to the file of that name in builder/;
      and the manifest in builder/ that names that file to this build: the file's size and SHA-256, the address at
      which the loader is entered, and the size of the firmware file the builder gives. The one thing of the manifest
      it cannot hold is the SHA-256 of that firmware file, which takes a firmware file:
@@ -46,6 +48,8 @@ two files, the loader's file and its manifest in builder/: that takes a firmware
 answer stays 1, and this tool says which command is next. Without --loader-version, --update leaves the entries of the
 loader as they are and says so. A name whose file is in builder/ with other bytes is refused when that file's
 manifest says it has run on a unit; a version of your own that nobody has tried may be built again under its name.
+With two loaders in build.json, the new name goes to the one whose build is not its kept file. When both changed it
+stops: a version's name is for one loader. The name of the other loader's file is refused too.
 
 Standard library only.
 """
@@ -103,6 +107,17 @@ def manifests_naming(blob_name):
                 manifest = json.load(f)
             if manifest.get("loader", {}).get("file") == blob_name:
                 out.append((name, manifest))
+    return out
+
+
+def loaders_of(plan):
+    """[(the loader's part of build.json, its builder's file's name, its profile, its name in packs/built.json as
+    linked)]: the loader under `loader`, whose file build.json names under `blob`, and the builder's second loader
+    under `loader_2`, which names its own `blob` and profile."""
+    out = [(plan["loader"], plan["blob"], plan["profile"], "loader.bin")]
+    if plan.get("loader_2"):
+        second = plan["loader_2"]
+        out.append((second, second.get("blob", ""), second.get("profile", plan["profile"]), "loader_2.bin"))
     return out
 
 
@@ -190,12 +205,11 @@ def main(argv=None):
     with open(KEPT, encoding="utf-8") as f:
         record = json.load(f)
     kept = record["files"]
-    named = BLOB.match(plan["blob"])
-    if not named:
-        print("error: build.json names the builder's file %s: its name has the form loader-<os>-<version>.bin" % plan["blob"])
-        return 2
-    kept_name = plan["blob"]                                              # the builder's file as build.json names it now
-    blob_name = "%s-%s.bin" % (named.group(1), args.loader_version) if args.loader_version else kept_name
+    loaders = loaders_of(plan)
+    for _loader, name, _profile, _linked in loaders:
+        if not BLOB.match(name):
+            print("error: build.json names the builder's file %s: its name has the form loader-<os>-<version>.bin" % name)
+            return 2
     for needed in (os.path.join("open-xy", "tooling", "formats.py"), os.path.join("open-xy", "local", "toolchain", "bin")):
         if not os.path.exists(os.path.join(ROOT, needed)):
             print("error: %s is not there: docs/build.md says how to get the toolchain" % needed)
@@ -210,7 +224,7 @@ def main(argv=None):
     try:
         with open(log_path, "w", encoding="utf-8") as log:
             run(python + ["tools/table_build.py", "--profile", profile_path, "--check"], log)
-            run(python + ["tools/change_list.py", "--profile", profile_path, "--check"], log)
+            run(python + ["tools/change_list.py", "--profile", plan.get("change_list", profile_path), "--check"], log)     # the profile of the loader the page offers by itself
             run(python + ["tools/interfaces.py", "--check"], log)
             for example in plan.get("examples", ()):
                 if example.get("profile"):                               # an example that changes places of the firmware has a profile of its own
@@ -224,22 +238,44 @@ def main(argv=None):
                 run(python + ["tools/pack_build.py", "build3", "--recipe", example["recipe"], "--profile", example.get("profile", profile_path),
                               "--out", from_root(target)], log)
                 made["examples/%s.pack" % example["name"]] = target
-            loader = plan["loader"]
-            run(python + ["tools/module_build.py", "--name", loader["name"], "--out", "build", "--linker", loader["linker"], "--include", "module"] + loader["sources"], log)
-            blob = os.path.join(out, blob_name)                           # the builder's file is the loader's binary itself
-            with open(blob, "xb") as f:
-                f.write(read(os.path.join(build, loader["name"] + ".bin")))
+            for loader, name, _profile, _linked in loaders:
+                run(python + ["tools/module_build.py", "--name", loader["name"], "--out", "build", "--linker", loader["linker"], "--include", "module"] + loader["sources"], log)
+                with open(os.path.join(out, name), "xb") as f:            # the builder's file is the loader's binary itself
+                    f.write(read(os.path.join(build, loader["name"] + ".bin")))
     except RuntimeError as problem:
         print("error: %s" % problem)
         print("the build's log: %s" % log_path)
         return 2
-    blob_data = read(blob)
-    renamed = blob_name != kept_name
-    if renamed and kept_name in kept and (kept[kept_name]["bytes"], kept[kept_name]["sha256"]) == (len(blob_data), hashlib.sha256(blob_data).hexdigest()):
+
+    def is_kept(name):
+        data = read(os.path.join(out, name))
+        return name in kept and (kept[name]["bytes"], kept[name]["sha256"]) == (len(data), hashlib.sha256(data).hexdigest())
+
+    # the loader a new version's name goes to: the one whose build is not its kept file
+    changed = [number for number, (_loader, name, _profile, _linked) in enumerate(loaders) if not is_kept(name)]
+    which = 0
+    if args.loader_version and not changed:
         # asked for a new version of a loader that did not change: nothing is renamed
         print("the loader is the kept one: no new version is needed, and --loader-version is passed over")
-        os.replace(blob, os.path.join(out, kept_name))
-        blob_name, blob, renamed = kept_name, os.path.join(out, kept_name), False
+    elif args.loader_version and len(changed) > 1:
+        print("error: both loaders of build.json changed (%s): a version's name is for one loader" % ", ".join(loaders[number][1] for number in changed))
+        print("       nothing was written into packs/built.json or build.json")
+        return 2
+    elif changed:
+        which = changed[0]
+    loader, kept_name, which_profile, linked = loaders[which]            # the builder's file as build.json names it now
+    blob_name = kept_name
+    if args.loader_version and changed:
+        blob_name = "%s-%s.bin" % (BLOB.match(kept_name).group(1), args.loader_version)
+        if blob_name != kept_name and blob_name in [name for _loader, name, _profile, _linked in loaders]:
+            print("error: build.json names %s for its other loader: give the changed loader a new name with --loader-version" % blob_name)
+            print("       nothing was written into packs/built.json or build.json")
+            return 2
+        os.replace(os.path.join(out, kept_name), os.path.join(out, blob_name))
+        loaders[which] = (loader, blob_name, which_profile, linked)
+    blob = os.path.join(out, blob_name)
+    blob_data = read(blob)
+    renamed = blob_name != kept_name
     in_builder = os.path.join(ROOT, "builder", blob_name)
     if args.loader_version and os.path.isfile(in_builder) and read(in_builder) != blob_data:
         # a version that has run on a unit keeps its bytes for good: its name is not given to another loader
@@ -251,10 +287,13 @@ def main(argv=None):
                 print("       nothing was written into packs/built.json or build.json")
                 return 2
     made.update({name + ".pack": os.path.join(packs, name + ".pack") for name in plan["packs"]})
-    made["loader.bin"] = os.path.join(build, loader["name"] + ".bin")
-    made[blob_name] = blob
-    of_the_loader = ("loader.bin", blob_name)
+    for each, name, _profile, as_linked in loaders:
+        made[as_linked] = os.path.join(build, each["name"] + ".bin")
+        made[name] = os.path.join(out, name)
+    of_the_loader = (linked, blob_name)                                   # the loader a new version's name goes to
+    of_a_loader = {name for _loader, blob_file, _profile, as_linked in loaders for name in (as_linked, blob_file)}
     wrong, astray, renewed, loader_differs = 0, 0, [], False     # built files that differ; faults of the builder's own files
+    differing = set()                                             # the names of the built files that differ
     for name in sorted(made):
         data = read(made[name])
         digest = hashlib.sha256(data).hexdigest()
@@ -269,7 +308,8 @@ def main(argv=None):
         elif not same:
             wrong += 1
             word = "DIFFERS"
-            loader_differs = loader_differs or name in of_the_loader
+            loader_differs = loader_differs or name in of_a_loader
+            differing.add(name)
         print("%-9s %-26s %8d bytes  %s" % (word, name, len(data), digest))
     if renewed:
         with open(KEPT, "w", encoding="utf-8", newline="\n") as f:
@@ -286,39 +326,43 @@ def main(argv=None):
             f.write(plan_text.replace(old, new))
         print("build.json names the builder's file %s now (%s before)" % (blob_name, kept_name))
 
-    # the builder's own two files: the loader's file, and the manifest that names it
-    version = BLOB.match(blob_name).group(3)
-    next_step = "node builder/write-manifest.mjs --loader %s --elf build/%s.elf --version %s --stock <your own os.ldr>" % (
-        from_root(blob), loader["name"], version)
-    if not os.path.isfile(in_builder):
-        astray += 1
-        print("MISSING   builder/%s and its manifest: write them with your own firmware file:" % blob_name)
-        print("          %s" % next_step)
-    elif read(in_builder) != blob_data:
-        astray += 1
-        print("DIFFERS   builder/%s is not the file that was built" % blob_name)
-        if not loader_differs:
-            print("          if %s is a version of your own that nobody else has, write it again:" % version)
-            print("          %s --replace" % next_step)
-    else:
-        print("the same  builder/%s, byte for byte" % blob_name)
-        with open(os.path.join(ROOT, *profile_path.split("/")), encoding="utf-8") as f:
-            profile = json.load(f)
-        entry = struct.unpack_from("<I", read(os.path.join(build, loader["name"] + ".elf")), 24)[0]     # where the linked loader says it is entered
-        naming = manifests_naming(blob_name)
-        if not naming:
+    # the builder's own two files of each loader: the loader's file, and the manifest that names it
+    for each, blob_name, each_profile, as_linked in loaders:
+        blob, in_builder = os.path.join(out, blob_name), os.path.join(ROOT, "builder", blob_name)
+        blob_data = read(blob)
+        version = BLOB.match(blob_name).group(3)
+        own_profile = "" if each_profile == profile_path else " --profile %s" % each_profile     # a loader with a profile of its own names it
+        next_step = "node builder/write-manifest.mjs --loader %s --elf build/%s.elf --version %s%s --stock <your own os.ldr>" % (
+            from_root(blob), each["name"], version, own_profile)
+        if not os.path.isfile(in_builder):
             astray += 1
-            print("MISSING   a manifest in builder/ that names %s: write it with your own firmware file:" % blob_name)
+            print("MISSING   builder/%s and its manifest: write them with your own firmware file:" % blob_name)
             print("          %s" % next_step)
-        for name, manifest in naming:
-            faults = manifest_faults(manifest, blob_name, blob_data, entry, profile)
-            if faults:
+        elif read(in_builder) != blob_data:
+            astray += 1
+            print("DIFFERS   builder/%s is not the file that was built" % blob_name)
+            if not (differing & {blob_name, as_linked}):
+                print("          if %s is a version of your own that nobody else has, write it again:" % version)
+                print("          %s --replace" % next_step)
+        else:
+            print("the same  builder/%s, byte for byte" % blob_name)
+            with open(os.path.join(ROOT, *each_profile.split("/")), encoding="utf-8") as f:
+                profile = json.load(f)
+            entry = struct.unpack_from("<I", read(os.path.join(build, each["name"] + ".elf")), 24)[0]     # where the linked loader says it is entered
+            naming = manifests_naming(blob_name)
+            if not naming:
                 astray += 1
-                print("DIFFERS   builder/%s is not this build's manifest" % name)
-                for fault in faults:
-                    print("          %s" % fault)
-            else:
-                print("the same  builder/%s names it: its size, its SHA-256, and the loader's entry at 0x%08x" % (name, entry))
+                print("MISSING   a manifest in builder/ that names %s: write it with your own firmware file:" % blob_name)
+                print("          %s" % next_step)
+            for name, manifest in naming:
+                faults = manifest_faults(manifest, blob_name, blob_data, entry, profile)
+                if faults:
+                    astray += 1
+                    print("DIFFERS   builder/%s is not this build's manifest" % name)
+                    for fault in faults:
+                        print("          %s" % fault)
+                else:
+                    print("the same  builder/%s names it: its size, its SHA-256, and the loader's entry at 0x%08x" % (name, entry))
     # the base the install page puts on every unit: builder/base.pack, and builder/base-pack.json that names it
     built_base = read(made["base.pack"])
     if "base.pack" in renewed:

@@ -1,0 +1,1013 @@
+{
+ "schema": 2,
+ "id": "op1f-1.7.3-n2",
+ "device": "OP-1 Field",
+ "firmware_version": "1.7.3+0",
+ "cpu": "bf703",
+ "about": [
+  "Where the second version of the loader of open-field, v2, and the base change OS 1.7.3+0 of the OP-1 Field, and nothing else: no byte of the firmware is in this file. It is profiles/op1f-1.7.3.json, the profile of the loader v1, with the room for our code and the change of the heap's size made for v2, and two fields more: pack_link and pack_room. The places and the tables are the same. A pack names the places it changes in a profile of its own.",
+  "stock_sha256 is the SHA-256 of the firmware file an owner copies off their own unit; every address below belongs to that one file.",
+  "patches: each place once. address and length say where it is; sum is the CRC-32 of the firmware's own bytes there, by which the loader knows the place before it changes it; name says in our words what stands there; group is the part of open-field that uses it (image: changed in the file by the builder; every other: changed in the running firmware at the start).",
+  "tables: for the loader and for the base (and, in a pack's own profile, for that pack), which function of ours goes to which place. form: a word of data, a call, a jump, or the load of an address. room and copies: the loader copies that many bytes of the instructions the change displaces from the running firmware into the room and puts a jump back behind them. An entry has a sum of its own when its trampoline copies more bytes than the place is long.",
+  "image: what the builder changes in the firmware file itself, before anything runs. kind imm32: the number an instruction loads at that address becomes new_imm. kind call: a call of the function target, which is in the loader, over length bytes. module_base and reserved_bytes are the room for the loader alone, 128 KiB at the top of the file's record of zeros: the new heap size makes the heap end at module_base, the loader's first byte. entry is the address the file's first record names, and heap_fill_base and heap_fill_bytes are the file's record of zeros that the room lies in: the builder looks for all three in an owner's file before it changes anything. builder/write-manifest.mjs makes the builder's manifest from these and from a built loader, with --profile profiles/op1f-1.7.3-n2.json. The loader is our small piece inside the firmware file; the base is the pack base.pack, a file on the unit.",
+  "pack_link and pack_room, the two fields this profile has and the one of v1 has not. pack_link is the window a pack is linked at, its first address and its bytes, the same window as under v1, so one pack file runs under both loaders. pack_room is where the loader v2 puts the pack files it loads: its first address, its bytes (16 MiB) and the most pack files it looks at (files). The builder holds the room's numbers in the manifest it writes, so the install page can make the same checks.",
+  "The table sources in module/ are made from profiles/op1f-1.7.3.json, whose places and tables this file repeats. docs/changes.md is made from this file, the profile of the loader the install page offers."
+ ],
+ "stock_sha256": "d134eb1ac7ad88e8370d988329cd5d7419f016005b1d269034f9cf7166fad0ec",
+ "stock_bytes": 2079016,
+ "stock_records": 313,
+ "entry": "0x11a00000",
+ "module_base": "0x8d4c4234",
+ "reserved_bytes": 131072,
+ "heap_fill_base": "0x8c0e4234",
+ "heap_fill_bytes": 20971520,
+ "pack_link": {
+  "base": "0x8d2f4234",
+  "bytes": 2031616
+ },
+ "pack_room": {
+  "base": "0x85000000",
+  "bytes": 16777216,
+  "files": 128
+ },
+ "patches": [
+  {
+   "address": "0x8d4e4260",
+   "length": 8,
+   "sum": "0x9403a020",
+   "group": "image",
+   "name": "The size the firmware gives its application heap at the start."
+  },
+  {
+   "address": "0x8c0b4358",
+   "length": 8,
+   "sum": "0x2263a65f",
+   "group": "image",
+   "name": "In the start-up, right behind the step that mounts the disk: the load of an address for the call that follows."
+  },
+  {
+   "address": "0x8490fc4c",
+   "length": 4,
+   "sum": "0xbb0cdc26",
+   "group": "loader",
+   "name": "A word in the table of the disk mode's root folder: the function that answers a folder's name with what that folder does."
+  },
+  {
+   "address": "0x8fcafc0a",
+   "length": 8,
+   "sum": "0x7edd457d",
+   "group": "loader",
+   "name": "In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it."
+  },
+  {
+   "address": "0x8c0b43e4",
+   "length": 8,
+   "sum": "0x420d32d0",
+   "group": "loader",
+   "name": "In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address."
+  },
+  {
+   "address": "0x8c0d8ff4",
+   "length": 8,
+   "sum": "0x5e40e0a1",
+   "group": "base",
+   "name": "Where the audio start-up registers the handler of an audio block: the load of the handler's address."
+  },
+  {
+   "address": "0x8c0caaa8",
+   "length": 8,
+   "sum": "0x5e40e0a1",
+   "group": "base",
+   "name": "Where the loopback controller registers the handler of an audio block, the first of two places: the load of the handler's address."
+  },
+  {
+   "address": "0x8c0cacd0",
+   "length": 8,
+   "sum": "0x5e40e0a1",
+   "group": "base",
+   "name": "Where the loopback controller registers the handler of an audio block, the second of two places: the load of the handler's address."
+  },
+  {
+   "address": "0x8fc8ab7c",
+   "length": 8,
+   "sum": "0x9558751d",
+   "group": "base",
+   "name": "The entry of the picture loader, which loads a screen's picture by its file name."
+  },
+  {
+   "address": "0x8fc8daae",
+   "length": 8,
+   "sum": "0x5485a989",
+   "group": "base",
+   "name": "The entry of the function that handles a complete MIDI system-exclusive message."
+  },
+  {
+   "address": "0x8c0b1904",
+   "length": 8,
+   "sum": "0xc1091572",
+   "group": "base",
+   "name": "In the display thread's frame loop: the call of the firmware's own work of a frame before the draw."
+  },
+  {
+   "address": "0x8c0b1914",
+   "length": 8,
+   "sum": "0x0fbfa31c",
+   "group": "base",
+   "name": "In the display thread's frame loop: the call that draws the screens."
+  },
+  {
+   "address": "0x8c0b1ae8",
+   "length": 8,
+   "sum": "0x16ecb7df",
+   "group": "base",
+   "name": "The start of the function that hands a key that goes down to the mode shown."
+  },
+  {
+   "address": "0x8c0b1b58",
+   "length": 8,
+   "sum": "0x6e415f42",
+   "group": "base",
+   "name": "The start of the function that hands a key that goes down while shift is held to the mode shown."
+  },
+  {
+   "address": "0x8c0b1b8c",
+   "length": 8,
+   "sum": "0x6e415f42",
+   "group": "base",
+   "name": "The start of the function that hands a key that comes up to the mode shown."
+  },
+  {
+   "address": "0x8c0b1c00",
+   "length": 8,
+   "sum": "0xe4c2b241",
+   "group": "base",
+   "name": "In the function that hands a knob's turn to the mode shown: the call right behind its own bookkeeping of the knob."
+  },
+  {
+   "address": "0x8c0b2578",
+   "length": 8,
+   "sum": "0xcb4e35d8",
+   "group": "base",
+   "name": "In the function that asks which screen is to show: the load right behind the mode's answer, where the screen's number is in hand."
+  },
+  {
+   "address": "0x8fca54dc",
+   "length": 8,
+   "sum": "0xbcc738c2",
+   "group": "base",
+   "name": "In the function that takes the keyboard's state: where it stores which keys are down, after it has told the unit of the presses."
+  },
+  {
+   "address": "0x8fc97914",
+   "length": 8,
+   "sum": "0xc9008b60",
+   "group": "base",
+   "name": "The entry of the function that switches an instrument to a sequencer, by the sequencer's type."
+  },
+  {
+   "address": "0x8fca1d84",
+   "length": 8,
+   "sum": "0x79c6abcc",
+   "group": "base",
+   "name": "The entry of the function that finds a sequencer's type by its name."
+  },
+  {
+   "address": "0x8fca1d00",
+   "length": 8,
+   "sum": "0x1d1a3439",
+   "group": "base",
+   "name": "The entry of the function that finds a sequencer's name by its type."
+  },
+  {
+   "address": "0x8c0c109c",
+   "length": 8,
+   "sum": "0x71785ad2",
+   "group": "base",
+   "name": "The entry of the first of the two functions that hand out the controller of the sequencer that plays."
+  },
+  {
+   "address": "0x8c0c1460",
+   "length": 8,
+   "sum": "0x71785ad2",
+   "group": "base",
+   "name": "The entry of the second of the two functions that hand out the controller of the sequencer that plays."
+  },
+  {
+   "address": "0x8d4f0f1e",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "base",
+   "name": "In the start-up: the call that reads the unit's catalog of sequencers, effects and engines from its file."
+  },
+  {
+   "address": "0x8d4f2ea8",
+   "length": 8,
+   "sum": "0x613e3b1a",
+   "group": "base",
+   "name": "The call that writes the unit's catalog of sequencers, effects and engines back to its file."
+  },
+  {
+   "address": "0x848d8668",
+   "length": 4,
+   "sum": "0x6c7f59d7",
+   "group": "base",
+   "name": "A word in a table of the firmware's: the function that says, for a screen, whether the notice that the sequencer is off stands over it."
+  },
+  {
+   "address": "0x8f008388",
+   "length": 8,
+   "sum": "0x911f04ae",
+   "group": "base",
+   "name": "The entry of the function that begins a note."
+  },
+  {
+   "address": "0x8f008518",
+   "length": 8,
+   "sum": "0x1de0691a",
+   "group": "base",
+   "name": "The entry of the function that ends a note."
+  },
+  {
+   "address": "0x11a052ee",
+   "length": 8,
+   "sum": "0xf8a96178",
+   "group": "base",
+   "name": "In the synth's work of each audio block: the load of where the synth's sound lies, just after its effect."
+  },
+  {
+   "address": "0x11a03e70",
+   "length": 8,
+   "sum": "0x088299d9",
+   "group": "base",
+   "name": "In the drum's work of each audio block: the load of where the drum's sound lies, just after its effect."
+  },
+  {
+   "address": "0x11a02ec0",
+   "length": 8,
+   "sum": "0xa5e817d7",
+   "group": "base",
+   "name": "In the work of each audio block: the load of the unit's whole sound just before the master effect."
+  },
+  {
+   "address": "0x11a02ee0",
+   "length": 8,
+   "sum": "0xd8b74769",
+   "group": "base",
+   "name": "In the work of each audio block: the load of where the unit's whole sound lies, just after the master effect."
+  },
+  {
+   "address": "0x8d4ea880",
+   "length": 8,
+   "sum": "0xe6ba2eef",
+   "group": "base",
+   "name": "In the loading of a synth sound: the call that reads the sound's file."
+  },
+  {
+   "address": "0x8d4ec7a2",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "base",
+   "name": "In the loading of a sampler sound: the call that reads the sound's file."
+  },
+  {
+   "address": "0x8d4ebb6c",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "base",
+   "name": "In the loading of a drum sound: the call that reads the sound's file."
+  },
+  {
+   "address": "0x8d4f3b26",
+   "length": 8,
+   "sum": "0xa80c51d1",
+   "group": "base",
+   "name": "In the function that puts a loaded sound onto a sound slot: the call that copies the sound's settings."
+  },
+  {
+   "address": "0x8c0ce1cc",
+   "length": 8,
+   "sum": "0x7b3304d7",
+   "group": "base",
+   "name": "In the saving of an instrument: the call that writes a synth sound's file."
+  },
+  {
+   "address": "0x8c0ce21a",
+   "length": 8,
+   "sum": "0xa744ef38",
+   "group": "base",
+   "name": "In the saving of an instrument: the call that writes a drum sound's file."
+  },
+  {
+   "address": "0x8c0c1db8",
+   "length": 8,
+   "sum": "0x7a6083f6",
+   "group": "base",
+   "name": "In the function that writes a tape's settings file: the call that stores the mixer's values."
+  },
+  {
+   "address": "0x8c0c348c",
+   "length": 8,
+   "sum": "0x02750317",
+   "group": "base",
+   "name": "The entry of the function that loads a tape's settings file."
+  },
+  {
+   "address": "0x8d5053b4",
+   "length": 8,
+   "sum": "0x84802f0b",
+   "group": "base",
+   "name": "In the function that builds a sound's slot: the call that makes its effect object."
+  },
+  {
+   "address": "0x8d4f398c",
+   "length": 8,
+   "sum": "0xbaed63c3",
+   "group": "base",
+   "name": "The entry of the function that puts an effect picked in the unit's list on a sound."
+  },
+  {
+   "address": "0x8400f2cc",
+   "length": 4,
+   "sum": "0x85566a12",
+   "group": "base",
+   "name": "A word in the mixer controller's table: the function that puts an effect picked in the list on the master."
+  },
+  {
+   "address": "0x8d51750c",
+   "length": 8,
+   "sum": "0xe095e325",
+   "group": "base",
+   "name": "The entry of the function that gives the LFO pages the name of a value of an effect or an engine."
+  },
+  {
+   "address": "0x8d4f3c24",
+   "length": 8,
+   "sum": "0x64ade193",
+   "group": "base",
+   "name": "The entry of the function that sets whether a sound's effect is switched on."
+  },
+  {
+   "address": "0x8d4f6468",
+   "length": 8,
+   "sum": "0x5f219dfb",
+   "group": "base",
+   "name": "In the loading of a synth sound onto its slot: the call that switches the sound's effect on or off."
+  },
+  {
+   "address": "0x8d4f4f38",
+   "length": 8,
+   "sum": "0x9076b0e1",
+   "group": "base",
+   "name": "In the loading of a drum sound onto its slot: the call that switches the sound's effect on or off."
+  },
+  {
+   "address": "0x8c0babc6",
+   "length": 8,
+   "sum": "0x79fa658e",
+   "group": "base",
+   "name": "In the saving of the mixer's settings: the call that asks whether the master's effect is switched on."
+  },
+  {
+   "address": "0x8f0112e8",
+   "length": 8,
+   "sum": "0x8341c8af",
+   "group": "base",
+   "name": "The entry of the function that makes the objects of a synth engine, by the engine's type."
+  },
+  {
+   "address": "0x8d4eb3e8",
+   "length": 8,
+   "sum": "0x8e2c6a48",
+   "group": "base",
+   "name": "The entry of the function that puts an engine picked in the unit's list on a synth sound."
+  },
+  {
+   "address": "0x8fc2688e",
+   "length": 8,
+   "sum": "0xa15b2423",
+   "group": "base",
+   "name": "In the display thread's drawing of the screens: the call of a screen's own drawing."
+  },
+  {
+   "address": "0x8d4ecb42",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "base",
+   "name": "In the loading of a synth sound picked in the unit's list: the call that reads the sound's file."
+  },
+  {
+   "address": "0x8d4ecc2c",
+   "length": 8,
+   "sum": "0x99097ebb",
+   "group": "base",
+   "name": "In the loading of a synth sound picked in the unit's list: the call that puts the sound on its slot."
+  },
+  {
+   "address": "0x8d4ec1f4",
+   "length": 8,
+   "sum": "0xbf339f84",
+   "group": "base",
+   "name": "In the loading of a drum kit picked in the unit's list: the call that reads the kit's file."
+  },
+  {
+   "address": "0x8d4ec2c6",
+   "length": 8,
+   "sum": "0x34cfb303",
+   "group": "base",
+   "name": "In the loading of a drum kit picked in the unit's list: the call that puts the kit on its slot."
+  },
+  {
+   "address": "0x8c0b1936",
+   "length": 8,
+   "sum": "0x712953dc",
+   "group": "base",
+   "name": "In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown."
+  },
+  {
+   "address": "0x8c0d57a8",
+   "length": 8,
+   "sum": "0xf5f3b463",
+   "group": "base",
+   "name": "The start of the function that adds a row to the list on the left of the unit's settings screen. The firmware calls it at the start, once for each of its six rows."
+  },
+  {
+   "address": "0x840134d8",
+   "length": 4,
+   "sum": "0x1a0505dc",
+   "group": "base",
+   "name": "A word in the table of the settings row KEYBOARD: its function for the row being chosen, which fills the lines on the right."
+  },
+  {
+   "address": "0x840134e0",
+   "length": 4,
+   "sum": "0x9027b844",
+   "group": "base",
+   "name": "A word in the table of the settings row KEYBOARD: its function for a turn of the red knob on a line."
+  },
+  {
+   "address": "0x840134b4",
+   "length": 4,
+   "sum": "0x4270cf71",
+   "group": "base",
+   "name": "A word in the table of the settings row SYSTEM: its function for the row being chosen, which fills the lines on the right."
+  },
+  {
+   "address": "0x840134bc",
+   "length": 4,
+   "sum": "0x89f53f9a",
+   "group": "base",
+   "name": "A word in the table of the settings row SYSTEM: its function for a turn of the red knob on a line."
+  },
+  {
+   "address": "0x840134fc",
+   "length": 4,
+   "sum": "0xdfaf55a7",
+   "group": "base",
+   "name": "A word in the table of the settings row MIDI: its function for the row being chosen, which fills the lines on the right."
+  },
+  {
+   "address": "0x84013504",
+   "length": 4,
+   "sum": "0x29fb618c",
+   "group": "base",
+   "name": "A word in the table of the settings row MIDI: its function for a turn of the red knob on a line."
+  },
+  {
+   "address": "0x8fc26744",
+   "length": 8,
+   "sum": "0x6b3a1314",
+   "group": "base",
+   "name": "In the render loop, in its part for the frame's first screen that draws: the call that fills the whole frame buffer black before the screens are drawn."
+  },
+  {
+   "address": "0x8c0ba6d6",
+   "length": 8,
+   "sum": "0x08a01142",
+   "group": "base",
+   "name": "In the function that opens the master's list of effects: the call that looks the master's effect up in the unit's catalog, whose answer is the row the list opens on."
+  },
+  {
+   "address": "0x8d4f3a54",
+   "length": 8,
+   "sum": "0xbaed63c3",
+   "group": "base",
+   "name": "The entry of the function that puts an LFO picked in the unit's list on a sound."
+  },
+  {
+   "address": "0x8d4f7a34",
+   "length": 8,
+   "sum": "0x4a08d6e5",
+   "group": "base",
+   "name": "The entry of the function that gives the row a sound's list of effects opens on. The lists of synth and drum sounds both call it, and nothing else does."
+  },
+  {
+   "address": "0x8d4f7ad0",
+   "length": 8,
+   "sum": "0x4a08d6e5",
+   "group": "base",
+   "name": "The entry of the function that gives the row a sound's list of LFOs opens on. The lists of synth and drum sounds both call it, and nothing else does."
+  },
+  {
+   "address": "0x8f00b7b0",
+   "length": 8,
+   "sum": "0xd0f0e34c",
+   "group": "base",
+   "name": "The entry of the function that puts what the tape has lifted into a synth sound's sample: the drop key on the sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work. Nothing else calls it."
+  }
+ ],
+ "image": [
+  {
+   "address": "0x8d4e4260",
+   "kind": "imm32",
+   "new_imm": "0x013e0000",
+   "does": "The builder makes it 128 KiB smaller, so that the heap ends where the loader begins. The memory that is left over is where the loader is loaded."
+  },
+  {
+   "address": "0x8c0b4358",
+   "kind": "call",
+   "length": 8,
+   "target": "op1f_boot_stub",
+   "does": "A call to our start-up stub, which runs the loader (it looks for pack files and makes their changes) and then does the load."
+  }
+ ],
+ "tables": [
+  {
+   "file": "module/build_l1_base_table.s",
+   "part": "loader",
+   "symbol": "op1f_base_table",
+   "entries": [
+    {
+     "address": "0x8490fc4c",
+     "form": "word",
+     "target": "op1f_base_root_child",
+     "does": "Ours answers for the folder `packs`, asks a pack that has folders of its own (`fx`, `lfo`), and hands every other name to the firmware's function."
+    },
+    {
+     "address": "0x8fcafc0a",
+     "form": "call",
+     "target": "op1f_base_populate_stub",
+     "does": "A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own."
+    }
+   ]
+  },
+  {
+   "file": "module/build_l1_base_text_table.s",
+   "part": "loader",
+   "symbol": "op1f_base_text_table",
+   "entries": [
+    {
+     "address": "0x8c0b43e4",
+     "form": "call",
+     "target": "op1f_base_text_stub",
+     "does": "A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock."
+    }
+   ]
+  },
+  {
+   "file": "module/build_r6d_base_table.s",
+   "part": "base",
+   "symbol": "op1f_boot_table",
+   "entries": [
+    {
+     "address": "0x8c0d8ff4",
+     "form": "load",
+     "target": "op1f_audio_handler",
+     "does": "The address becomes our wrapper's. It measures the time an audio block takes and calls the firmware's handler."
+    },
+    {
+     "address": "0x8c0caaa8",
+     "form": "load",
+     "target": "op1f_audio_handler",
+     "does": "The address becomes our wrapper's, as at the audio start-up."
+    },
+    {
+     "address": "0x8c0cacd0",
+     "form": "load",
+     "target": "op1f_audio_handler",
+     "does": "The address becomes our wrapper's, as at the audio start-up."
+    },
+    {
+     "address": "0x8fc8ab7c",
+     "form": "jump",
+     "target": "op1f_svg_load",
+     "room": "op1f_svg_load_room",
+     "copies": 8,
+     "does": "A jump to our loader. A picture for which a pack carries instructions is put together from the unit's own pictures and handed to the firmware's reader; every other name goes on in the firmware's function."
+    },
+    {
+     "address": "0x8fc8daae",
+     "form": "jump",
+     "target": "op1f_door_entry",
+     "room": "op1f_door_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers the messages of the install page's door (listing, sending and applying pack files, each change asked on the unit) and hands every other message to the firmware's function (through a trampoline)."
+    },
+    {
+     "address": "0x8c0b1904",
+     "form": "call",
+     "target": "op1f_cost_tick",
+     "does": "A call to our wrapper, which takes the time, makes the firmware's call as it was and takes the time again: what a frame costs."
+    },
+    {
+     "address": "0x8c0b1914",
+     "form": "call",
+     "target": "op1f_cost_draw",
+     "does": "A call to our wrapper, which takes the time, makes the firmware's call as it was and takes the time again: what a frame costs."
+    },
+    {
+     "address": "0x8c0b1ae8",
+     "form": "jump",
+     "target": "op1f_input_down_entry",
+     "room": "op1f_input_down_room",
+     "copies": 8,
+     "does": "A jump to ours, which offers the key to the packs first: the pack whose page shows, then the others in the order of their files. A key a pack takes goes no further; any other goes on into the firmware's function, whose first instructions ours runs from its room."
+    },
+    {
+     "address": "0x8c0b1b58",
+     "form": "jump",
+     "target": "op1f_input_shift_entry",
+     "room": "op1f_input_shift_room",
+     "copies": 12,
+     "sum": "0xea3ec432",
+     "does": "The same for a key that goes down while shift is held."
+    },
+    {
+     "address": "0x8c0b1b8c",
+     "form": "jump",
+     "target": "op1f_input_up_entry",
+     "room": "op1f_input_up_room",
+     "copies": 12,
+     "sum": "0xea3ec432",
+     "does": "A jump to ours, which hands a key that comes up to whoever took it when it went down: the pack, or the firmware's function."
+    },
+    {
+     "address": "0x8c0b1c00",
+     "form": "jump",
+     "target": "op1f_input_turn_place",
+     "room": "op1f_input_turn_room",
+     "copies": 8,
+     "does": "A jump to ours, which offers the turn to the packs as a key is offered; a turn a pack takes goes no further, any other goes on as before."
+    },
+    {
+     "address": "0x8c0b2578",
+     "form": "call",
+     "target": "op1f_page_screen",
+     "does": "A call to ours, which does the load and, while a pack's page is open in the mode shown, answers the screen the base lends packs in place of the mode's."
+    },
+    {
+     "address": "0x8fca54dc",
+     "form": "jump",
+     "target": "op1f_door_keymap_entry",
+     "room": "op1f_door_keymap_room",
+     "copies": 8,
+     "does": "A jump to ours, which keeps a copy of which keys are down for the door's confirm page, then makes the two stores as the firmware did."
+    },
+    {
+     "address": "0x8fc97914",
+     "form": "jump",
+     "target": "op1f_seq_switch_entry",
+     "room": "op1f_seq_switch_room",
+     "copies": 8,
+     "does": "A jump to ours, which counts every switch and takes a switch to a sequencer a pack added; every other goes on in the firmware's function (through a trampoline)."
+    },
+    {
+     "address": "0x8fca1d84",
+     "form": "jump",
+     "target": "op1f_seq_name_entry",
+     "room": "op1f_seq_name_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers the type of a sequencer a pack added; every other name goes on in the firmware's function (through a trampoline)."
+    },
+    {
+     "address": "0x8fca1d00",
+     "form": "jump",
+     "target": "op1f_seq_type_entry",
+     "room": "op1f_seq_type_room",
+     "copies": 14,
+     "sum": "0xb896142a",
+     "does": "A jump to ours, which answers the name of a sequencer a pack added; every other type goes on in the firmware's function (through a trampoline)."
+    },
+    {
+     "address": "0x8c0c109c",
+     "form": "jump",
+     "target": "op1f_seq_ctl_entry",
+     "room": "op1f_seq_ctl_room",
+     "copies": 14,
+     "sum": "0xad316f5e",
+     "does": "A jump to ours, which hands out the base's own controller while a sequencer a pack added plays; otherwise the firmware's function runs (through a trampoline)."
+    },
+    {
+     "address": "0x8c0c1460",
+     "form": "jump",
+     "target": "op1f_seq_ctl2_entry",
+     "room": "op1f_seq_ctl2_room",
+     "copies": 14,
+     "sum": "0xad316f5e",
+     "does": "A jump to ours, which hands out the base's own controller while a sequencer a pack added plays; otherwise the firmware's function runs (through a trampoline)."
+    },
+    {
+     "address": "0x8d4f0f1e",
+     "form": "call",
+     "target": "op1f_seq_catalog_read",
+     "does": "A call to ours, which makes the firmware's call and then adds the sequencers, effects and engines the packs registered to what was read."
+    },
+    {
+     "address": "0x8d4f2ea8",
+     "form": "call",
+     "target": "op1f_seq_catalog_write",
+     "does": "A call to ours, which leaves out what the packs added and then makes the firmware's call, so that the file holds the unit's own entries only."
+    },
+    {
+     "address": "0x848d8668",
+     "form": "word",
+     "target": "op1f_seq_overlay_is",
+     "does": "Ours answers for the page of a sequencer a pack added, and hands every other screen to the firmware's function."
+    },
+    {
+     "address": "0x8f008388",
+     "form": "jump",
+     "target": "op1f_notes_on_entry",
+     "room": "op1f_notes_on_room",
+     "copies": 8,
+     "does": "A jump to ours, which lets the packs that listen hear the note, then the firmware's function runs as it was (through a trampoline)."
+    },
+    {
+     "address": "0x8f008518",
+     "form": "jump",
+     "target": "op1f_notes_off_entry",
+     "room": "op1f_notes_off_room",
+     "copies": 8,
+     "does": "A jump to ours, which lets the packs that listen hear the note end, then the firmware's function runs as it was (through a trampoline)."
+    },
+    {
+     "address": "0x11a052ee",
+     "form": "call",
+     "target": "op1f_stages_synth_after",
+     "does": "A call to ours, which runs the sound stages packs put after the synth's effect, then makes the load as the firmware did."
+    },
+    {
+     "address": "0x11a03e70",
+     "form": "call",
+     "target": "op1f_stages_drum_after",
+     "does": "A call to ours, which runs the sound stages packs put after the drum's effect, then makes the load as the firmware did."
+    },
+    {
+     "address": "0x11a02ec0",
+     "form": "call",
+     "target": "op1f_stages_master_before",
+     "does": "A call to ours, which runs the sound stages packs put before the master effect, then makes the load as the firmware did."
+    },
+    {
+     "address": "0x11a02ee0",
+     "form": "call",
+     "target": "op1f_stages_master_after",
+     "does": "A call to ours, which runs the sound stages packs put after the master effect, then makes the load as the firmware did."
+    },
+    {
+     "address": "0x8d4ea880",
+     "form": "call",
+     "target": "op1f_keeps_read_preset_stub",
+     "does": "A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file."
+    },
+    {
+     "address": "0x8d4ec7a2",
+     "form": "call",
+     "target": "op1f_keeps_read_sampler_stub",
+     "does": "A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file."
+    },
+    {
+     "address": "0x8d4ebb6c",
+     "form": "call",
+     "target": "op1f_keeps_read_drum_stub",
+     "does": "A call to our stub, which makes the firmware's call and keeps the values packs keep in the kit's file."
+    },
+    {
+     "address": "0x8d4f3b26",
+     "form": "call",
+     "target": "op1f_keeps_assign_stub",
+     "does": "A call to our stub, which makes the firmware's call and tells the packs that another sound is on the slot."
+    },
+    {
+     "address": "0x8c0ce1cc",
+     "form": "call",
+     "target": "op1f_keeps_save_synth_stub",
+     "does": "A call to our stub, which adds the values packs keep with the sound to what is written and then makes the firmware's call."
+    },
+    {
+     "address": "0x8c0ce21a",
+     "form": "call",
+     "target": "op1f_keeps_save_drum_stub",
+     "does": "A call to our stub, which adds the values packs keep with the kit to what is written and then makes the firmware's call."
+    },
+    {
+     "address": "0x8c0c1db8",
+     "form": "call",
+     "target": "op1f_keeps_tape_save_stub",
+     "does": "A call to our stub, which makes the firmware's call and then writes the values packs keep with the tape."
+    },
+    {
+     "address": "0x8c0c348c",
+     "form": "jump",
+     "target": "op1f_keeps_tape_load",
+     "room": "op1f_keeps_tape_load_room",
+     "copies": 8,
+     "does": "A jump to ours, which lets the firmware's function run (through a trampoline) and then reads back the values packs keep with the tape."
+    },
+    {
+     "address": "0x8d5053b4",
+     "form": "call",
+     "target": "op1f_fx_make",
+     "does": "A call to ours, which makes the firmware's call and, while a pack has added an effect, wraps the object so that a sound riding a pack's effect runs it."
+    },
+    {
+     "address": "0x8d4f398c",
+     "form": "jump",
+     "target": "op1f_fx_pick_entry",
+     "room": "op1f_fx_pick_room",
+     "copies": 8,
+     "does": "A jump to ours, which begins or ends a sound's ride on a pack's effect and then lets the firmware's function run (through a trampoline)."
+    },
+    {
+     "address": "0x8400f2cc",
+     "form": "word",
+     "target": "op1f_fx_master_pick",
+     "does": "Ours begins or ends the master's ride on a pack's effect and then hands the pick to the firmware's function."
+    },
+    {
+     "address": "0x8d51750c",
+     "form": "jump",
+     "target": "op1f_fx_names_entry",
+     "room": "op1f_fx_names_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers the names a pack gave its values for a sound that rides its effect or engine; every other name comes from the firmware's function (through a trampoline)."
+    },
+    {
+     "address": "0x8d4f3c24",
+     "form": "jump",
+     "target": "op1f_fx_active_entry",
+     "room": "op1f_fx_active_room",
+     "copies": 8,
+     "does": "A jump to ours, which keeps the files from saying that the effect of a sound riding a pack's effect is on, then the firmware's function runs (through a trampoline)."
+    },
+    {
+     "address": "0x8d4f6468",
+     "form": "call",
+     "target": "op1f_fx_apply_synth_at",
+     "does": "A call to ours, which leaves the effect off while the sound rides a pack's effect and makes the firmware's call otherwise."
+    },
+    {
+     "address": "0x8d4f4f38",
+     "form": "call",
+     "target": "op1f_fx_apply_drum_at",
+     "does": "A call to ours, which leaves the effect off while the sound rides a pack's effect and makes the firmware's call otherwise."
+    },
+    {
+     "address": "0x8c0babc6",
+     "form": "call",
+     "target": "op1f_fx_master_saved",
+     "does": "A call to ours, which answers off while the master rides a pack's effect and makes the firmware's call otherwise."
+    },
+    {
+     "address": "0x8f0112e8",
+     "form": "jump",
+     "target": "op1f_engine_factory_entry",
+     "room": "op1f_engine_factory_room",
+     "copies": 8,
+     "does": "A jump to ours, which lets the firmware's function make the objects (through a trampoline) and then tells the base of them, so that a sound on a pack's engine plays it."
+    },
+    {
+     "address": "0x8d4eb3e8",
+     "form": "jump",
+     "target": "op1f_engine_pick_entry",
+     "room": "op1f_engine_pick_room",
+     "copies": 8,
+     "does": "A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline)."
+    },
+    {
+     "address": "0x8fc2688e",
+     "form": "call",
+     "target": "op1f_popups_place",
+     "does": "A call to ours, which makes the firmware's call and, while a pack's page is shown, lets the unit's own popups stand over it."
+    },
+    {
+     "address": "0x8d4ecb42",
+     "form": "call",
+     "target": "op1f_keeps_read_list_synth_stub",
+     "does": "A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file."
+    },
+    {
+     "address": "0x8d4ecc2c",
+     "form": "call",
+     "target": "op1f_keeps_put_synth_at",
+     "does": "A call to ours, which makes the firmware's call and then tells the packs that another sound is on the slot."
+    },
+    {
+     "address": "0x8d4ec1f4",
+     "form": "call",
+     "target": "op1f_keeps_read_list_drum_stub",
+     "does": "A call to our stub, which makes the firmware's call and keeps the values packs keep in the kit's file."
+    },
+    {
+     "address": "0x8d4ec2c6",
+     "form": "call",
+     "target": "op1f_keeps_put_drum_at",
+     "does": "A call to ours, which makes the firmware's call and then tells the packs that another kit is on the slot."
+    },
+    {
+     "address": "0x8c0b1936",
+     "form": "call",
+     "target": "op1f_gfx_frame_hook",
+     "does": "A call to our frame hook, which does our own work of a frame and then makes the firmware's call."
+    },
+    {
+     "address": "0x8c0d57a8",
+     "form": "jump",
+     "target": "op1f_options_add",
+     "room": "op1f_options_add_room",
+     "copies": 8,
+     "does": "A jump to ours, part of the packs' settings (first written by hasis, pull request 20). It has each row added by the firmware's function, whose first instructions ours runs from its room, and adds the row PACKS of ours behind the last of the six."
+    },
+    {
+     "address": "0x840134d8",
+     "form": "word",
+     "target": "op1f_settings_chosen_keyboard",
+     "does": "Ours calls the firmware's function first, then puts the packs' settings for KEYBOARD on lines behind the unit's own and lets the ochre knob reach them."
+    },
+    {
+     "address": "0x840134e0",
+     "form": "word",
+     "target": "op1f_settings_red_keyboard",
+     "does": "Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours."
+    },
+    {
+     "address": "0x840134b4",
+     "form": "word",
+     "target": "op1f_settings_chosen_system",
+     "does": "Ours calls the firmware's function first, then puts the packs' settings for SYSTEM on lines behind the unit's own and lets the ochre knob reach them."
+    },
+    {
+     "address": "0x840134bc",
+     "form": "word",
+     "target": "op1f_settings_red_system",
+     "does": "Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours."
+    },
+    {
+     "address": "0x840134fc",
+     "form": "word",
+     "target": "op1f_settings_chosen_midi",
+     "does": "Ours calls the firmware's function first, then puts the packs' settings for MIDI on lines behind the unit's own and lets the ochre knob reach them."
+    },
+    {
+     "address": "0x84013504",
+     "form": "word",
+     "target": "op1f_settings_red_midi",
+     "does": "Ours hands a turn on one of the unit's own lines to the firmware's function, and changes a pack's setting on a line of ours."
+    },
+    {
+     "address": "0x8fc26744",
+     "form": "call",
+     "target": "op1f_fill_place",
+     "does": "A call to ours, part of a page that keeps its picture (base 33): in a frame where the page at 77 asked to be kept, it leaves the black fill out; otherwise it makes the firmware's call."
+    },
+    {
+     "address": "0x8c0ba6d6",
+     "form": "call",
+     "target": "op1f_layer_c3_stub",
+     "does": "A call to our stub, which makes the firmware's call and, while the master rides a pack's effect, has the list open on the pack's row."
+    },
+    {
+     "address": "0x8d4f3a54",
+     "form": "jump",
+     "target": "op1f_layer_lg_stub",
+     "room": "op1f_layer_lg_room",
+     "copies": 8,
+     "does": "A jump to ours, which puts a pack's LFO on the sound or takes it off, and lets the firmware's function run (through a trampoline)."
+    },
+    {
+     "address": "0x8d4f7a34",
+     "form": "jump",
+     "target": "op1f_layer_eh_stub",
+     "room": "op1f_layer_eh_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise."
+    },
+    {
+     "address": "0x8d4f7ad0",
+     "form": "jump",
+     "target": "op1f_layer_lh_stub",
+     "room": "op1f_layer_lh_room",
+     "copies": 8,
+     "does": "A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise."
+    },
+    {
+     "address": "0x8f00b7b0",
+     "form": "jump",
+     "target": "op1f_sample_sd_stub",
+     "room": "op1f_sample_sd_room",
+     "copies": 8,
+     "does": "A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline."
+    }
+   ]
+  }
+ ]
+}

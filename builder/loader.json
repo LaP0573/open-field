@@ -7,25 +7,31 @@
     "entry": "0x11a00000"
   },
   "reserve": {
-    "module_base": "0x8d2e4234",
-    "reserved_bytes": 2097152,
+    "module_base": "0x8d4c4234",
+    "reserved_bytes": 131072,
     "heap_fill_base": "0x8c0e4234",
-    "heap_fill_bytes": 20971520
+    "heap_fill_bytes": 20971520,
+    "pack_room": {
+      "base": "0x85000000",
+      "bytes": 16777216,
+      "files": 128
+    }
   },
   "loader": {
-    "file": "loader-1.7.3-v1.bin",
-    "bytes": 25876,
-    "sha256": "4db491cd06f914fef25f0be3c62a84253ce33b128094b6af26bd06ad3e3d7254",
-    "stub": "0x8d2e4234",
-    "version": "v1",
-    "status": "ran on a unit (2026-11-19)"
+    "file": "loader-1.7.3-v2.bin",
+    "bytes": 24272,
+    "sha256": "12a6465065d6fd1f8ee9d6bf43fccc334446669ac8d94d115470d663d6169f0b",
+    "stub": "0x8d4c4234",
+    "end": "0x8d4d8878",
+    "version": "v2",
+    "status": "ran on a unit (2026-11-26)"
   },
   "edits": [
     {
       "kind": "imm32",
       "address": "0x8d4e4260",
       "file_offset": "0xfc814",
-      "new_imm": "0x01200000"
+      "new_imm": "0x013e0000"
     },
     {
       "kind": "call",
@@ -36,7 +42,7 @@
     }
   ],
   "output": {
-    "bytes": 2104908,
-    "sha256": "ccbabb289dc56f56d2d480cd593b880ac77d77790ee2b70ff5f24ea24ca6dfe7"
+    "bytes": 2103304,
+    "sha256": "220a7fc561b127681b7ef41a0f2ea819102f67b57265a1f985e97f70a4123820"
   }
 }

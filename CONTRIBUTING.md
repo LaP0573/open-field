@@ -71,7 +71,7 @@ python -I tools/build_all.py --out out-new --update
 
 | What | Where |
 | --- | --- |
-| A place where the loader or the base changes the firmware | `profiles/op1f-1.7.3.json`. The tables in `module/` and the page `docs/changes.md` are made from it, never written by hand. A pack has a profile of its own |
+| A place where the loader or the base changes the firmware | `profiles/op1f-1.7.3.json`, and `profiles/op1f-1.7.3-n2.json` for the loader N2. The tables in `module/` are made from the first, the page `docs/changes.md` from N2's, the loader the install page offers; neither is written by hand. A pack has a profile of its own |
 | The loader's and the base's code | `module/`, built by `build.json` and `packs/base.json` |
 | The code of `8 tracks`, `fx train`, `lfo` and `sidechain` | Not here: in [open-field-packs](https://github.com/LaP0573/open-field-packs), a folder each. A change to one of them is a pull request there |
 | A small pack to learn from | `examples/wink/`, `examples/yoyo/`, `examples/list/`, `examples/sketch/`, `examples/echo/`, `examples/dub/`, `examples/crush/`, `examples/ping/`, `examples/pluck/` and `examples/fold/`, one or two for each level of the base, and `examples/trampolines/` for a pack that changes places of the firmware |
