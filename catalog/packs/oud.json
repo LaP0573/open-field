@@ -1,0 +1,20 @@
+{
+  "id": "oud",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "library"
+  ],
+  "description": "A synth engine: plucked strings in courses. Oud, saz, qanun, kora, bouzouki and lute, with eight sounds.",
+  "repository": "https://github.com/hooligan333/open-field-oud-maqam",
+  "commit": "9b0e815bd7cf4d463236ade815725db9647fcea3",
+  "path": "oud.pack",
+  "sha256": "284d3c0fd794a109a7d06af20391673528aebaf3ad217f8221a3f61ceec494eb",
+  "bytes": 100456,
+  "version": 6,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 9,
+  "folders": []
+}

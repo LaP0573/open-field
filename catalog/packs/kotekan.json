@@ -1,0 +1,20 @@
+{
+  "id": "kotekan",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "A sequencer for the synth: hold one key and it weaves the two interlocking parts of Balinese kotekan around it.",
+  "repository": "https://github.com/hooligan333/open-field-gangsa-kotekan",
+  "commit": "f2f59baae5158a150ae23c692785afbe187a0b2c",
+  "path": "kotekan.pack",
+  "sha256": "7d64b3a9c5847619df01d312f68a822142fd169f69fd9c879ea8fbf755123877",
+  "bytes": 53187,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 7,
+  "folders": []
+}

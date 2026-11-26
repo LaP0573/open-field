@@ -1,0 +1,20 @@
+{
+  "id": "vowel",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "A vowel filter in the unit's list of effects: three formants that move between vowels, with a drawn page.",
+  "repository": "https://github.com/hooligan333/open-field-vowel",
+  "commit": "7e37352bde441a694527cf1770655ce2d303fdaa",
+  "path": "vowel.pack",
+  "sha256": "d659342a3ea61f129fa47d4d150bcb74c356f4b2945ec25515453b73e7923f7d",
+  "bytes": 31429,
+  "version": 5,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": []
+}

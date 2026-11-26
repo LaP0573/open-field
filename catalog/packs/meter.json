@@ -1,0 +1,21 @@
+{
+  "id": "meter",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "tape",
+    "sequencing"
+  ],
+  "description": "Meters other than 4/4: the metronome's accent, the count-in and the tape's bar lines, grid and jumps follow the meter.",
+  "repository": "https://github.com/hooligan333/open-field-meter",
+  "commit": "316639e7d4231f7dfe16eddd23f5ca292629f0e8",
+  "path": "meter.pack",
+  "sha256": "c8392e6d8fc9532eab1a6fdb619da27f03c100147b3fe21f1d23231c2510a4a4",
+  "bytes": 18060,
+  "version": 4,
+  "firmware": "1.7.3",
+  "places": 8,
+  "needs": [],
+  "level": 7,
+  "folders": []
+}
