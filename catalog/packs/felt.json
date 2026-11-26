@@ -1,0 +1,25 @@
+{
+  "id": "felt",
+  "author": "Slow-Magic",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "Soft felt piano synth. Requires the separate felt.msb sample bank from the slowp1 GitHub release.",
+  "repository": "https://github.com/slowmagic222/slowp1",
+  "commit": "555873e50d1a9e626ce8a4ef281a76697bd46087",
+  "path": "felt.pack",
+  "sha256": "c542a76f1dd4f8668760a8cf00c810b4dad698b4fbbd367b0e9b7179c7581c07",
+  "bytes": 64385,
+  "version": 23,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [
+    {
+      "name": "felt",
+      "place": "felt"
+    }
+  ]
+}
