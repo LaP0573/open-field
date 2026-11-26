@@ -183,7 +183,8 @@ static const char KEY_SYNTH_LIST[] = "synth_types";       // R6: the engines' li
 static const char FALLBACK[] = "endless";
 static const char* const HOSTS[2] = { "synth", "drum" };
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");   // the cards unit's list, filled by the loader
+// R20 (base 42): the cards unit's list, op1f_cards_2 (module/build_r3_base.h), filled by the loader N2, or by
+// op1f_cards_lists from the loader's first under N1: read only past op1f_cards_lists or op1f_cards_verdict.
 
 // R5: the effects unit's three names at the catalog (module/build_r5_base.h), weak: away, nothing of effects is done.
 extern "C" void __attribute__((weak)) op1f_effects_catalog_read(void* document) OP1F_NAMED("op1f_effects_catalog_read");
@@ -294,7 +295,7 @@ static volatile u32 told_on[2];                         // the pack was told ON 
 
 // A period's counts, per registration and per card's slot (refused).
 static volatile u32 counts[SEQ_MOST][6];
-static volatile u32 refused[OP1F_CARDS_MOST];
+static volatile u32 refused[OP1F_SLOTS_MOST];
 enum { C_TICKS = 0, C_KEYS = 1, C_TAKEN = 2, C_ONS = 3, C_OFFS = 4, C_ENDED = 5 };
 
 // ---------------------------------------------------------------- small helpers
@@ -359,9 +360,10 @@ static u32 type_of_host(u32 host) {
 }
 
 static int slot_of(const Op1fCard* card) {
-    u32 count = op1f_cards.count < (u32)OP1F_CARDS_MOST ? op1f_cards.count : (u32)OP1F_CARDS_MOST;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 count = op1f_cards_2.count < (u32)OP1F_SLOTS_MOST ? op1f_cards_2.count : (u32)OP1F_SLOTS_MOST;
     for (u32 i = 0; i < count; ++i)
-        if (card && op1f_cards.slots[i].card == card) return (int)i;
+        if (card && op1f_cards_2.slots[i].card == card) return (int)i;
     return -1;
 }
 
@@ -386,7 +388,7 @@ static int function_in_order(const Op1fCardSlot* s, const void* f) {
 
 // One ask of a sequencer checked; its table's name copied for the lines whatever comes of it.
 static void look_at(u32 slot, u32 number, const Op1fAsk* a) {
-    const Op1fCardSlot* s = &op1f_cards.slots[slot];
+    const Op1fCardSlot* s = &op1f_cards_2.slots[slot];
     ++asks_seen;
     u32 at = (u32)a->what;
     if (a->bytes < (u32)SEQ_LEAST_BYTES || a->bytes > (u32)OP1F_ASK_BYTES_MOST || (at & 3u) != 0 || !in_pack(s, at, a->bytes)) {
@@ -417,10 +419,11 @@ static void look_at(u32 slot, u32 number, const Op1fAsk* a) {
 }
 
 static void look_through() {
-    u32 count = op1f_cards.count < (u32)OP1F_CARDS_MOST ? op1f_cards.count : (u32)OP1F_CARDS_MOST;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 count = op1f_cards_2.count < (u32)OP1F_SLOTS_MOST ? op1f_cards_2.count : (u32)OP1F_SLOTS_MOST;
     for (u32 slot = 0; slot < count; ++slot) {
         if (op1f_cards_verdict(slot) != 0) continue;
-        const Op1fCard* card = op1f_cards.slots[slot].card;
+        const Op1fCard* card = op1f_cards_2.slots[slot].card;
         if (card->level < 4 || card->bytes < (u32)OP1F_CARD_LEVEL_4_BYTES || card->asks == 0) continue;
         u32 asks = card->ask_count < (u32)OP1F_ASKS_MOST ? card->ask_count : (u32)OP1F_ASKS_MOST;
         for (u32 i = 0; i < asks; ++i)
@@ -1047,7 +1050,7 @@ static u32 still_frames;                                // frames since the last
 static QuietGate quiet;
 
 static const char* pack_name(u32 slot) {
-    return op1f_cards.slots[slot].card->name;
+    return op1f_cards_2.slots[slot].card->name;
 }
 
 static void say_start() {
@@ -1115,11 +1118,14 @@ static void keep_choice() {
     }
 }
 
+// R20 (base 42): the period's refusals as taken, a word a slot of the 128: zeroed data, not the stack.
+static u32 refusals[OP1F_SLOTS_MOST];
+
 // The period's lines, for each sequencer that did anything: at the period's end through the gate, or at once (`now`)
 // when the power popup comes up.
 static void say_period(int now) {
     u32 count = op1f_seq_registered, mixed = quiet_start(), active = 0;
-    u32 taken[SEQ_MOST][6], refusals[OP1F_CARDS_MOST];
+    u32 taken[SEQ_MOST][6];
     for (u32 n = 0; n < count; ++n)
         for (u32 c = 0; c < 6u; ++c) {
             taken[n][c] = counts[n][c];
@@ -1127,24 +1133,25 @@ static void say_period(int now) {
             mixed = quiet_mix(mixed, taken[n][c]);
             active |= taken[n][c];
         }
-    for (u32 s = 0; s < (u32)OP1F_CARDS_MOST; ++s) {
+    for (u32 s = 0; s < (u32)OP1F_SLOTS_MOST; ++s) {
         refusals[s] = refused[s];
         refused[s] = 0;
         active |= refusals[s];
     }
     if (!now && !quiet_period(&quiet, mixed, active != 0)) return;
-    u32 slots_said = 0;
+    Op1fSlotSet slots_said = {{0, 0, 0, 0}};
     for (u32 n = 0; n < count; ++n) {
-        u32 slot = reg[n].slot, first = !((slots_said >> slot) & 1u);
+        u32 slot = reg[n].slot, first = !op1f_slot_test(&slots_said, slot);
         u32 refusal = first ? refusals[slot] : 0u;
-        slots_said |= 1u << slot;
+        op1f_slot_set(&slots_said, slot);
         if ((taken[n][C_TICKS] | taken[n][C_KEYS] | taken[n][C_ONS] | taken[n][C_OFFS] | taken[n][C_ENDED] | refusal) == 0) continue;
         STOCK_LOG(3, LOG_FILE, 13, "seq: '%s' this period: %u tick(s), %u key(s) (%u taken), %u note(s) on, %u off, %u ended by the base, %u refused", reg[n].name,
                   taken[n][C_TICKS], taken[n][C_KEYS], taken[n][C_TAKEN], taken[n][C_ONS], taken[n][C_OFFS], taken[n][C_ENDED], refusal);
     }
-    u32 cards = op1f_cards.count < (u32)OP1F_CARDS_MOST ? op1f_cards.count : (u32)OP1F_CARDS_MOST;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 cards = op1f_cards_2.count < (u32)OP1F_SLOTS_MOST ? op1f_cards_2.count : (u32)OP1F_SLOTS_MOST;
     for (u32 s = 0; s < cards; ++s)
-        if (refusals[s] && !((slots_said >> s) & 1u))
+        if (refusals[s] && !op1f_slot_test(&slots_said, s))
             STOCK_LOG(2, LOG_FILE, 16, "seq: '%s' asked for %u note(s) this period with no sequencer of its own playing: refused", pack_name(s), refusals[s]);
 }
 

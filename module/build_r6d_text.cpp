@@ -22,7 +22,7 @@
 //
 //   the room       512 texts for all packs together, at most 256 for one pack (base 18: sixty-four for all). A text
 //                  counts for the pack whose card made its document; the base's own texts (op1f_text_base) count
-//                  under a slot of their own, behind the thirty-two cards' slots, in the same 512;
+//                  under a slot of their own, behind the 128 cards' slots (R20), in the same 512;
 //   op1f_text_set  op1f_text with an alignment, OP1F_LEFT, OP1F_CENTRE or OP1F_RIGHT, handed to the firmware's label
 //                  maker as its third argument when the part's label is made. The label keeps it for good, so a
 //                  part's alignment is its first use's: a later call with another one sets the text, keeps the
@@ -84,14 +84,23 @@ typedef LabelBox (*LabelBoundsFn)(void* label);                            // 0x
 #define RD32(a) (*(volatile u32*)(a))
 #endif
 
-enum { LABELS = 512, PACK_LABELS = 256, BASE_SLOT = OP1F_CARDS_MOST, SLOTS = OP1F_CARDS_MOST + 1, PART_KEPT = 24, TEXT_KEPT = 40, SCREEN_WIDTH = 480,
+// R20 (base 42): the cards unit's second list and two of its names (module/build_r3_base.h, which this unit's card
+// header does not take): the same declarations.
+#ifndef OP1F_BUILD_R3_BASE_H
+enum { OP1F_SLOTS_MOST = 128 };
+struct Op1fCards2 { unsigned count, more; Op1fCardSlot slots[OP1F_SLOTS_MOST]; };
+extern "C" Op1fCards2 op1f_cards_2 OP1F_NAMED("op1f_cards_2");
+extern "C" void op1f_cards_lists() OP1F_NAMED("op1f_cards_lists");
+extern "C" int op1f_cards_in_use(unsigned slot) OP1F_NAMED("op1f_cards_in_use");
+#endif
+
+enum { LABELS = 512, PACK_LABELS = 256, BASE_SLOT = OP1F_SLOTS_MOST, SLOTS = OP1F_SLOTS_MOST + 1, PART_KEPT = 24, TEXT_KEPT = 40, SCREEN_WIDTH = 480,
        LINES_SAID = 16, ALIGNMENTS = 3, Q10 = 10 };
 enum { NODE_PAINT = 5, DOCUMENT_PAINTS = 0x84 / 4, DOCUMENT_PAINTS_END = 0x88 / 4, PAINT_BYTES = 20 };   // the node's table's word +0x14; the document's paints
 
 static const char LOG_FILE[] = "../src/main/op1f_text.cpp";
 static const char* const ALIGNED[ALIGNMENTS] = { "left", "centre", "right" };
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 extern "C" int op1f_cards_document(const void* document) OP1F_NAMED("op1f_cards_document");
 
@@ -110,7 +119,7 @@ struct Text {
     void* label;
     char text[TEXT_KEPT];                              // the text as last laid out, in small letters
     u32 laid;                                          // the text was laid out at least once
-    u8 slot;                                           // R1: the slot of the card whose document it is; BASE_SLOT for the base's own
+    u8 slot;                                           // R1: the slot of the card whose document it is; BASE_SLOT for the base's own (R20: 0 to 128, a byte holds it)
     u8 align;                                          // R1: the alignment the label was made with, for good
 };
 
@@ -219,7 +228,7 @@ extern "C" int op1f_text_set(void* document, const char* part, const char* text,
     if (align >= (unsigned)ALIGNMENTS) return 0;
     int slot = op1f_cards_document(document);
     if (slot < 0) return 0;                                                       // a document a card made, and no other
-    Text* t = made(document, part, op1f_cards.slots[slot].card->name, (u32)slot, align);
+    Text* t = made(document, part, op1f_cards_2.slots[slot].card->name, (u32)slot, align);
     if (t == 0) return 0;
     return lay(t, text, width);
 }

@@ -240,7 +240,7 @@ Sounds are said as `synth 1` to `synth 8`. The tag is `op1f_engines`.
 | Declared cost | 1 to 40,000 cycles a voice's render |
 | Switched off | Eight renders in one second over twice the declared cost and over the declared cost plus 20,000, or one render over 120,000 |
 | Stack | 1 KiB a render, with whatever it calls |
-| Working memory | Up to 1 MiB a voice, six voices, from level 6's 16 MiB, 8 MiB kept free |
+| Working memory | Up to 1 MiB a voice, six voices, from level 6's working memory and inside its limits ([level 6](level-6.md#limits-in-one-place)) |
 | Sounds | 32 an engine, 2,048 bytes each, written only with room for all and 20 more of the owner's |
 
 ## How `pluck` works

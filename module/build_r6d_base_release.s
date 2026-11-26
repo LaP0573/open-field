@@ -7,6 +7,6 @@
 .global op1f_release
 .type op1f_release, STT_OBJECT
 op1f_release:
-    .ascii "0.21"
+    .ascii "0.24"
     .fill 12, 1, 0
 .size op1f_release, .-op1f_release

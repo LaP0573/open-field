@@ -186,7 +186,7 @@ enum : u32 {
 enum {
     ENGINES = OP1F_ENGINES_MOST, VALUES = OP1F_ENGINE_VALUES_MOST, SLOTS = 8, VOICES = 6, TABLE_WORDS = 11, ID_FIRST = 32,
     DSYNTH = 12, NAME = OP1F_KIND_NAME, SOUND_NAME = 24, TABLE_BYTES = 284, BLOCK_BYTES = 52, FRAMES = 128, RATE = 88200,
-    CARDS = OP1F_CARDS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, ROW_BYTES = 64, KNOB_BYTES = 8, RECORD_BYTES = 52,
+    CARDS = OP1F_SLOTS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, ROW_BYTES = 64, KNOB_BYTES = 8, RECORD_BYTES = 52,
     KIND_INT = 1, KIND_UINT = 2, KIND_STRING = 4, KIND_ARRAY = 6, KIND_OBJECT = 7, KIND_AT = 4, MEMBER_ROOM = 64,
     ASIDES_KEPT = 16, RIDE_LINES = 32, PERIOD_FRAMES = 256, ALIGN_LEAST = 4, CALL_SHOWN = OP1F_CALL_SHOWN,
     RIDE_AWAY = 0x80, STORE_MOST = 2048, STORE_LINES = 16, SOUND_ROOM = OP1F_ENGINE_SOUND_MOST + 64, PATH = 96, SOUNDS = OP1F_ENGINE_SOUNDS_MOST,
@@ -249,7 +249,8 @@ static Heard heard[SLOTS];
 
 // ---- from the cards unit ----
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 
@@ -272,7 +273,7 @@ enum { NONE = 0, CLEARING = 1, READY = 2, REFUSED = 3 };
 struct Engine {
     const Op1fEngine* table;
     u32 number;                                        // its place in the registry: its id less 32
-    u32 slot, ask, version;                            // the card's slot in op1f_cards, the ask's number in its list, the pack's version
+    u32 slot, ask, version;                            // the card's slot in op1f_cards_2, the ask's number in its list, the pack's version
     u32 flags, cycles, count, voice_bytes, voice_align, stride;
     char name[NAME];
     char value_names[VALUES][NAME];
@@ -830,10 +831,11 @@ static u32 check(const Op1fAsk* ask, const Op1fCardSlot* slot, u32* a, u32* b) {
 
 // The asks of kind OP1F_ASK_ENGINE of the cards the base uses, in the list's order and each card's, held to their form.
 static void look_through() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;                                   // a card the base does not use
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 9u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
@@ -910,7 +912,7 @@ static void enrol(const void* list) {
             set_aside(candidates[c].slot, WHY_TAKEN, 0, 0, t->head.name);
             continue;
         }
-        const Op1fCard* card = op1f_cards.slots[candidates[c].slot].card;
+        const Op1fCard* card = op1f_cards_2.slots[candidates[c].slot].card;
         Engine* e = &engines[n];
         e->table = t;
         e->number = n;
@@ -1250,7 +1252,7 @@ static void heard_expire() {
 static void first_frame() {
     for (u32 i = 0; i < aside_count; ++i) {
         const Aside* s = &asides[i];
-        const char* pack = op1f_cards.slots[s->slot].card->name;
+        const char* pack = op1f_cards_2.slots[s->slot].card->name;
         if (s->why == WHY_ORDER) op1f_log(2, LOG_FILE, 2, "engine: '%s' of '%s' is left aside: its table is not in order (%u, %u)", s->name, pack, s->a, s->b);
         else op1f_log(2, LOG_FILE, 2, "engine: '%s' of '%s' is left aside: %s", s->name, pack, aside_reason(s));
     }
@@ -1276,7 +1278,7 @@ static void first_frame() {
     for (u32 k = 0; k < n; ++k) {
         Engine* e = &engines[k];
         op1f_log(3, LOG_FILE, 11, "engine: '%s' of '%s' rides dsynth, entry %u of the engine list, %u cycles a voice declared, %u bytes a voice", e->name,
-                 op1f_cards.slots[e->slot].card->name, (u32)ID_FIRST + k, e->cycles, e->voice_bytes);
+                 op1f_cards_2.slots[e->slot].card->name, (u32)ID_FIRST + k, e->cycles, e->voice_bytes);
     }
     if (n) map_all();
     if (n) say_count();                                                             // R6d: the room for the engines' sounds
@@ -1588,7 +1590,7 @@ extern "C" int op1f_engines_riding(unsigned card_slot, unsigned ask, unsigned* b
 
 // R17 (base 39): synth slot `slot`'s ride, for the sample unit (module/build_r17_sample.cpp), which names it weakly.
 // Answers 0 when the slot rides no registered engine (nothing, an engine whose pack is away, or no such slot); else 1
-// with `card` the card's slot in op1f_cards and `ask` the ask's number in its list, or 2 with them written while a sound
+// with `card` the card's slot in op1f_cards_2 and `ask` the ask's number in its list, or 2 with them written while a sound
 // loaded onto the slot is not told yet (its assign seen and not yet said at a frame, or its member still to be read
 // once its build has come: the ride may change at a frame). `loads` (not 0): the sounds loaded onto the slot since the
 // start. From any thread: single words read in one masked instant, nothing called.

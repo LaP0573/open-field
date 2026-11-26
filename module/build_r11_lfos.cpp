@@ -128,7 +128,7 @@ enum { OP1F_LAYER_PAGE_UNIT = 0, OP1F_LAYER_PAGE_OWN = 1 };
 
 enum {
     LAYERS = OP1F_LFOS_MOST, SLOTS = 8, DRUM = OP1F_PLACE_DRUM, PLACES = DRUM + SLOTS, WORDS = 8, KINDS = 6, ID_FIRST = 16, NAME = OP1F_KIND_NAME,
-    TABLE_BYTES = 28, CARDS = OP1F_CARDS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, RECORD_BYTES = 52, LIST_SCREEN = 45,
+    TABLE_BYTES = 28, CARDS = OP1F_SLOTS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, RECORD_BYTES = 52, LIST_SCREEN = 45,
     OPEN_FRAMES = 64, BACK_FRAMES = 2, RIDE_LINES = 32, MEMBER_ROOM = 64,
     KIND_INT = 1, KIND_UINT = 2, KIND_STRING = 4, KIND_ARRAY = 6, KIND_OBJECT = 7, KIND_AT = 4
 };
@@ -145,7 +145,8 @@ static const char KIND_NAMES[KINDS][NAME] = {"tremolo", "value", "random", "elem
 
 // ---- from the cards unit ----
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 
@@ -173,7 +174,7 @@ extern "C" unsigned op1f_lfos_riding(const Op1fCard* card, unsigned ask) OP1F_NA
 
 struct Layer {
     const Op1fKindHead* head;
-    u32 slot, ask;                                     // the card's slot in op1f_cards, the ask's number in its list
+    u32 slot, ask;                                     // the card's slot in op1f_cards_2, the ask's number in its list
     u32 flags;                                         // the head's, OP1F_LFO_DRUM
     volatile u32 page;                                // OP1F_LAYER_PAGE_UNIT or _OWN, the pack's choice
     char name[NAME];
@@ -286,10 +287,11 @@ static const Layer* riding(u32 place) {
 }
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -338,10 +340,11 @@ static int in_order(const Op1fAsk* ask, const Op1fCardSlot* slot) {
 
 // The asks of kind OP1F_ASK_LFO of the cards the base uses, in the list's order and each card's.
 static void look_through() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 8u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
@@ -679,7 +682,7 @@ static void first_frame() {
     u32 n = layer_count;
     if (list_state) op1f_log(2, LOG_FILE, 5, "lfo: the unit's list of LFOs could not be read (%u): no LFO layer is registered", list_state);
     for (u32 k = 0; k < n; ++k)
-        op1f_log(3, LOG_FILE, 1, "lfo: '%s' of '%s' is a layer of the lists of LFOs, entry %u%s", layers[k].name, op1f_cards.slots[layers[k].slot].card->name,
+        op1f_log(3, LOG_FILE, 1, "lfo: '%s' of '%s' is a layer of the lists of LFOs, entry %u%s", layers[k].name, op1f_cards_2.slots[layers[k].slot].card->name,
                  (u32)ID_FIRST + k, (layers[k].flags & (u32)OP1F_LFO_DRUM) ? ", the drum's too" : "");
     if (n == 0) return;
     for (u32 k = 0; k < (u32)KINDS; ++k) kind_screens[k] = STOCK_LFO_SCREEN_OF(k);
