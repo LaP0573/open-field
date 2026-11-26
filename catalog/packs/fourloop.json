@@ -1,0 +1,25 @@
+{
+  "id": "fourloop",
+  "author": "Slow-Magic",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "4loop is a master effect with four independently controlled loopers.",
+  "repository": "https://github.com/slowmagic222/slowp1",
+  "commit": "555873e50d1a9e626ce8a4ef281a76697bd46087",
+  "path": "4loop.pack",
+  "sha256": "520ee0dfe41abd8e7bb4892f07ff7c62f0a53b2ad9b2454a3af82ceb3a61b3f6",
+  "bytes": 58292,
+  "version": 4,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 8,
+  "folders": [
+    {
+      "name": "4loop",
+      "place": "4loop"
+    }
+  ]
+}
