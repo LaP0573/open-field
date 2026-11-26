@@ -76,6 +76,7 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 37 | [Drum sounds ride an LFO layer](layers.md#an-lfo-layer) too, when it says so | none: `op1f_layer_start` answers for a drum's place |
 | 38 | An effect switched off for its cost plays again after a new pick, and the runs of effects inside packs are handed on once no place runs them ([level 8](level-8.md)); no canvas while the base's own top page is up ([level 4](level-4.md)) | none |
 | 39 | [A sound's sample](sample.md): a cut the tape has lifted, dropped by the unit into the sample of a synth sound that plays the pack's engine, as its sampler takes one and kept over a restart; and any synth or drum sound's sample read | `op1f_sample_1` |
+| 40 | [A drum engine](drum-engine.md): a pack's engine in the drum's engine list, riding the drum sampler; picked, its page stands on T1 with the keys and knobs offered to it first, and the drum sound's file keeps its name; one pack holds it | `op1f_drum_engine_1` |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 

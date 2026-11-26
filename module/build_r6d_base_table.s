@@ -55,6 +55,7 @@ op1f_boot_table:
     .long 0x00000012, 0x8c0babc6, op1f_fx_master_saved, 0x79fa658e, 0    /* A call to ours, which answers off while the master rides a pack's effect and makes the firmware's call otherwise. */
     .long 0x00080014, 0x8f0112e8, op1f_engine_factory_entry, 0x8341c8af, op1f_engine_factory_room    /* A jump to ours, which lets the firmware's function make the objects (through a trampoline) and then tells the base of them, so that a sound on a pack's engine plays it. */
     .long 0x00080014, 0x8d4eb3e8, op1f_engine_pick_entry, 0x8e2c6a48, op1f_engine_pick_room    /* A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline). */
+    .long 0x00080014, 0x8d4eb160, op1f_drum_pick_entry, 0x8e2c6a48, op1f_drum_pick_room    /* A jump to ours, which puts a pack's drum engine on a drum sound that plays the drum sampler (the sound stays as it is) or takes it off, and lets the firmware's function run (through a trampoline) for every other pick. */
     .long 0x00000012, 0x8fc2688e, op1f_popups_place, 0xa15b2423, 0    /* A call to ours, which makes the firmware's call and, while a pack's page is shown, lets the unit's own popups stand over it. */
     .long 0x00000012, 0x8d4ecb42, op1f_keeps_read_list_synth_stub, 0xbf339f84, 0    /* A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file. */
     .long 0x00000012, 0x8d4ecc2c, op1f_keeps_put_synth_at, 0x99097ebb, 0    /* A call to ours, which makes the firmware's call and then tells the packs that another sound is on the slot. */
@@ -74,6 +75,7 @@ op1f_boot_table:
     .long 0x00080014, 0x8d4f7a34, op1f_layer_eh_stub, 0x4a08d6e5, op1f_layer_eh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. */
     .long 0x00080014, 0x8d4f7ad0, op1f_layer_lh_stub, 0x4a08d6e5, op1f_layer_lh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. */
     .long 0x00080014, 0x8f00b7b0, op1f_sample_sd_stub, 0xd0f0e34c, op1f_sample_sd_room    /* A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline. */
+    .long 0x00080014, 0x8f00ba38, op1f_sample_dd_stub, 0xd0f0e34c, op1f_sample_dd_room    /* A jump to our stub. A drop a pack asked for into a drum sound that rides its drum engine (op1f_sample_drop) is done by ours, in the unit's turn; every other, the drum page's own drop key's among them, goes on in the firmware's function through a trampoline. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

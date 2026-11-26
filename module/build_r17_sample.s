@@ -48,6 +48,36 @@ op1f_sample_sd_stub:
     RTS;
 .size op1f_sample_sd_stub, .-op1f_sample_sd_stub
 
+/* R18 (base 40): DD, the head of the worker's drum drop job (0x8f00ba38, request 10; its first eight bytes are the same
+ * three instructions as SD's), in SD's form: no ticket for this drum slot (op1f_sample_dd_armed is not the slot + 1),
+ * the unit's own drop, counted (op1f_sample_dd_passes) and on to the room; a ticket, op1f_sample_drum_job(slot, clip).
+ */
+.global op1f_sample_dd_stub
+.type op1f_sample_dd_stub, STT_FUNC
+op1f_sample_dd_stub:
+    P2.H = op1f_sample_dd_armed;
+    P2.L = op1f_sample_dd_armed;
+    R3 = [P2];
+    R3 += -1;
+    CC = R0 == R3;
+    IF CC JUMP .Ldd_ticket;
+    P2.H = op1f_sample_dd_passes;
+    P2.L = op1f_sample_dd_passes;
+    R3 = [P2];
+    R3 += 1;
+    [P2] = R3;
+    P2.H = op1f_sample_dd_room;
+    P2.L = op1f_sample_dd_room;
+    JUMP (P2);
+.Ldd_ticket:
+    [--SP] = RETS;
+    SP += -12;
+    CALL op1f_sample_drum_job;
+    SP += 12;
+    RETS = [SP++];
+    RTS;
+.size op1f_sample_dd_stub, .-op1f_sample_dd_stub
+
 /* The trampoline's room, in the pack's zeroed data: the eight bytes it copies, and eight for the jump back. */
 .section .bss
 .balign 4
@@ -56,3 +86,9 @@ op1f_sample_sd_stub:
 op1f_sample_sd_room:
     .space 16
 .size op1f_sample_sd_room, .-op1f_sample_sd_room
+.balign 4
+.global op1f_sample_dd_room
+.type op1f_sample_dd_room, STT_OBJECT
+op1f_sample_dd_room:
+    .space 16
+.size op1f_sample_dd_room, .-op1f_sample_dd_room

@@ -32,6 +32,8 @@
     "module/build_r11_layers.s",
     "module/build_r6d_engines.cpp",
     "module/build_r6_engines.s",
+    "module/build_r18_drum.cpp",
+    "module/build_r18_drum.s",
     "module/build_r17_sample.cpp",
     "module/build_r17_sample.s",
     "module/build_r17_restore.cpp",
@@ -126,7 +128,8 @@
     "op1f_parts_1",
     "op1f_sample_drop",
     "op1f_sample_get",
-    "op1f_sample_1"
+    "op1f_sample_1",
+    "op1f_drum_engine_1"
   ],
   "pictures": [
     {

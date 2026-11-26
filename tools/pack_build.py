@@ -442,6 +442,18 @@ TABLE_BYTES_6[LFO] = 28
 ASK_KEYS_6[LFO] = ("kind", "name", "drum", "shown")
 ASK_ADDRESSES_6[LFO] = (("shown", 24),)
 ASK_KEYS_6[7] = ASK_KEYS_6[7] + ("layer",)
+# since base 40 (module/build_r6e_card.h, "Base 40: a drum engine"): a card of level 8 or later may add an engine to the
+# drum's engine list that rides the drum sampler ({"kind": "drum engine", "name": ..., "shown": a function's symbol or
+# null}; OP1F_ASK_DRUM_ENGINE, its table the head, 28 bytes, flags 0): picked, the pack's page stands on T1. No new level:
+# a card with it names the mark op1f_drum_engine_1 in a word behind its level's, so that a base before 40 leaves it out.
+# One a card (one pack of all holds it: the first by file name).
+DRUM_PAGE, DRUM_PAGE_LEVEL_LEAST = 12, 8                        # OP1F_ASK_DRUM_ENGINE, the level it needs
+DRUM_PAGE_MARK = "op1f_drum_engine_1"                           # the mark of a base that adds a pack's engine to the drum's list
+STOCK_DRUM_ENGINES = ("dbox", "drum", "drums", "sampler", "drum sampler", "drum_sampler", "synth")   # names the base refuses a drum engine
+KIND_WORDS_6[DRUM_PAGE] = "drum engine"
+TABLE_BYTES_6[DRUM_PAGE] = 28
+ASK_KEYS_6[DRUM_PAGE] = ("kind", "name", "shown")
+ASK_ADDRESSES_6[DRUM_PAGE] = (("shown", 24),)
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1312,6 +1324,9 @@ def asks_of_card_6(asks, level):
         if kind == KIND_WORDS_6[LFO] and level >= LFO_LEVEL_LEAST:     # since R11 (base 35): a layer of a sound's list of LFOs
             out.append(lfo_of_card(number, ask, out))
             continue
+        if kind == KIND_WORDS_6[DRUM_PAGE] and level >= DRUM_PAGE_LEVEL_LEAST:     # since base 40: a drum engine
+            out.append(drum_page_of_card(number, ask, out))
+            continue
         if not isinstance(kind, str) or kind not in known:
             later = (" ('keeps' is level 7's)" if kind == "keeps" and level == 6 else
                      " ('lfo', base 35's, is for a card of level %d or later)" % LFO_LEVEL_LEAST if kind == KIND_WORDS_6[LFO] else "")
@@ -1691,6 +1706,30 @@ def lfo_of_card(number, ask, earlier):
     return LFO, name, LFO_DRUM if ask.get("drum", False) else 0, {"shown": ask.get("shown")}, {}
 
 
+def drum_page_of_card(number, ask, earlier):
+    """Since base 40: the ask of a drum engine (kind OP1F_ASK_DRUM_ENGINE): (12, name, 0, {"shown"}, {})."""
+    name = ask.get("name")
+    said = "Ask %d of the card, the drum engine %r" % (number, name)
+    unknown = sorted(set(ask) - set(ASK_KEYS_6[DRUM_PAGE]))
+    if unknown:
+        raise ValueError("%s, has %s, which such an ask has not: it is {%s}"
+                         % (said, ", ".join("'%s'" % key for key in unknown), ", ".join('"%s"' % key for key in ASK_KEYS_6[DRUM_PAGE])))
+    if not isinstance(name, str) or not EFFECT_NAME_FORM.fullmatch(name):
+        raise ValueError("%s: its name is not in order: one to fifteen characters of a-z, 0-9, ' ', '-' and '_'" % said)
+    if name in STOCK_DRUM_ENGINES:
+        raise ValueError("%s: the name is one of the unit's own drum engines (%s); the base refuses it" % (said, ", ".join(STOCK_DRUM_ENGINES)))
+    if any(other[0] == DRUM_PAGE for other in earlier):
+        raise ValueError("%s: the card asks for a drum engine twice; one pack holds it, once" % said)
+    if not a_symbol(ask.get("shown")):
+        raise ValueError("%s: its shown is the symbol of a function of the pack, or null: %r" % (said, ask["shown"]))
+    return DRUM_PAGE, name, 0, {"shown": ask.get("shown")}, {}
+
+
+def has_drum_page(asks):
+    """Since base 40: whether a card's asks hold a drum engine, for which the card names the mark op1f_drum_engine_1."""
+    return any(ask is not None and ask[0] == DRUM_PAGE for ask in asks)
+
+
 def has_layer(asks):
     """Since R11 (base 35): whether a card's asks (as card_asks or ask_tables answer them) hold an effect layer or an LFO
     layer, for which the card names the mark op1f_layer_1."""
@@ -1866,6 +1905,8 @@ def ask_words(what, name, flags, functions, extra=None):
         said += ", %d value(s): %s" % (len(extra["params"]), "; ".join("%s %d..%d from %d" % p for p in extra["params"]))
         said += ", %d sound(s)" % len(extra["sounds"]) + (": " + " ".join(n for n, _t in extra["sounds"]) if extra["sounds"] else "")
         return said + "".join(", " + key for key in ("reset", "shown") if functions.get(key))
+    if what == DRUM_PAGE:                                   # since base 40: "drum engine 'chop', rides the drum sampler, shown"
+        return "drum engine '%s', rides the drum sampler" % name + (", shown" if functions.get("shown") else "")
     if what == LFO:                                         # since R11 (base 35): "lfo layer 'ufo', the synth's and the drum's, shown"
         return "lfo layer '%s', the synth's%s" % (name, " and the drum's" if flags & LFO_DRUM else "") + (", shown" if functions.get("shown") else "")
     if what == 7 and flags & EFFECT_LAYER:                  # since R11 (base 35): "effect 'train', a layer, 2000 cycles a call, mono, reset"
@@ -1959,7 +2000,7 @@ def ask_table_words(ask, address_of=None):
         if symbol is None:
             return "0" if address_of is None else 0
         return symbol if address_of is None else address_of(symbol)
-    if what == LFO:                                         # since R11 (base 35): an LFO layer's table is its head alone
+    if what in (LFO, DRUM_PAGE):                           # since R11 (base 35), base 40: a table that is its head alone
         return []
     if what == 3:
         return [extra["point"], extra["cycles"], extra["memory"], address(functions["process"])]
@@ -2182,6 +2223,12 @@ def render_card(recipe, recipe_name):
                                 % LAYER_MARK, 1)
             level_end = ".size %s_level, .-%s_level\n" % (label, label)
             text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_layer", "    .long %s\n" % LAYER_MARK, "OBJECT"), 1)
+        if has_drum_page(asks):                             # since base 40: a word behind the level's names op1f_drum_engine_1
+            text = text.replace(" */\n.section", " * Base 40 (module/build_r6e_card.h, \"Base 40: a drum engine\"): the card asks for a drum engine, so a\n"
+                                " * word in front of it names the mark %s, and a base before 40 leaves the pack out. Nothing reads it.\n */\n.section"
+                                % DRUM_PAGE_MARK, 1)
+            level_end = ".size %s_level, .-%s_level\n" % (label, label)
+            text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_drum_engine", "    .long %s\n" % DRUM_PAGE_MARK, "OBJECT"), 1)
         text += asks_source(label, asks) if asks else ""
     return text
 
@@ -2295,6 +2342,8 @@ def ask_tables_6(data, level, layered=None):
         layered = (LAYER_MARK, True) in fields["lists"]["imports"]
     if layered and level >= LFO_LEVEL_LEAST:
         known.add(LFO)
+    if (DRUM_PAGE_MARK, True) in fields["lists"]["imports"] and level >= DRUM_PAGE_LEVEL_LEAST:     # since base 40
+        known.add(DRUM_PAGE)
     out = []
     for kind, size, what in asks_in(data):
         if kind not in known:
@@ -2305,6 +2354,9 @@ def ask_tables_6(data, level, layered=None):
             continue
         if kind == LFO:                                      # since R11 (base 35): an LFO layer, read as the cards unit reads it
             out.append(lfo_table(fields, body, size, what, out))
+            continue
+        if kind == DRUM_PAGE:                                # since base 40: a drum engine, read as the base reads it
+            out.append(drum_page_table(fields, body, size, what, out))
             continue
         if kind == 7:                                        # since R5: an effect, read as a base of level 8 reads it
             out.append(effect_table(fields, body, size, what, out, layered))
@@ -2425,6 +2477,34 @@ def ask_tables_6(data, level, layered=None):
         elif any(o[0] == 7 and o[3] is not None and o[3][1] == item[3][1] for o in out):
             out[number] = item[:4] + ("its name is an effect's of its card",)
     return out
+
+
+def drum_page_table(fields, body, size, what, earlier):
+    """Since base 40: the table of a drum engine read from a pack file as linked, as the base holds it (a head of at least
+    28 bytes, its name in order and none of the unit's own, flags 0, its shown the pack's own). Answers (12, size, what, ask or None, what
+    is not in order or None)."""
+    first, span = linked_at(fields, 0), fields["body_bytes"] + fields["bss_bytes"]
+    table = TABLE_BYTES_6[DRUM_PAGE]
+    if not what or size < table or size > ASK_BYTES_MOST or what % 4 or not (first <= what and what + table <= first + span):
+        return (DRUM_PAGE, size, what, None, "its table is not a head")
+    raw = bytes(body[what - first:what - first + table]).ljust(table, b"\0")
+    head_bytes, name_raw, flags, shown = KIND_HEAD.unpack_from(raw, 0)
+    name = effect_name(name_raw)
+    ask = (DRUM_PAGE, name if name is not None else name_raw.split(b"\0")[0].decode("latin-1"), flags, {"shown": shown}, {})
+    wrong = None
+    if head_bytes != size:
+        wrong = "its table is not a head"
+    elif name is None:
+        wrong = "its name is not in order"
+    elif name in STOCK_DRUM_ENGINES:
+        wrong = "its name is one the drum's engine list already shows"
+    elif flags:
+        wrong = "it has a flag this base does not know"
+    elif any(o[0] == DRUM_PAGE and o[3] is not None and o[4] is None for o in earlier):
+        wrong = "a second ask of a drum engine"
+    elif shown and (not first <= shown < first + span or shown & 1):
+        wrong = "its shown does not lie in its pack on an even address"
+    return (DRUM_PAGE, size, what, ask, wrong)
 
 
 def lfo_table(fields, body, size, what, earlier):
@@ -2673,6 +2753,8 @@ def card_faults(data):
             if (LAYER_MARK, True) not in lists["imports"] and card["level"] >= 6 and has_layer(
                     [t[3] for t in ask_tables_6(data, card["level"], True) if not t[4]]):
                 faults.append("it asks for a layer and the pack does not need %s, so a base before 35 would not leave it out" % LAYER_MARK)
+            if (DRUM_PAGE_MARK, True) not in lists["imports"] and any(kind == DRUM_PAGE for kind, _s, _w in asks_in(data)):     # since base 40
+                faults.append("it asks for a drum engine and the pack does not need %s, so a base before 40 would not leave it out" % DRUM_PAGE_MARK)
             for number, (_kind, _size, what, ask, wrong) in enumerate(tables, 1):
                 if wrong:
                     faults.append("its ask %d is not in order: %s" % (number, wrong))
@@ -2962,6 +3044,10 @@ def build3(recipe, target_os, out_dir=None, objects=None, log=print, serve=None)
                 raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % LAYER_MARK)
             if has_layer(asks) and (LAYER_MARK not in needed or (values[label + "_layer"] - origin, KIND_WORD, needed.index(LAYER_MARK), 0) not in places):
                 raise ValueError("The card asks for a layer and the pack does not need %s: a base before 35 would not leave it out" % LAYER_MARK)
+            if has_drum_page(asks) != has(label + "_drum_engine"):   # since base 40: the word that names op1f_drum_engine_1
+                raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % DRUM_PAGE_MARK)
+            if has_drum_page(asks) and (DRUM_PAGE_MARK not in needed or (values[label + "_drum_engine"] - origin, KIND_WORD, needed.index(DRUM_PAGE_MARK), 0) not in places):
+                raise ValueError("The card asks for a drum engine and the pack does not need %s: a base before 40 would not leave it out" % DRUM_PAGE_MARK)
         if bytes(body[card_place:card_place + len(linked)]) != linked or level_place not in places:
             raise ValueError("The card in the sources is not the recipe's: write it again with `card`")
         if not card_place:
