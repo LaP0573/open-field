@@ -3,7 +3,7 @@
   "author": "hasis",
   "status": "listed",
   "categories": [
-    "library"
+    "synths"
   ],
   "description": "A clarinet synth engine in the engine list: a reed and bore model, an animated face and five sounds. Long notes breathe, slurs change holes.",
   "repository": "https://github.com/hasis/field-packs-releases",
