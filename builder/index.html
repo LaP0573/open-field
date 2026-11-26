@@ -487,11 +487,10 @@
             <div data-m="update">
               <h3>open-field <span class="releaseHere">?</span> is out</h3>
               <p>You're on <span class="releaseUnit">?</span>.</p>
-              <p class="hidden" id="loaderNext">After this, the page offers the new loader too.</p>
               <div class="row" style="margin-top:14px"><button type="button" class="btn ochre" id="updateBase"><span>update to <span class="releaseHere">?</span></span></button></div>
             </div>
             <div data-m="loader">
-              <h3>the new loader is out</h3>
+              <h3>open-field <span class="releaseHere">?</span> is out</h3>
               <p id="loaderLine"></p>
               <div class="row" style="margin-top:14px"><button type="button" class="btn ochre" id="installAgain"><span>install again</span></button></div>
             </div>
@@ -1604,9 +1603,10 @@
   function momentFor() {
     if (!unit || !rowsNow) return client.hello ? "ours" : "connect";
     if (resolved && (resolved.plan.send.length || resolved.plan.remove.length)) return "packs";
-    if (P.updateOffered(rowsNow.base)) return "update";
-    // a unit whose door says the loader N1 while the page offers N2: the page leads with the new loader (after the base)
+    // a unit with less room than the page's loader gives (a base older than 40, or a door that says so): the whole
+    // install, firmware file and base.pack together, comes first; a base update alone is for a unit on the page's loader
     if (P.loaderOffered(unit.hello, files && files.manifest)) return "loader";
+    if (P.updateOffered(rowsNow.base)) return "update";
     return "ours";
   }
 
@@ -1872,10 +1872,8 @@
     const room = P.roomWords(unit.hello, files && files.manifest);
     $("roomNote").textContent = room || "";
     $("roomNote").classList.toggle("hidden", !room);
-    // the moment "loader"'s line (the grey note above stays out of that moment), and the base update's line for a base
-    // older than 40, which can't say its loader and is on N1
+    // the moment "loader"'s line (the grey note above stays out of that moment)
     $("loaderLine").textContent = P.loaderLine(unit.hello, files && files.manifest) || "";
-    $("loaderNext").classList.toggle("hidden", !P.loaderAfterUpdate(rowsNow.base.unitVersion, files && files.manifest));
     const waiting = resolved && (resolved.plan.send.length || resolved.plan.remove.length);
     $("oursHead").textContent = waiting ? "changes waiting" : "you're up to date";
   }
