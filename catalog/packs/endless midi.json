@@ -1,0 +1,20 @@
+{
+  "id": "endless midi",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "Record endless's steps from a MIDI keyboard at the pitches played, over its whole range, while shift is held.",
+  "repository": "https://github.com/hooligan333/open-field-endless-midi",
+  "commit": "0b44b22d71a4a1996fed200acb24f0ab9ea559fb",
+  "path": "endless midi.pack",
+  "sha256": "a80e99d8bfc72a7f32e3726f482736b5369468adc80ce5d95deb5ddf3bd07846",
+  "bytes": 6136,
+  "version": 6,
+  "firmware": "1.7.3",
+  "places": 3,
+  "needs": [],
+  "level": 5,
+  "folders": []
+}

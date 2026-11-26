@@ -1,6 +1,6 @@
 # The change list
 
-Every place where the loader and the base of open-field change OS 1.7.3+0 of the OP-1 Field, and nothing else. This page is made from `profiles/op1f-1.7.3.json` by `tools/change_list.py`; change the profile, not the page.
+Every place where the loader and the base of open-field change OS 1.7.3+0 of the OP-1 Field, and nothing else. This page is made from `profiles/op1f-1.7.3-n2.json` by `tools/change_list.py`; change the profile, not the page.
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
@@ -11,7 +11,7 @@ There are 71 places. 2 of them are changed in the firmware file, by the builder,
 | Address | Bytes | What stands there | What is changed |
 | --- | --- | --- | --- |
 | `0x8c0b4358` | 8 | In the start-up, right behind the step that mounts the disk: the load of an address for the call that follows. | A call to our start-up stub, which runs the loader (it looks for pack files and makes their changes) and then does the load. |
-| `0x8d4e4260` | 8 | The size the firmware gives its application heap at the start. | The builder makes it 2 MiB smaller. The memory that is left over is where our code is loaded. |
+| `0x8d4e4260` | 8 | The size the firmware gives its application heap at the start. | The builder makes it 128 KiB smaller, so that the heap ends where the loader begins. The memory that is left over is where the loader is loaded. |
 
 The builder also adds one record to the file: the loader, our own code, loaded into the memory the first change sets aside. The packs, the base among them, are files on the unit.
 

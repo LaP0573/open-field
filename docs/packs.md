@@ -12,9 +12,27 @@ Everything here is for OS 1.7.3 and the loader of this repository (`module/build
 
 On the unit's disk, in the folder `user/pk`. The unit's disk mode shows the same folder as `packs`.
 
-The loader takes every file there whose name ends in `.pack`, in small letters or capitals. A name is 6 to 39 characters long with its ending, in plain characters, without any of `/ \ : * ? " < > |`, and does not begin with a dot or a space. What a pack is stands inside the file, not in its name. At most 32 pack files are looked at.
+The loader takes every file there whose name ends in `.pack`, in small letters or capitals. A name is 6 to 39 characters long with its ending, in plain characters, without any of `/ \ : * ? " < > |`, and does not begin with a dot or a space. What a pack is stands inside the file, not in its name. At most 128 pack files are looked at under N2, the loader the install page offers by itself, and 32 under N1 ([below](#two-loaders-n1-and-n2)).
 
 Nothing of a pack is inside the firmware file: the base, too, is a file in this folder.
+
+## Two loaders, N1 and N2
+
+There are two versions of the loader, and every pack file runs under both, as it is. The install page's builder has both: loader v2 is N2, the one the page offers by itself since 2026-11-26, and loader v1 is N1, which the page gives to someone who asks for it by name (`?loader=1.7.3-v1` behind its address). N1 stays for the way back.
+
+| | N1 (loader v1) | N2 (loader v2) |
+| --- | --- | --- |
+| The room for all packs | 2,031,616 bytes, from `0x8d2f4234` | 16 MiB, from `0x85000000` |
+| Pack files looked at | 32 | 128 |
+| The log's first loader line | `M4 at the load point` | `N2 at the load point` |
+
+The start screen reads the same under both. The log's first line tells them apart, and so does the install page once it is connected: on a unit with N1 it says so when the page offers N2. Going from N1 to N2 is a new install of the firmware file from the page, with the same steps and the same risk as the first. Your pack files stay where they are. With 128 files, N2 takes about 1.3 seconds longer to start.
+
+A base that knows N2 (base 40 and later) takes its numbers from the loader. An older base counts against N1's numbers under both loaders: under N2 it refuses a change from the install page that would leave more than 32 pack files or more than N1's room, though the unit would run it.
+
+**Stuck with more than 32 files.** With more than 32 pack files and a base older than 40 (copied by hand, say, or under N2), the base refuses every change from the install page, the new `base.pack` too, since the count after the change is still over 32. The way out is the disk mode: its folder `packs` shows every file under N2. Take files off there until 32 are left, or copy the new `base.pack` there yourself. Then switch the unit off and on, and the page works again.
+
+**Going back from N2 to N1.** Before you write N1's firmware file, cut the folder `packs` down to 32 files at most and N1's room of 2,031,616 bytes, with `base.pack` among them. N1 looks at the first 32 files in the order the folder happens to list them, not by name, so with more files `base.pack` may be one of those it never sees. Nothing is harmed either way, but which packs run would be chance.
 
 ## What is in the file
 
@@ -114,7 +132,7 @@ What it may count on:
 
 The loader runs once, early in the start-up, on the main thread, right after the firmware has mounted the disk and before the tape, the sound engine and the screens are set up. Every line below is in the log with the tag `op1f_loader`.
 
-**1. It looks at itself.** It checks its own three changes and tries a write of code on a function of its own. Its first line names it, M4.
+**1. It looks at itself.** It checks its own three changes and tries a write of code on a function of its own. Its first line names it: M4 for N1, as here, or N2, whose line reads `N2 at the load point` and `packs are loaded from 0x85000000, room 16777216 bytes`.
 
 ```
 loader: M4 at the load point: control 0x00000207, packs are loaded from 0x8d2f4234, room 2031616 bytes; 3 of its own 3 changes of stock pass their check, 3 by a checksum
@@ -135,16 +153,18 @@ loader: keys at the start 00000000 00000000 (answer 0x42, 8 bytes, 2079803 cycle
 loader: the folder user/pk listed: 8 pack(s) of the new kind and 0 of the old in 8 file(s); 0 more not looked at, 0 other name(s)
 ```
 
-`of the old` counts files in an earlier pack format. This repository does not build that format. The loader still reads it, and such a file runs only when no pack file of today's format does.
+`of the old` counts files in an earlier pack format. This repository does not build that format. N1 still reads it, and such a file runs only when no pack file of today's format does. N2 does not run it: it is left out with the line for a format the loader does not know, and the start screen counts it among the files left out.
 
-**4. It places the packs.** Packs stand one behind the other in a room of 2,031,616 bytes that begins at `0x8d2f4234`, in the order of their files' names. Each pack is read from its file straight into its place, body and lists. Its CRC-32 is taken there and held against the header's.
+**4. It places the packs.** Packs stand one behind the other in a room of 16 MiB that begins at `0x85000000` (under N1, 2,031,616 bytes from `0x8d2f4234`), in the order of their files' names. Each pack is read from its file straight into its place, body and lists. Its CRC-32 is taken there and held against the header's.
 
-A pack is linked for the room's first byte and stands somewhere else. So the loader **moves** it: at every place of the pack's own, it writes the address the pack was linked with, further on by the distance. A pack stands at the next address that is a multiple of 32 bytes away from where it was linked.
+A pack is linked for `0x8d2f4234`, the first byte of N1's room, under either loader, and stands somewhere else. So the loader **moves** it: at every place of the pack's own, it writes the address the pack was linked with, further on by the distance. A pack stands at the next address that is a multiple of 32 bytes away from where it was linked.
 
 ```
 loader: user/pk/base.pack 'base' version 17 is placed at 0x8d3626b4, 451712 from where it was linked: 2683 places of its own moved
 loader: its 107396 bytes read in 3155090 cycles, checksum 6309e0a3 ok in 1440202 cycles
 ```
+
+That example is from N1. Under N2 the first pack stands at `0x85000014`, -137314848 from where it was linked: the distance is negative, since the room lies below the address packs are linked for.
 
 Of two files that hold the same pack, the one with the higher version is placed, and the other stands by with a line that ends `stands by and is not read: ... holds this pack, version 2`. A newer file of a pack that cannot run is still the one placed: it shadows an older file that would run.
 
@@ -155,6 +175,8 @@ Of two files that hold the same pack, the one with the higher version is placed,
 ```
 loader: 3 card(s) handed to 'base', its list at 0x8d375510; 0 more than the list holds
 ```
+
+That list has 32 slots, and cards past them are counted as more. N2 also fills a second list of 128 slots, `op1f_cards_2`, when the base offers one, and then writes that line once for each list.
 
 **7. It makes the changes.** First its own, then each pack's table. A pack's table is written after the tables of the packs that lean on it: those that need it, or need a name it offers. So the base comes last. For every entry the loader reads the place again, takes the checksum again, makes the trampoline if the entry has one, writes, and reads back what it wrote.
 
@@ -194,7 +216,7 @@ Each of these is a line of the level E, an error, of the form `loader: <file> '<
 | `is left out: it was made for another interface of the pack X` | The pack X runs with another interface number than this pack was built for |
 | `is left out: it offers a name the loader keeps to itself, X` | Every name that begins `op1f_loader_` is the loader's |
 | `is left out: an earlier pack offers the same name X` | Two packs offer one name. The earlier one, by the order of the files' names, keeps it. That holds for the base too: a file sorted before `base.pack` that offers one of its names leaves the base out |
-| `is left out: nobody offers the name it needs, X` | A name the pack cannot run without. For a mark, `op1f_level_3` say, the base on the unit is older than the pack's card, or there is no `base.pack`; for `op1f_loader_2`, the loader is older than the pack |
+| `is left out: nobody offers the name it needs, X` | A name the pack cannot run without. For a mark, `op1f_level_3` say, the base on the unit is older than the pack's card, or there is no `base.pack`; for `op1f_loader_2`, the loader is N1 and the pack needs N2. Naming that mark as needed is how a pack says it runs only under N2 |
 | `is left out: a direct call does not reach the name X` | Should not happen inside the room |
 | `is left out, a kind this loader does not know` | A table entry of a kind a newer loader has |
 | `is left out, a site outside stock's memory or off its alignment` | A table entry's address is no place code or a word can stand at |
@@ -260,7 +282,8 @@ The build works the lists out from the compiled code. Call an optional name only
 A needed name can also stand for an ability and not for a function to call: a **mark**. It is never called or read.
 
 - The base offers `op1f_level_1` to `op1f_level_10`: "this base serves cards of that level". A pack's card makes its level's mark a name the pack needs ([the base](base.md), "The levels, and their marks").
-- The loader answers itself for `op1f_loader_1`: "this loader hands the cards over". The base needs it. A pack that needs something only a later loader does names that loader's mark, and under this loader it is left out with a line that says which mark was missing.
+- The loader answers itself for `op1f_loader_1`: "this loader hands the cards over". The base needs it. A pack that needs something only a later loader does names that loader's mark, and under an older loader it is left out with a line that says which mark was missing.
+- N2 answers for `op1f_loader_2` as well, with the address of six words of its own: their size in bytes (24), the loader's generation (2), the room's first address, the room's bytes, the most pack files it looks at (128) and the slots of the second list of cards (128). Read the size first and only the words it covers: a later loader adds words behind and never changes the meaning of one. Under N1 the name gives 0, so a pack that names it as optional can tell the two loaders apart.
 
 ## What the start screen says
 
@@ -319,8 +342,8 @@ It prints each pack's place and the checksum the loader logs for it (`its sum as
 
 | What | Limit |
 | --- | --- |
-| The room for all packs | 2,031,616 bytes, a pack's code, data and zeroed data together. The base alone takes 526,512 of them and the base with the four features 1,296,388, which leaves 735,228. A delay line, a loop or a big table belongs in [working memory](level-6.md#working-memory) instead, up to 16 MiB for all packs together |
-| Pack files looked at | 32 |
+| The room for all packs | 16 MiB under N2, 2,031,616 bytes under N1, a pack's code, data and zeroed data together. The loader takes any pack that fits. A pack built by this repository's tools is linked in a window of 2,031,616 bytes: a limit of the tools, not of the loader. Under N1 the base alone takes 526,512 of them and the base with the four features 1,296,388, which leaves 735,228. A delay line, a loop or a big table belongs in [working memory](level-6.md#working-memory) instead, up to 16 MiB for all packs together |
+| Pack files looked at | 128, and 32 under N1 |
 | A pack's name | 15 characters |
 | A file's name | 39 characters with `.pack` |
 | Entries in a table of changes | 4,096 |
@@ -328,7 +351,7 @@ It prints each pack's place and the checksum the loader logs for it (`its sum as
 | The largest alignment inside a pack | 32 bytes |
 | A picture's name | 23 characters |
 | A picture | A megabyte |
-| Cards the base serves | 32 |
+| Cards the base serves | 128 under N2 with base 42 or later; 32 under N1, and 32 with an older base. With more packs that carry a card than the base serves, it serves the first ones in the order of the files' names; the others run, without their card |
 | A card's folders | 8, and 64 in all |
 | Texts on pages | 64 in all |
 

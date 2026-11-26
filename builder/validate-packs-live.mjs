@@ -57,7 +57,7 @@ const R2 = {
   lfo: { sha256: "d2215f995b523baa89a771eae030ec50a583fa61361b1393dd20b32be050d664", bytes: 430062, version: 9 },
   sidechain: { sha256: "9c5d031d1da64a85e3adca74ea2c74159e964657186fbb69787a395eb195b02f", bytes: 106150, version: 8 },
 };
-const CATS = { tape: "tape", effects: "effects", modulation: "modulation", sequencing: "sequencing", mixer: "mixer", looks: "screens and looks", tools: "tools", examples: "examples", library: "library" };
+const CATS = { tape: "tape", effects: "effects", synths: "synths", drums: "drums", modulation: "modulation", sequencing: "sequencing", mixer: "mixer", looks: "screens and looks", tools: "tools", examples: "examples", library: "library" };
 const FEATURES = [["8 tracks", "tape"], ["fx train", "effects"], ["lfo", "modulation"], ["sidechain", "mixer"]];
 
 function listingOf(set, commit, extra = [], earlier = null) {
@@ -233,6 +233,57 @@ const row = (rows, key) => [rows.base, ...rows.listed, ...rows.others].find((r) 
   check("33 pack files after the change: refused with words", r5.counts.packsAfter === 33 && r5.problems.length === 1 && /32 at most/.test(r5.problems[0]), JSON.stringify(r5.problems));
   c5.ticked.delete("extra00.pack");
   check("one unticked: 32 again", P.resolve(bigger.rows, c5, bigger.listing, pageBase(N1)).problems.length === 0);
+  // the door's own most files (hello's tail, door build 7): 32 for a door that says 32 or nothing, 128 for the loader N2
+  const said32 = rowsFor(data, many.filter((f) => f.name !== "sidechain.pack"), { baseVersion: 17, release: "0.3", packsMost: 32 }, pageBase(N1));
+  const c32 = P.initialChoices(said32.rows); c32.ticked.add("garden.pack");
+  const r32 = P.resolve(said32.rows, c32, said32.listing, pageBase(N1));
+  check("rule 6 with a door that says 32: 33 refused, 32 named", said32.rows.packsMost === 32 && r32.problems.length === 1 && /loads 32 at most/.test(r32.problems[0]), JSON.stringify(r32.problems));
+  const said128 = rowsFor(data, many.filter((f) => f.name !== "sidechain.pack"), { baseVersion: 17, release: "0.3", packsMost: 128 }, pageBase(N1));
+  const c128 = P.initialChoices(said128.rows); c128.ticked.add("garden.pack");
+  check("rule 6 with a door that says 128: 33 allowed", said128.rows.packsMost === 128 && P.resolve(said128.rows, c128, said128.listing, pageBase(N1)).problems.length === 0);
+  const lots = n1Unit().filter((f) => f.name !== "sidechain.pack");
+  while (lots.length < 127) lots.push({ name: "more" + String(lots.length).padStart(3, "0") + ".pack", size: 10, sha256: (lots.length % 10).toString().repeat(64), isPack: true });
+  const full = rowsFor(data, lots, { baseVersion: 17, release: "0.3", packsMost: 128 }, pageBase(N1));
+  const cf = P.initialChoices(full.rows);
+  check("rule 6 with 128: 127 pack files, nothing wrong", P.resolve(full.rows, cf, full.listing, pageBase(N1)).problems.length === 0);
+  cf.ticked.add("garden.pack");                                                            // and sidechain with it: 129
+  const rf = P.resolve(full.rows, cf, full.listing, pageBase(N1));
+  check("rule 6 with 128: 129 refused, 128 named", rf.counts.packsAfter === 129 && rf.problems.length === 1 && /leave 129 packs .* loads 128 at most/.test(rf.problems[0]), JSON.stringify(rf.problems));
+  cf.ticked.delete("more010.pack");
+  check("rule 6 with 128: one unticked, 128 allowed", P.resolve(full.rows, cf, full.listing, pageBase(N1)).problems.length === 0);
+  check("MOST_PACKS is still 32, the default", P.MOST_PACKS === 32);
+}
+
+// ---------- 4b. the loader's room: the line for a unit on N1 when the page offers N2 ----------
+
+{
+  const v1 = { os: "1.7.3", reserve: { module_base: "0x8d2e4234", reserved_bytes: 2097152 } };
+  const v2 = { os: "1.7.3", reserve: { module_base: "0x8d2e4234", reserved_bytes: 2097152, pack_room: { base: "0x85000000", bytes: 16777216, files: 128 } } };
+  const n1Said = { loaderSaid: true, loaderGeneration: 1, packsMost: 32, packRoom: 2031616 };
+  const n1Inferred = { loaderSaid: false, loaderGeneration: 1, packsMost: 32, packRoom: 2031616 };
+  const n2 = { loaderSaid: true, loaderGeneration: 2, packsMost: 128, packRoom: 16777216 };
+  const LINE = "This unit's loader has a room of 2 MB for 32 pack files. Install again for 16 MB and 128.";
+  check("room: N1 said by the door, the page offers N2: the line", P.roomWords(n1Said, v2) === LINE, P.roomWords(n1Said, v2));
+  check("room: an older door (N1's numbers taken, the loader not said), the page offers N2: no line, the unit may be on N2", P.roomWords(n1Inferred, v2) === null);
+  check("room: a hello with no loader fields at all: no line", P.roomWords({ protocol: 3 }, v2) === null);
+  check("room: the page offers N1 (no pack_room): no line", P.roomWords(n1Said, v1) === null && P.roomWords(n1Inferred, v1) === null);
+  check("room: the unit on N2 already: no line", P.roomWords(n2, v2) === null);
+  check("room: no manifest or no hello: no line", P.roomWords(n1Said, null) === null && P.roomWords(null, v2) === null);
+  const v2b = { reserve: { pack_room: { base: "0x85000000", bytes: 33554432, files: 200 } } };
+  check("room: the numbers come from the door and the manifest", P.roomWords({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "This unit's loader has a room of 3 MB for 40 pack files. Install again for 32 MB and 200.");
+  // the moment "loader": the page leads with the new loader exactly when roomWords has a line
+  check("loader: N1 said by the door, the page offers N2: offered", P.loaderOffered(n1Said, v2) === true);
+  check("loader: the unit on N2 already (generation 2): not offered", P.loaderOffered(n2, v2) === false);
+  check("loader: a door that says neither its loader nor its base: not offered", P.loaderOffered(n1Inferred, v2) === false && P.loaderOffered({ protocol: 3 }, v2) === false);
+  check("loader: a base older than 40 (it cannot say its loader): offered", P.loaderOffered({ loaderSaid: false, baseVersion: 39 }, v2) === true && P.loaderOffered({ baseVersion: 25 }, v2) === true);
+  check("loader: base 40 that says nothing of its loader: not offered", P.loaderOffered({ loaderSaid: false, baseVersion: 40 }, v2) === false);
+  check("loader: a base older than 40 while the page offers v1 (no pack_room): not offered", P.loaderOffered({ baseVersion: 39 }, v1) === false);
+  check("loader: the page offers N1 (no pack_room): not offered", P.loaderOffered(n1Said, v1) === false && P.loaderOffered(n1Said, null) === false && P.loaderOffered(null, v2) === false);
+  const PANEL = "Install again to get it: room for 128 pack files and 16 MB, and the new base with it. Your pack files stay where they are.";
+  check("loader: the panel's line", P.loaderLine(n1Said, v2) === PANEL, P.loaderLine(n1Said, v2));
+  check("loader: the panel's line from the door's and the manifest's numbers", P.loaderLine({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "Install again to get it: room for 200 pack files and 32 MB, and the new base with it. Your pack files stay where they are.");
+  check("loader: no panel line when not offered", P.loaderLine(n2, v2) === null && P.loaderLine(n1Inferred, v2) === null && P.loaderLine(n1Said, v1) === null);
+  check("loader: the panel's line for a base older than 40", P.loaderLine({ baseVersion: 39 }, v2) === PANEL, P.loaderLine({ baseVersion: 39 }, v2));
 }
 
 // ---------- 5. the plan's order, and the unit's files read from the door ----------

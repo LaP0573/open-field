@@ -1,0 +1,29 @@
+{
+  "id": "tuning",
+  "author": "hooligan333",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "Alternate tunings for the synth: maqam, gamelan, just and Pythagorean intonation, quarter tones, or your own from a Scala file.",
+  "repository": "https://github.com/hooligan333/open-field-tuning",
+  "commit": "7a899efbf1703d560dc9222f343c208667aebf59",
+  "path": "tuning.pack",
+  "sha256": "0150f76ec23117931b7748df89d09750e880b332429846f66f3a81ed4a732957",
+  "bytes": 41182,
+  "version": 8,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 3,
+  "folders": [
+    {
+      "name": "tuning",
+      "place": "tuning"
+    },
+    {
+      "name": "tuning-set",
+      "place": "tuning-set"
+    }
+  ]
+}

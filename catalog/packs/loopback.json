@@ -1,0 +1,30 @@
+{
+  "id": "loopback",
+  "author": "seajaysec",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "USB/line loopback in three states: loopback, wet+dry, wet. Amp return supported.",
+  "repository": "https://github.com/seajaysec/loopback-op1f",
+  "commit": "060915cdbfd31ef98c95b7a216a68e6fe5d54be9",
+  "path": "loopback.pack",
+  "sha256": "ff8acb34ae52e8a7cb1a9f5c26f061dab29062017aeff6dfae8b32f23a1bf209",
+  "bytes": 34213,
+  "version": 2,
+  "firmware": "1.7.3",
+  "places": 4,
+  "needs": [],
+  "level": 3,
+  "folders": [
+    {
+      "name": "loopback",
+      "place": "loopback"
+    }
+  ],
+  "picture": {
+    "path": "thumbs/loopback.png",
+    "sha256": "1a51442c91303c76bd10d4a9515d9d1964e1906d0be815f9893130997f53163d",
+    "bytes": 970
+  }
+}

@@ -13,6 +13,14 @@
    "bytes": 25876,
    "sha256": "4db491cd06f914fef25f0be3c62a84253ce33b128094b6af26bd06ad3e3d7254"
   },
+  "loader_2.bin": {
+   "bytes": 24272,
+   "sha256": "12a6465065d6fd1f8ee9d6bf43fccc334446669ac8d94d115470d663d6169f0b"
+  },
+  "loader-1.7.3-v2.bin": {
+   "bytes": 24272,
+   "sha256": "12a6465065d6fd1f8ee9d6bf43fccc334446669ac8d94d115470d663d6169f0b"
+  },
   "examples/crush.pack": {
    "bytes": 2668,
    "sha256": "a417e9012a0734b7ab60d739d95b9fa63cd7beb01c8843e1c8fefaa2c500a2dd"

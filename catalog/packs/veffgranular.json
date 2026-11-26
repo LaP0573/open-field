@@ -3,7 +3,7 @@
   "author": "galfaroth",
   "status": "listed",
   "categories": [
-    "tools"
+    "synths"
   ],
   "description": "A granular sample synth in the unit's engine list: grains of the sampler's sample, shape, reverse, and a tape cut dropped on its page.",
   "repository": "https://github.com/galfaroth/open-field-veff",

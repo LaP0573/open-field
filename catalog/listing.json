@@ -3,6 +3,8 @@
   "categories": {
     "tape": "tape",
     "effects": "effects",
+    "synths": "synths",
+    "drums": "drums",
     "modulation": "modulation",
     "sequencing": "sequencing",
     "mixer": "mixer",

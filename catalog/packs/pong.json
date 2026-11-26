@@ -5,13 +5,13 @@
   "categories": [
     "effects"
   ],
-  "description": "Stereo delay with court timing, repeat count, stereo spin and input level.",
+  "description": "Stereo delay with Table timing, tempo sync, repeats, stereo spin and input level.",
   "repository": "https://github.com/midnightops94/open-field-midnight94",
-  "commit": "849eefc5e5dac26acee29cbb3b6a2782e3197c10",
+  "commit": "083486c8f7fdd142f93a2533e81e22a297b7f0d7",
   "path": "packs/pong.pack",
-  "sha256": "f7bc5df47ea9e26994f1200c6ec144ba76fa003b4065221613231e3720a268e6",
-  "bytes": 1349157,
-  "version": 6,
+  "sha256": "a902f79bb6aed1f4c705f17961cc847bf89ba62154ec7d439c2071ba5bc2b31a",
+  "bytes": 703470,
+  "version": 10,
   "firmware": "1.7.3",
   "places": 0,
   "needs": [],

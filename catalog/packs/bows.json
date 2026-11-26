@@ -1,0 +1,25 @@
+{
+  "id": "bows",
+  "author": "Slow-Magic",
+  "status": "listed",
+  "categories": [
+    "tools"
+  ],
+  "description": "Bowed string section synth. Requires the separate bows.msb sample bank from the slowp1 GitHub release.",
+  "repository": "https://github.com/slowmagic222/slowp1",
+  "commit": "555873e50d1a9e626ce8a4ef281a76697bd46087",
+  "path": "bows.pack",
+  "sha256": "2708f0874b720858e7ac2c82333a357c023a9dbcca0020ee9fd9efca187952db",
+  "bytes": 51301,
+  "version": 14,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [
+    {
+      "name": "bows",
+      "place": "bows"
+    }
+  ]
+}

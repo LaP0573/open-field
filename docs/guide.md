@@ -123,6 +123,18 @@ A file may have any name that ends in `.pack`. If a file cannot run, the start s
 
 **A new `base.pack`** is copied over the old one in the same way, with no install; the next run of the install page also puts the page's own on. The number behind `open-field` on the start screen is the release of the base that runs.
 
+## Room for packs
+
+The loader in your firmware file decides how many pack files the unit reads. The page installs the second loader, N2. It reads up to 128 pack files and has a room of 16 MB for all of them. The first loader, N1, reads 32 and has 2 MB. N1 is still there for the way back: add `?loader=1.7.3-v1` behind the page's address. Every pack file runs under both, as it is. With 128 files the unit takes about 1.3 seconds longer to start.
+
+N2 needs base 40 or later. The page puts base 42 on with it, so a unit installed from the page has a base that fits.
+
+**If you installed open-field before 0.24**, do the install again to get the new room: build the firmware file on the page again and write it from the bootloader's menu, the same steps as [the first time](#the-install-once), with the same warnings. This write carries the same risk as the first one. Your pack files stay on the unit, and the new base goes on with the firmware file. When you connect, the page says so at the top, with an "install again" button that opens these steps.
+
+**If the page refuses every change and you have more than 32 pack files**, your base is older than base 40, which counts to 32 whatever the loader. Open the disk mode and delete files in `packs` until 32 are left, or copy the new `base.pack` in there yourself. Switch the unit off and on, and the page works again.
+
+**Going back from N2 to N1**: open the page with `?loader=1.7.3-v1` behind its address. Before you write N1's firmware file, cut `packs` down to 32 files and 2 MB in all, `base.pack` among them. N1 takes the first 32 the folder happens to list, not by name, so with more files `base.pack` might not be one of them.
+
 ## Taking a feature away
 
 Delete its file from `packs` in the disk mode, and switch the unit off and on. On a Mac, take it off in the install page's packs section. Keep `base.pack` while any feature file is there. With no pack file left, the unit starts as the original firmware and the start screen reads `1.7.3 stock (no pack)`, or `1.7.3+1 stock (no pack)`.

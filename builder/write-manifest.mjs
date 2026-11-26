@@ -14,7 +14,17 @@
 //              good, so a changed loader gets a new name
 //   --stock    your own OS 1.7.3 file, or the environment's OPEN_FIELD_STOCK. It is read for one thing: the size and
 //              the SHA-256 of the firmware file the builder gives with this loader. Nothing of it is written anywhere.
-//              A file that is not the one the profile build.json names (profiles/op1f-1.7.3.json) is for is refused
+//              A file that is not the one the profile is for is refused
+//
+// More of what it is given:
+//   --profile  the profile of the loader's room and of the two changes of the firmware file. Without it, the one
+//              build.json names (profiles/op1f-1.7.3.json, the loader v1's). The loader v2 has a profile of its own,
+//              profiles/op1f-1.7.3-n2.json: its room holds the loader alone, and its field pack_room says where the
+//              loader puts the pack files. For such a profile the tool refuses three things: a heap that does not end
+//              at the loader's first byte (heap_fill_base and the new heap size), a room that is not inside the
+//              file's record of zeros, and a loader that does not fit its room with its zeroed data (__module_end in
+//              the linked file). The manifest then also carries the pack room and the loader's end, so the page makes
+//              the same checks
 //
 // What it writes, into this folder (or the one --out names):
 //   loader-<os>-<version>.bin    the loader's file, byte for byte the one given
@@ -45,7 +55,7 @@
 // Answers 0 when it wrote or found everything as it should be, 1 when --check found a difference, 2 when it refused.
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join, basename } from "node:path";
+import { dirname, join, basename, resolve } from "node:path";
 import { parseLdr, mappedOffset } from "./ldr.mjs";
 import { assembleImage, buildImage, sha256hex } from "./patch.mjs";
 
@@ -57,7 +67,7 @@ const need = (condition, message) => { if (!condition) throw new Refusal(message
 
 function options(words) {
   const out = { flags: new Set() };
-  const valued = new Set(["--loader", "--elf", "--version", "--stock", "--status", "--out"]);
+  const valued = new Set(["--loader", "--elf", "--version", "--stock", "--status", "--out", "--profile"]);
   const flags = new Set(["--current", "--replace", "--check"]);
   for (let at = 0; at < words.length; at++) {
     const word = words[at];
@@ -110,23 +120,59 @@ function linkedFile(bytes) {
 }
 
 // The loader has the first 64 KiB of the room for our code; the packs are loaded behind it (linker/op1f-1.7.3-base.ld).
+// A profile with pack_room gives the loader the whole room, reserved_bytes, and the packs a room of their own.
 const LOADER_ROOM = 0x10000;
 
+// A profile's pack_room, held to its form: {base, bytes, files}.
+function packRoom(profile) {
+  const room = profile.pack_room;
+  need(room && typeof room === "object" && !Array.isArray(room), "the profile's pack_room is not {base, bytes, files}");
+  const base = number(room.base);
+  for (const field of ["bytes", "files"])
+    need(Number.isInteger(room[field]) && room[field] > 0 && room[field] <= 0xffffffff, `the profile's pack_room.${field} is not a count above 0`);
+  return { base: hex8(base), bytes: room.bytes, files: room.files };
+}
+
+// For a profile with pack_room, the loader alone is in the room: the heap ends at its first byte, the room lies in the
+// file's record of zeros, and the loader with its zeroed data (to __module_end) fits the room.
+function heldToRoom(profile, loader, end) {
+  const low = number(profile.module_base), fillLow = number(profile.heap_fill_base);
+  const fillHigh = fillLow + profile.heap_fill_bytes, reserved = profile.reserved_bytes;
+  const heaps = profile.image.filter((item) => item.kind === "imm32");
+  need(heaps.length === 1, "a profile with pack_room has one change of the heap's size (kind imm32)");
+  const heapEnd = fillLow + number(heaps[0].new_imm);
+  need(heapEnd === low, `the heap does not end at the loader's first byte: heap_fill_base ${hex8(fillLow)} and the new heap size ` +
+       `${hex8(number(heaps[0].new_imm))} end at ${hex8(heapEnd)}, and module_base is ${hex8(low)}`);
+  need(Number.isInteger(reserved) && reserved > 0 && Number.isInteger(profile.heap_fill_bytes) && fillLow <= low && low + reserved <= fillHigh,
+       `the room [${hex8(low)}, ${hex8(low + reserved)}) is not inside the file's record of zeros [${hex8(fillLow)}, ${hex8(fillHigh)})`);
+  need(end !== undefined, "the linked file names no __module_end: the loader with its zeroed data cannot be held to its room");
+  need(end >= low + loader.length, `the linked file's __module_end, ${hex8(end)}, lies before the end of the loader's file: ` +
+       "not the linked file of this loader, or not linked at module_base");
+  need(end - low <= reserved, `the loader with its zeroed data is ${end - low} bytes (__module_end ${hex8(end)}), and its room is ${reserved}`);
+}
+
 // The manifest as an object, its fields in the order the page's manifest has had them from its first version.
-// `places` is [{address, offset}] for the two changes when a firmware file was read, or null.
-function composed(profile, os, loader, loaderHash, stub, version, status, places) {
+// `places` is [{address, offset}] for the two changes when a firmware file was read, or null. `end` is the loader's
+// __module_end, given for a profile with pack_room alone: such a manifest also carries reserve.pack_room and loader.end.
+function composed(profile, os, loader, loaderHash, stub, version, status, places, end) {
   const edits = profile.image.map((item, index) => {
     const offset = places ? "0x" + places[index].toString(16) : null;
     if (item.kind === "imm32") return { kind: "imm32", address: item.address, file_offset: offset, new_imm: hex8(number(item.new_imm)) };
     need(item.kind === "call" && (item.length === 8 || item.length === 12), "the profile names a change of the file this builder does not know: " + item.kind);
     return { kind: "call", address: item.address, file_offset: offset, length: item.length, target: "stub" };
   });
+  const reserve = { module_base: profile.module_base, reserved_bytes: profile.reserved_bytes, heap_fill_base: profile.heap_fill_base,
+                    heap_fill_bytes: profile.heap_fill_bytes };
+  const ourFile = { file: `loader-${os}-${version}.bin`, bytes: loader.length, sha256: loaderHash, stub: hex8(stub) };
+  if ("pack_room" in profile) {
+    reserve.pack_room = packRoom(profile);
+    ourFile.end = hex8(end);
+  }
   return {
     os,
     stock: { sha256: profile.stock_sha256, bytes: profile.stock_bytes, records: profile.stock_records, entry: profile.entry },
-    reserve: { module_base: profile.module_base, reserved_bytes: profile.reserved_bytes, heap_fill_base: profile.heap_fill_base,
-               heap_fill_bytes: profile.heap_fill_bytes },
-    loader: { file: `loader-${os}-${version}.bin`, bytes: loader.length, sha256: loaderHash, stub: hex8(stub), version, status },
+    reserve,
+    loader: { ...ourFile, version, status },
     edits,
     output: { bytes: profile.stock_bytes + 16 + loader.length, sha256: null },
   };
@@ -148,20 +194,32 @@ async function main() {
   if ("--status" in given) need(/^[\x20-\x7e]{1,80}$/.test(given["--status"]) && given["--status"].trim() === given["--status"], "the status is one short line of plain letters");
   const folder = given["--out"] || here;
 
-  const plan = JSON.parse(readFileSync(join(here, "..", "build.json"), "utf8"));              // the tree's own profile
-  const profile = JSON.parse(readFileSync(join(here, "..", ...plan.profile.split("/")), "utf8"));
-  const os = profile.id.split("-").pop();
-  need(/^[0-9]+(\.[0-9]+)*$/.test(os), "the profile's id does not end in an OS version: " + profile.id);
+  let profilePath;
+  if ("--profile" in given) {
+    profilePath = resolve(given["--profile"]);
+    need(existsSync(profilePath), "no such file: " + given["--profile"]);
+  } else {
+    const plan = JSON.parse(readFileSync(join(here, "..", "build.json"), "utf8"));            // the tree's own profile
+    profilePath = join(here, "..", ...plan.profile.split("/"));
+  }
+  const profile = JSON.parse(readFileSync(profilePath, "utf8"));
+  const os = (profile.id || "").split("-").filter((word) => /^[0-9]+(\.[0-9]+)*$/.test(word)).pop();
+  need(os, "the profile's id names no OS version: " + profile.id);
   for (const field of ["entry", "heap_fill_base", "heap_fill_bytes", "module_base", "reserved_bytes", "stock_sha256", "stock_bytes", "stock_records", "image"])
     need(field in profile, "the profile has no " + field);
+  const roomed = "pack_room" in profile;                      // the loader alone in its room, the packs in a room of their own
+  if (roomed) packRoom(profile);
 
   // the loader's file, and the linked file it was made from
   const loader = u8(given["--loader"]);
   const low = number(profile.module_base);
   need(loader.length > 0 && loader.length % 4 === 0, `the loader's file is ${loader.length} bytes: the builder takes a length that is a multiple of 4`);
-  need(loader.length <= LOADER_ROOM, `the loader's file is ${loader.length} bytes and the loader has ${LOADER_ROOM}: the packs are loaded behind it. ` +
-       "Give the file tools/build_all.py writes into its --out folder (build.json names it under blob)");
+  if (roomed) need(loader.length <= profile.reserved_bytes, `the loader's file is ${loader.length} bytes and its room is ${profile.reserved_bytes}`);
+  else need(loader.length <= LOADER_ROOM, `the loader's file is ${loader.length} bytes and the loader has ${LOADER_ROOM}: the packs are loaded behind it. ` +
+            "Give the file tools/build_all.py writes into its --out folder (build.json names it under blob)");
   const linked = linkedFile(u8(given["--elf"]));
+  const end = linked.names.get("__module_end");
+  if (roomed) heldToRoom(profile, loader, end);
   const call = profile.image.find((item) => item.kind === "call");
   need(call && call.target, "the profile names no function for the builder's call");
   need(linked.names.has(call.target), `the linked file has no function ${call.target}: it is not the loader's linked file`);
@@ -195,7 +253,7 @@ async function main() {
     try {
       const blocks = parseLdr(stock);
       places = profile.image.map((item) => mappedOffset(blocks, number(item.address), item.kind === "call" ? item.length : 8));
-      manifest = composed(profile, os, loader, loaderHash, stub, version, status, places);
+      manifest = composed(profile, os, loader, loaderHash, stub, version, status, places, end);
       const image = await assembleImage(stock, manifest, loader);
       need(image.length === manifest.output.bytes, "the firmware file is not the size it should be");
       manifest.output.sha256 = await sha256hex(image);
@@ -206,7 +264,7 @@ async function main() {
       throw new Refusal("the builder does not take this loader: " + problem.message);
     }
   } else {
-    manifest = composed(profile, os, loader, loaderHash, stub, version, status, null);
+    manifest = composed(profile, os, loader, loaderHash, stub, version, status, null, end);
   }
 
   const loaderName = manifest.loader.file, loaderPath = join(folder, loaderName);

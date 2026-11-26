@@ -128,7 +128,10 @@ class TheProfile(unittest.TestCase):
         self.assertEqual(sorted(kinds), ["call", "imm32"])
 
     def test_the_change_list_is_what_the_profile_gives(self):
-        self.assertEqual(text("docs", "changes.md"), tool("change_list").render(self.profile))
+        """The change list is made from the profile of the loader the install page offers by itself, which build.json
+        names under change_list (v2's); the tree's profile when it names none."""
+        named = load("build.json").get("change_list", PROFILE)
+        self.assertEqual(text("docs", "changes.md"), tool("change_list").render(load(*named.split("/"))))
 
     def test_the_change_list_names_every_place(self):
         page = text("docs", "changes.md")
@@ -147,10 +150,10 @@ class TheRecipes(unittest.TestCase):
                 self.assertTrue(os.path.isfile(os.path.join(ROOT, *picture["file"].split("/"))), picture["file"])
 
     def test_every_source_is_built_into_something(self):
-        """Every source in module/ is one a recipe or the loader names, or one such a source includes (a unit compiled
+        """Every source in module/ is one a recipe or a loader names, or one such a source includes (a unit compiled
         twice, once as it is and once inside another with a switch defined, as the train's page is for lfo)."""
         plan = load("build.json")
-        used = set(plan["loader"]["sources"])
+        used = set(plan["loader"]["sources"]) | set(plan.get("loader_2", {}).get("sources", ()))     # the builder's second loader, v2, too
         for name in plan["packs"]:
             used.update(load("packs", name + ".json")["sources"])
         for path in list(used):

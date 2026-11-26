@@ -73,10 +73,13 @@ else {
   else ok("the manifest holds no run of the firmware's bytes");
 }
 
-// 3. the loader's file is the loader alone, inside the loader's 64 KiB: the packs, base.pack among them, are files on
-// the unit and are loaded behind it, never carried in the firmware file
-if (loader.length > 0x10000) bad("the loader's file is larger than the loader's 64 KiB");
-else ok(`the loader's file is the loader alone (${loader.length} bytes of its 64 KiB)`);
+// 3. the loader's file is the loader alone, inside the loader's room: 64 KiB for v1, whose packs are loaded behind it,
+// and its whole reservation for a loader with a room of its own (v2's 128 KiB). The packs, base.pack among them, are
+// files on the unit, never carried in the firmware file
+const ownRoom = manifest.reserve && manifest.reserve.pack_room ? manifest.reserve.reserved_bytes : 0x10000;
+const roomWords = ownRoom === 0x10000 ? "64 KiB" : (ownRoom / 1024) + " KiB";
+if (loader.length > ownRoom) bad("the loader's file is larger than the loader's " + roomWords);
+else ok(`the loader's file is the loader alone (${loader.length} bytes of its ${roomWords})`);
 
 // 4. the manifest says whether its image has run on a unit: the page shows that line beside the version
 if (typeof our.status !== "string" || !our.status) bad("the manifest does not say whether its image has run on a unit");

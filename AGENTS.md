@@ -64,7 +64,7 @@ Change the source, then run the tool. Never edit these by hand.
 | File | Made from | By |
 | --- | --- | --- |
 | The tables, `module/*_table.s` and `examples/*/*_table.s` | The profile beside them | `python -I tools/table_build.py --profile <profile> --all` |
-| `docs/changes.md` | `profiles/op1f-1.7.3.json` | `python -I tools/change_list.py --profile profiles/op1f-1.7.3.json` |
+| `docs/changes.md` | `profiles/op1f-1.7.3-n2.json`, the profile of the loader the install page offers | `python -I tools/change_list.py --profile profiles/op1f-1.7.3-n2.json` |
 | `docs/firmware-interfaces.md` | The sources and `profiles/op1f-1.7.3-interfaces.json` | `python -I tools/interfaces.py` |
 | A pack's directory of pictures, `module/*_pictures.s` and `examples/*/*_pictures.s` | The pack's recipe | `python -I tools/pack_build.py pictures --recipe <recipe> --out <file>` |
 | A pack's card, `examples/*/*_card.s` | The pack's recipe | `tools/pack_build.py card`, as [docs/base.md](docs/base.md) says under "The card" |

@@ -18,6 +18,12 @@
 // two seconds have passed.
 
 export const PAGE_PROTOCOL = 3;                     // the door's protocol this page speaks: 3, the one that can apply
+// hello's one byte the page sends: 04 asks a door of build 7 or later (base 40) for protocol 3's 68 bytes and a tail of
+// 8, the loader's record. Every door before build 7 answers 04 as it answers 03 (build 1 always its 44 bytes, build 2
+// its 60 for 2 or more, builds 3 to 6 their 68 for 3 or more), so 04 is safe with each of them.
+export const HELLO_TAIL = 4;
+// The loader N1's numbers, taken when hello has no tail (44, 60 or 68 bytes): its generation, the most pack files, the room's bytes.
+export const N1_LOADER = Object.freeze({ loaderGeneration: 1, packsMost: 32, packRoom: 2031616 });
 export const HEADER = Object.freeze([0xF0, 0x7D, 0x4F, 0x46]);
 export const IDENTITY_REQUEST = Object.freeze([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]);
 const REFUSED_PREFIX = Object.freeze([0xF0, 0x00, 0x20, 0x76]); // the only place these bytes are written: a prefix that is refused, never built
@@ -209,7 +215,7 @@ export function parseAnswer(bytes) {
 
 // The messages the page sends, each built from its payload (the client sends them through exchange()).
 export const payloads = Object.freeze({
-  hello: () => [PAGE_PROTOCOL],
+  hello: (level = HELLO_TAIL) => [level],
   // the third byte is bits (protocol section 14.1): 01 protocol 3's flags, 02 each entry's header (a door of build 5 or later)
   list: (index, folder = 0, flags = false, header = false) => {
     const bits = (flags ? 1 : 0) | (header ? 2 : 0);
@@ -251,17 +257,21 @@ function text(bytes) {
   return String.fromCharCode(...bytes.subarray(0, end));
 }
 
-// hello's answer: 44 bytes (protocol 1), 60 (protocol 2) or 68 (protocol 3).
+// hello's answer: 44 bytes (protocol 1), 60 (protocol 2), 68 (protocol 3), or 76 (protocol 3 and the loader's record,
+// door build 7 to hello 04): [68] the loader's generation, [69] 0, [70..71] the most pack files, [72..75] the room's
+// bytes. Without the tail the loader is taken to be N1 (N1_LOADER).
 export function parseHello(p) {
-  if (p.length !== 44 && p.length !== 60 && p.length !== 68) throw new DoorError("protocol", "hello's answer holds " + p.length + " bytes, not 44, 60 or 68");
+  if (p.length !== 44 && p.length !== 60 && p.length !== 68 && p.length !== 76) throw new DoorError("protocol", "hello's answer holds " + p.length + " bytes, not 44, 60, 68 or 76");
   if (p.length === 60 && p[0] < 2) throw new DoorError("protocol", "hello's answer holds 60 bytes but says protocol " + p[0]);
-  if (p.length === 68 && p[0] < 3) throw new DoorError("protocol", "hello's answer holds 68 bytes but says protocol " + p[0]);
+  if (p.length >= 68 && p[0] < 3) throw new DoorError("protocol", "hello's answer holds " + p.length + " bytes but says protocol " + p[0]);
   const h = {
     protocol: p[0], mark: p[1], baseVersion: rd16(p, 2), release: text(p.subarray(4, 20)), osId: rd32(p, 20),
     maxMessage: rd32(p, 24), maxOther: rd32(p, 32), slice: rd32(p, 36), listEntries: p[40], state: p[41],
   };
   if (p.length >= 60) Object.assign(h, { piece: rd32(p, 44), maxFile: rd32(p, 48), margin: rd32(p, 52), maxWaiting: p[56], waiting: p[57], build: p[58] });
-  if (p.length === 68) Object.assign(h, { maxRemovals: p[60], removalsNoted: p[61], restartMs: rd16(p, 62), startFound: p[64], applyOutcome: p[65] });
+  if (p.length >= 68) Object.assign(h, { maxRemovals: p[60], removalsNoted: p[61], restartMs: rd16(p, 62), startFound: p[64], applyOutcome: p[65] });
+  if (p.length === 76) Object.assign(h, { loaderSaid: true, loaderGeneration: p[68], packsMost: rd16(p, 70), packRoom: rd32(p, 72) });
+  else Object.assign(h, { loaderSaid: false }, N1_LOADER);
   return h;
 }
 
@@ -428,7 +438,8 @@ export const SWITCH_OFF_AND_ON_WORDS = "Switch your OP-1 off and on, then try ag
 export const OTHER_MIDI_WORDS = "Something else has talked to your OP-1 over MIDI since it started, another music program or a Bluetooth MIDI device, and after that it won't change its packs until it restarts. Close other music programs and disconnect Bluetooth MIDI, then switch your OP-1 off and on and try again. Nothing changed.";
 
 // Why commit 01 was refused, in the owner's words: { status, words, reason?, name? }. Nothing changed in every case.
-export function commitRefusal(status, payload) {
+// packsMost: the most pack files the door said its loader takes (hello's tail; N1's 32 when it said none).
+export function commitRefusal(status, payload, packsMost = N1_LOADER.packsMost) {
   const p = Uint8Array.from(payload);
   const r = { status, words: "" };
   const said = (w) => Object.assign(r, { words: w });
@@ -437,7 +448,7 @@ export function commitRefusal(status, payload) {
       Object.assign(r, { reason: p[0], name: String.fromCharCode(...p.subarray(1)) });
       return said("Your OP-1 won't use " + r.name + ", because " + (UNIT_REFUSES_WORDS[r.reason] ?? "of reason " + r.reason) + ". Nothing changed.");
     case STATUS.noRoom:
-      if (p[0] === 6 && p.length === 2) { r.count = p[1]; return said("That would leave " + r.count + " pack files on your OP-1, and it takes 32 at most. Untick a few. Nothing changed."); }
+      if (p[0] === 6 && p.length === 2) { r.count = p[1]; return said("That would leave " + r.count + " pack files on your OP-1, and it takes " + packsMost + " at most. Untick a few. Nothing changed."); }
       if (p[0] === 7 && p.length === 9) return said("Those packs together are too big for the room your OP-1 keeps for packs. Untick one or two. Nothing changed.");
       if (p[0] === 1 && p.length === 5) return said("Your OP-1's disk is too full for this (" + rd32(p, 1).toLocaleString("en-US") + " kB free). Free some space first. Nothing changed.");
       if (p[0] === 8) return said("Your OP-1's packs folder holds too many files. Take some off in disk mode first. Nothing changed.");
@@ -594,7 +605,7 @@ export class MessageQueue {
 // that the browser keeps nothing of the unit while it goes away and comes back. why is "restart", or "power" when the
 // unit asks to be switched off and on.
 
-const DEFAULT_LIMITS = Object.freeze({ maxMessage: MAX_BEFORE_HELLO, maxOther: MAX_BEFORE_HELLO, slice: 16384, listEntries: 8 });
+const DEFAULT_LIMITS = Object.freeze({ maxMessage: MAX_BEFORE_HELLO, maxOther: MAX_BEFORE_HELLO, slice: 16384, listEntries: 8, packsMost: N1_LOADER.packsMost, packRoom: N1_LOADER.packRoom });
 
 export class DoorClient {
   constructor(io, options = {}) {
@@ -768,6 +779,8 @@ export class DoorClient {
       Object.assign(this.limits, { piece, maxFile: h.maxFile, margin: h.margin, maxWaiting: h.maxWaiting });
     }
     if (this.protocol === 3) Object.assign(this.limits, { maxRemovals: h.maxRemovals, restartMs: h.restartMs });
+    // the loader's room, from hello's tail (N1's numbers when it has none)
+    Object.assign(this.limits, { packsMost: h.packsMost ?? N1_LOADER.packsMost, packRoom: h.packRoom ?? N1_LOADER.packRoom });
   }
 
   // hello: { status, hello } or { restarting: true }.
@@ -814,6 +827,10 @@ export class DoorClient {
   // whether this door gives each entry's header (section 14): build 5 or later, which hello 03 says in its field 58
   canHeader() { return this.protocol >= 3 && !!this.hello && (this.hello.build ?? 0) >= 5; }
 
+  // the last start index this door's list takes: 191 from door build 8 (base 42), which counts up to 192 files; 63
+  // before it, which counts up to 64 and says the rest in the answer's second byte (beyond)
+  listLast() { return this.hello && (this.hello.build ?? 0) >= 8 ? 191 : 63; }
+
   async listPacks(folder = 0, flags = false, header = false) {
     if ((folder === 2 || flags) && this.protocol < 3) throw new DoorError("protocol", "the door speaks protocol " + this.protocol + ": it has no list of removals");
     if (header && !this.canHeader()) throw new DoorError("protocol", "the door on this unit gives no pack's header: it is older than build 5");
@@ -829,7 +846,7 @@ export class DoorClient {
         entries.push(...L.entries);
         if (L.count === 0 || L.first + L.count >= L.total) break;
         index = L.first + L.count;
-        if (index > 63) break;
+        if (index > this.listLast()) break;
       }
       if (!changed) return { total, beyond, entries };
       this.fault("the folder changed while it was listed; listing again from the start");
@@ -1120,7 +1137,7 @@ export class DoorClient {
       } else if (a.status === STATUS.applying) {
         result.applying = true;
       } else {
-        result.refused = commitRefusal(a.status, a.payload);
+        result.refused = commitRefusal(a.status, a.payload, this.limits.packsMost);
         return Object.assign(result, { ended: true, words: result.refused.words });
       }
     }
@@ -1225,6 +1242,9 @@ export class DoorClient {
     }
     if (!files.length && !remove.length) return stop("refused", "Nothing to change.");
     if (remove.length > (this.limits.maxRemovals ?? 32)) return stop("refused", "At most " + (this.limits.maxRemovals ?? 32) + " packs can come off in one go.");
+    // the door's waiting folder takes so many files for one change (hello's byte 56, 32 in every door so far): with a
+    // loader of 128 files a change can now want more, and the door would stop it halfway
+    if (files.length > (this.limits.maxWaiting ?? 32)) return stop("refused", "At most " + (this.limits.maxWaiting ?? 32) + " packs can go on in one go. Untick a few, send, and then send the rest.");
     // 2. what the unit holds now
     say("read", "Reading what's on your OP-1");
     const pk = await this.listPacks(0);

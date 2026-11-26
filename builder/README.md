@@ -16,7 +16,8 @@ One page that leads an owner through the install, the helpers that do the file w
 | `patch.mjs`, `ldr.mjs` | The builder: the open-field firmware file from the owner's own file |
 | `placement.mjs` | Where the bootloader's write lands, worked out from a listing of the unit's disk, and the size of the one extra file (the pad file) that makes it land |
 | `loader.json` | The manifest: what the builder does. It names the two places the builder changes, the loader's file it adds, and the SHA-256 the result must have. This one is the version the page offers by itself |
-| `loader-1.7.3-v1.bin` | The loader's file that manifest names: the loader, our small piece of code inside the firmware file, built from this repository. The packs, `base.pack` among them, are files on the unit and are not in it |
+| `loader-1.7.3-v2.bin` | The loader's file that manifest names: the loader N2, our small piece of code inside the firmware file, built from this repository. The packs, `base.pack` among them, are files on the unit and are not in it |
+| `loader-1.7.3-v1.json`, `loader-1.7.3-v1.bin` | The first version of the loader, N1, and its manifest, kept beside the second for the way back. It is built from the same sources and loads fewer pack files. The page offers it only to someone who asks for it by name |
 | `base.pack` | The base, the shared pack every feature needs, built from this repository. The page puts it on every unit it installs, with the new firmware file. The build holds it to `packs/built.json`, byte for byte |
 | `base-pack.json` | Its size and SHA-256, and its version and release: the page refuses a `base.pack` that is not this one |
 | `build-image.mjs` | The builder as a command, for those who prefer one |
@@ -65,16 +66,16 @@ A helper can be run whole without a unit: `-Source` (the `.ps1`) or `--source` (
 
 ## More than one version of the loader
 
-The loader's file has a version: `v1` today, the first for OS 1.7.3. A version that anyone may have installed keeps its bytes for good, so a changed loader is a new file under a new name, with a manifest of its own. A change to the base, `base.pack`, needs none of this: the base is a file on the unit, and a new one is copied there.
+The loader's file has a version. There are two for OS 1.7.3 today. `v2` is the one the page offers by itself. `v1` stands beside it as the way back: you get it with `?loader=1.7.3-v1` behind the page's address. A version that anyone may have installed keeps its bytes for good, so a changed loader is a new file under a new name, with a manifest of its own. A change to the base, `base.pack`, needs none of this: the base is a file on the unit, and a new one is copied there.
 
 | In this folder | What it is | Who gets it |
 | --- | --- | --- |
 | `loader.json` and the loader's file it names | The version the page offers by itself | Everyone who opens the page |
-| A manifest named after its version, such as `loader-1.7.3-v2.json`, and its loader's file | A version kept beside that one: a new one that waits for a try on a unit, or an older one | Someone who asks for it by name, with `?loader=1.7.3-v2` behind the page's address |
+| A manifest named after its version, such as `loader-1.7.3-v1.json`, and its loader's file | A version kept beside that one: a new one that waits for a try on a unit, or an older one | Someone who asks for it by name, with `?loader=1.7.3-v1` behind the page's address |
 
 The page shows a line beside the version it has loaded: `ran on a unit` with a date, or `not run on a unit yet`. That line comes from the manifest.
 
-`write-manifest.mjs` makes both files of a version. Its first lines are its manual, and [building](../docs/build.md) has the steps under "A change to the loader". A new version is written beside `loader.json`. Making it the one the page offers by itself is the maintainer's step, after a try on a unit.
+`write-manifest.mjs` makes both files of a version. For `v2`, the page's own, give it `--profile profiles/op1f-1.7.3-n2.json`, the profile of that loader's room. Without it, the tool takes the profile of `v1`. Its first lines are its manual, and [building](../docs/build.md) has the steps under "A change to the loader". A new version is written beside `loader.json`. Making it the one the page offers by itself is the maintainer's step, after a try on a unit.
 
 The two commands that take a manifest take a version's name too:
 

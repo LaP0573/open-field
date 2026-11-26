@@ -12,17 +12,18 @@
 //    not know is kept as it is.
 // 4. The base cannot be unticked.
 // 5. A pack another needs is ticked with it, and stays ticked while the other does.
-// 6. At most 32 pack files after the change, and a name the loader would not take is never offered.
+// 6. At most the door's most pack files after the change (hello's tail; 32, the loader N1's, when it says none), and a
+//    name the loader would not take is never offered.
 // 7. The plan: the removals, then the files to send with base.pack last (the unit moves it last as well).
 // 8. A pack file the owner picked on the computer (catalog.mjs's checkPickedFile) goes on as it is, under its pack's own
 //    name. It takes the place of the unit's file of that name, or of a file whose own header names the same pack, or of a
 //    listed pack of that name; the same file already on the unit is not sent again. The listed packs it needs are ticked
 //    with it (rule 5), and a pack it needs that nothing brings is a problem.
 
-import { checkName } from "./door.mjs";
+import { checkName, N1_LOADER } from "./door.mjs";
 import { fileName, withNeeds, neededBy, entryForFile } from "./catalog.mjs";
 
-export const MOST_PACKS = 32;
+export const MOST_PACKS = N1_LOADER.packsMost;     // the most pack files when the door does not say (the loader N1's 32)
 export const BASE = "base.pack";
 export const STATE = Object.freeze({ on: "on", update: "update", different: "different", absent: "absent", notListed: "not listed", leftOut: "left out" });
 export const ACTION = Object.freeze({ keep: "keep", add: "add", update: "update", remove: "remove", none: "none", picked: "picked" });
@@ -90,7 +91,53 @@ export function readRows({ listing, base, unit, known = new Map() }) {
     others.push({ key: k, kind: "other", name: f.name, entry: null, unit: f, state: f.isPack ? STATE.notListed : STATE.leftOut,
       unitVersion: knownAs ? knownAs.version : (f.headerVersion ?? null), knownId: knownAs ? knownAs.id : null, otherFirmware: otherFirmware(f) });
   }
-  return { base: baseRow, listed, others };
+  // rule 6's count: the most pack files the unit's door says its loader takes
+  const most = unit.hello && Number.isInteger(unit.hello.packsMost) && unit.hello.packsMost > 0 ? unit.hello.packsMost : MOST_PACKS;
+  return { base: baseRow, listed, others, packsMost: most };
+}
+
+// The line for a unit whose loader has less room than the one the page offers: its door says generation 1, or its base
+// is older than 40 and so says nothing of its loader (N2 came out with base 42 and the page installs them together: such
+// a unit is on N1), and the page's loader manifest is of generation 2 (it carries reserve.pack_room). null otherwise.
+// hello: door.mjs's parseHello. manifest: the page's loader.json (or the version asked for beside it).
+export function roomWords(hello, manifest) {
+  const f = roomFacts(hello, manifest);
+  return f && "This unit's loader has a room of " + f.mb + " MB for " + f.files + " pack files. Install again for " + f.offerMb + " MB and " + f.offerFiles + ".";
+}
+
+// The first base whose door says its loader (hello 04's tail).
+export const LOADER_SAYING_BASE = 40;
+
+// The numbers behind roomWords: { mb, files, offerMb, offerFiles }, or null when roomWords gives no line.
+function roomFacts(hello, manifest) {
+  const room = pageRoom(manifest);
+  if (!hello || !room) return null;
+  let generation, bytes, files;
+  if (hello.loaderSaid === true) ({ loaderGeneration: generation, packRoom: bytes, packsMost: files } = hello);
+  else if (Number.isInteger(hello.baseVersion) && hello.baseVersion < LOADER_SAYING_BASE)
+    ({ loaderGeneration: generation, packRoom: bytes, packsMost: files } = N1_LOADER);   // a base older than 40: N1
+  else return null;
+  if (generation !== 1 || (room.bytes <= bytes && room.files <= files)) return null;
+  const mb = (n) => Math.round(n / 1048576);
+  return { mb: mb(bytes), files, offerMb: mb(room.bytes), offerFiles: room.files };
+}
+
+// The page's loader manifest's room for packs (reserve.pack_room, the loader N2 and later), or null.
+function pageRoom(manifest) {
+  const room = manifest && manifest.reserve ? manifest.reserve.pack_room : null;
+  return room && Number.isFinite(room.bytes) && Number.isInteger(room.files) ? room : null;
+}
+
+// Whether the page leads with the new loader (the moment "loader", before a base update: the install puts the page's
+// base.pack on with the firmware file): exactly when roomWords has a line.
+export function loaderOffered(hello, manifest) {
+  return roomFacts(hello, manifest) !== null;
+}
+
+// The moment "loader"'s line, from the same numbers as roomWords; null when the loader is not offered.
+export function loaderLine(hello, manifest) {
+  const f = roomFacts(hello, manifest);
+  return f && "Install again to get it: room for " + f.offerFiles + " pack files and " + f.offerMb + " MB, and the new base with it. Your pack files stay where they are.";
 }
 
 // The ticks as the page starts: every file on the unit ticked, no update asked.
@@ -231,7 +278,8 @@ export function resolve(rows, choices, listing, base, picked = []) {
   const onUnit = [rows.base, ...rows.listed, ...rows.others].filter((r) => r.unit && r.unit.isPack).map((r) => r.unit.name.toLowerCase());
   const after = new Set(onUnit.filter((n) => !remove.some((x) => x.toLowerCase() === n)));
   for (const s of send) after.add(s.name.toLowerCase());
-  if (after.size > MOST_PACKS) problems.push("That would leave " + after.size + " packs on your OP-1, and it loads " + MOST_PACKS + " at most. Untick a few.");
+  const most = rows.packsMost ?? MOST_PACKS;
+  if (after.size > most) problems.push("That would leave " + after.size + " packs on your OP-1, and it loads " + most + " at most. Untick a few.");
   const isNew = (s) => s.kind === ACTION.add || (s.kind === ACTION.picked && !s.replaces);
   const counts = {
     added: send.filter(isNew).length,
