@@ -1,0 +1,25 @@
+{
+  "id": "pendulum",
+  "author": "Slow-Magic",
+  "status": "listed",
+  "categories": [
+    "sequencing"
+  ],
+  "description": "A sequencer that retriggers notes as their pendulums swing through the center.",
+  "repository": "https://github.com/slowmagic222/slowp1",
+  "commit": "555873e50d1a9e626ce8a4ef281a76697bd46087",
+  "path": "pendulum.pack",
+  "sha256": "86eea0bc0a3ba2a394eaa3ca2ed9d48d272fe29ab5902c6c08cc6a3069cd6e53",
+  "bytes": 26008,
+  "version": 9,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 5,
+  "folders": [
+    {
+      "name": "pendulum",
+      "place": "pendulum"
+    }
+  ]
+}
