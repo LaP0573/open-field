@@ -1,0 +1,25 @@
+{
+  "id": "ampig",
+  "author": "midnightops94",
+  "status": "listed",
+  "categories": [
+    "effects"
+  ],
+  "description": "Stereo amp drive with an animated combo cabinet, dynamic supply sag and selectable circuit and recovery.",
+  "repository": "https://github.com/midnightops94/open-field-midnight94",
+  "commit": "083486c8f7fdd142f93a2533e81e22a297b7f0d7",
+  "path": "packs/ampig.pack",
+  "sha256": "7546d16ff2a7439d72585f6f45bc078ec9e5de1fcf85fb93b2fb3024b962af7d",
+  "bytes": 156026,
+  "version": 11,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [],
+  "picture": {
+    "path": "thumbs/ampig.png",
+    "sha256": "371bc492e65c0127829bdb62d3562c6636c1360980b4c9bed169ab37c11a7764",
+    "bytes": 28950
+  }
+}
