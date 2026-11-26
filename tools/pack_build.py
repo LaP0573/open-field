@@ -2371,7 +2371,9 @@ def ask_tables_6(data, level, layered=None):
             continue
         head_bytes, name, flags, shown = KIND_HEAD.unpack_from(body, at)
         text = name.split(b"\0")[0].decode("latin-1")
-        words = struct.unpack_from("<4I", body, at + KIND_HEAD.size)
+        # the words behind the head, as many as the table holds (a memory table has two, and may end the body), 0 beyond
+        held = min(4, max(0, (size - KIND_HEAD.size) // 4))
+        words = struct.unpack_from("<%dI" % held, body, at + KIND_HEAD.size) + (0,) * (4 - held)
         functions, extra, wrong = {"shown": shown}, {}, None
         if kind == 3:
             extra = {"point": words[0], "cycles": words[1], "memory": words[2]}
