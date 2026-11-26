@@ -1,8 +1,8 @@
 {
   "about": "base.pack, the shared pack every other pack relies on, which the install page puts on the unit with the new firmware file. The page downloads the file beside this one and refuses it unless its size and SHA-256 are these. tools/build_all.py holds the file to the build and to packs/built.json, and this file to the file.",
   "file": "base.pack",
-  "bytes": 354897,
-  "sha256": "6f49c9a89d46a043d13d7b4503d18cade3f18f3b995d34eccd1de3fded1278a2",
+  "bytes": 364473,
+  "sha256": "4ad3132eb4a461de2a752e6cfe1d0add543c896b3bbead76d4cf4fd6a2aa2b57",
   "version": 39,
   "release": "0.21"
 }
