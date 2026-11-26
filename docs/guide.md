@@ -129,7 +129,7 @@ The loader in your firmware file decides how many pack files the unit reads. The
 
 N2 needs base 40 or later. The page puts base 42 on with it, so a unit installed from the page has a base that fits.
 
-**If your unit is already on N1**, you get N2 by doing the install again: build the firmware file on the page again and write it from the bootloader's menu, the same steps as [the first time](#the-install-once), with the same warnings. This write carries the same risk as the first one. Your pack files stay on the unit. When the install page is connected to a unit on N1, it tells you: "This unit's loader has a room of 2 MB for 32 pack files. Install again for 16 MB and 128."
+**If your unit is already on N1**, you get N2 by doing the install again: build the firmware file on the page again and write it from the bootloader's menu, the same steps as [the first time](#the-install-once), with the same warnings. This write carries the same risk as the first one. Your pack files stay on the unit. When you connect a unit on N1, the page tells you so at the top, "the new loader is out", with an "install again" button that opens these steps.
 
 **If the page refuses every change and you have more than 32 pack files**, your base is older than base 40, which counts to 32 whatever the loader. Open the disk mode and delete files in `packs` until 32 are left, or copy the new `base.pack` in there yourself. Switch the unit off and on, and the page works again.
 

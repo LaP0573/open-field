@@ -100,14 +100,44 @@ export function readRows({ listing, base, unit, known = new Map() }) {
 // nothing, which is N1) and the page's loader manifest is of generation 2 (it carries reserve.pack_room). null otherwise.
 // hello: door.mjs's parseHello. manifest: the page's loader.json (or the version asked for beside it).
 export function roomWords(hello, manifest) {
-  const room = manifest && manifest.reserve ? manifest.reserve.pack_room : null;
+  const f = roomFacts(hello, manifest);
+  return f && "This unit's loader has a room of " + f.mb + " MB for " + f.files + " pack files. Install again for " + f.offerMb + " MB and " + f.offerFiles + ".";
+}
+
+// The numbers behind roomWords: { mb, files, offerMb, offerFiles }, or null when roomWords gives no line.
+function roomFacts(hello, manifest) {
+  const room = pageRoom(manifest);
   // Only when the door says its loader is N1 (base 40 and later): an older base says nothing of the loader, and the
   // unit may already be on N2 under it, so no advice is given then.
-  if (!hello || hello.loaderSaid !== true || !room || !Number.isFinite(room.bytes) || !Number.isInteger(room.files)) return null;
+  if (!hello || hello.loaderSaid !== true || !room) return null;
   const generation = hello.loaderGeneration, bytes = hello.packRoom, files = hello.packsMost;
   if (generation !== 1 || (room.bytes <= bytes && room.files <= files)) return null;
   const mb = (n) => Math.round(n / 1048576);
-  return "This unit's loader has a room of " + mb(bytes) + " MB for " + files + " pack files. Install again for " + mb(room.bytes) + " MB and " + room.files + ".";
+  return { mb: mb(bytes), files, offerMb: mb(room.bytes), offerFiles: room.files };
+}
+
+// The page's loader manifest's room for packs (reserve.pack_room, the loader N2 and later), or null.
+function pageRoom(manifest) {
+  const room = manifest && manifest.reserve ? manifest.reserve.pack_room : null;
+  return room && Number.isFinite(room.bytes) && Number.isInteger(room.files) ? room : null;
+}
+
+// Whether the page leads with the new loader (the moment "loader"): exactly when roomWords has a line.
+export function loaderOffered(hello, manifest) {
+  return roomFacts(hello, manifest) !== null;
+}
+
+// The moment "loader"'s line, from the same numbers as roomWords; null when the loader is not offered.
+export function loaderLine(hello, manifest) {
+  const f = roomFacts(hello, manifest);
+  return f && "Your OP-1 has room for " + f.files + " pack files and " + f.mb + " MB. Install again for " + f.offerFiles + " and " + f.offerMb + " MB. Your pack files stay where they are.";
+}
+
+// The base update panel's extra line: a unit whose base is older than 40 can't say its loader, and it is on N1 (N2 needs
+// base 40); when the page offers a loader with a room for packs, the new base brings the offer of it.
+export const LOADER_SAYING_BASE = 40;
+export function loaderAfterUpdate(baseVersion, manifest) {
+  return Number.isInteger(baseVersion) && baseVersion < LOADER_SAYING_BASE && pageRoom(manifest) !== null;
 }
 
 // The ticks as the page starts: every file on the unit ticked, no update asked.

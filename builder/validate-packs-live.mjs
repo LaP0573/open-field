@@ -271,6 +271,20 @@ const row = (rows, key) => [rows.base, ...rows.listed, ...rows.others].find((r) 
   check("room: no manifest or no hello: no line", P.roomWords(n1Said, null) === null && P.roomWords(null, v2) === null);
   const v2b = { reserve: { pack_room: { base: "0x85000000", bytes: 33554432, files: 200 } } };
   check("room: the numbers come from the door and the manifest", P.roomWords({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "This unit's loader has a room of 3 MB for 40 pack files. Install again for 32 MB and 200.");
+  // the moment "loader": the page leads with the new loader exactly when roomWords has a line
+  check("loader: N1 said by the door, the page offers N2: offered", P.loaderOffered(n1Said, v2) === true);
+  check("loader: the unit on N2 already (generation 2): not offered", P.loaderOffered(n2, v2) === false);
+  check("loader: an older base (the loader not said): not offered", P.loaderOffered(n1Inferred, v2) === false && P.loaderOffered({ protocol: 3 }, v2) === false);
+  check("loader: the page offers N1 (no pack_room): not offered", P.loaderOffered(n1Said, v1) === false && P.loaderOffered(n1Said, null) === false && P.loaderOffered(null, v2) === false);
+  const PANEL = "Your OP-1 has room for 32 pack files and 2 MB. Install again for 128 and 16 MB. Your pack files stay where they are.";
+  check("loader: the panel's line", P.loaderLine(n1Said, v2) === PANEL, P.loaderLine(n1Said, v2));
+  check("loader: the panel's line from the door's and the manifest's numbers", P.loaderLine({ loaderSaid: true, loaderGeneration: 1, packsMost: 40, packRoom: 3 * 1048576 }, v2b) === "Your OP-1 has room for 40 pack files and 3 MB. Install again for 200 and 32 MB. Your pack files stay where they are.");
+  check("loader: no panel line when not offered", P.loaderLine(n2, v2) === null && P.loaderLine(n1Inferred, v2) === null && P.loaderLine(n1Said, v1) === null);
+  // the base update panel's extra line: a base older than 40 can't say its loader and is on N1
+  check("loader after update: base 39, the page offers N2: the line", P.loaderAfterUpdate(39, v2) === true);
+  check("loader after update: base 40 (it says its loader): no line", P.loaderAfterUpdate(40, v2) === false);
+  check("loader after update: the page offers N1 (no pack_room): no line", P.loaderAfterUpdate(39, v1) === false && P.loaderAfterUpdate(39, null) === false);
+  check("loader after update: no base version: no line", P.loaderAfterUpdate(null, v2) === false);
 }
 
 // ---------- 5. the plan's order, and the unit's files read from the door ----------
