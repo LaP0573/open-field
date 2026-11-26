@@ -78,7 +78,8 @@ extern "C" volatile unsigned op1f_sample_sd_passes OP1F_NAMED("op1f_sample_sd_pa
 extern "C" u8 op1f_sample_sd_room[] OP1F_NAMED("op1f_sample_sd_room");
 
 // ---- from the cards unit ----
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 // 1 when the nearest of the base's calls into packs around the caller is an input call of this card, for an event on
@@ -144,7 +145,7 @@ typedef void (*JobFn)(u32 slot, u32 clip);             // SD's room: stock's job
 
 static const char LOG_FILE[] = "../src/main/op1f_sample.cpp";
 
-enum { SLOTS = 8, NAME = OP1F_KIND_NAME, CARD_NAME = 16, CARDS = OP1F_CARDS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES };
+enum { SLOTS = 8, NAME = OP1F_KIND_NAME, CARD_NAME = 16, CARDS = OP1F_SLOTS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES };
 enum { FREE = 0, QUEUED = 1, RUNNING = 2, ENDED = 3 };
 enum { REFUSALS = 8, REFUSAL_LINES = 32, AGAIN_FRAMES = 256 };
 static const u32 TICKET_MOST = 0x7fffffffu;            // a ticket is answered as a positive int
@@ -202,10 +203,11 @@ static struct {
 // ---------------------------------------------------------------- small helpers
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -479,12 +481,14 @@ static void place_words(u32 place, const char** what, u32* number) {
 }
 
 static void card_name(u32 card, char* name) {
-    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards.count ? op1f_cards.slots[card].card : 0;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards_2.count ? op1f_cards_2.slots[card].card : 0;
     copy_name(name, c ? c->name : 0, (u32)CARD_NAME + 1u);
 }
 
 static void engine_name(u32 card, u32 ask, char* name) {
-    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards.count ? op1f_cards.slots[card].card : 0;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    const Op1fCard* c = card < (u32)CARDS && card < op1f_cards_2.count ? op1f_cards_2.slots[card].card : 0;
     const Op1fEngine* e = c ? engine_ask(c, ask) : 0;
     copy_name(name, e ? e->head.name : 0, (u32)NAME + 1u);
 }

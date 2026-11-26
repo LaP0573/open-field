@@ -1,10 +1,10 @@
 {
-  "about": "The base: the shared pack every other pack relies on, the file base.pack, which every unit with open-field needs. It holds the interface for packs by anyone, levels 1 to 10 of a pack's card (docs/base.md): words and pictures on the unit's screens, a page of its own, painting and text on it, folders and files, a sequencer, sound stages and working memory, values kept with the tapes and the sounds, effects and synth engines in the unit's own lists, and the value as a sound plays it; and, since base 32, a pack's own settings in the unit's settings list; and, since base 33, a page that keeps its picture from one frame to the next, so that a pack paints only what moved. Since base 34 it also shows the unit's own log files as a folder `logs` in the disk mode. Since base 35 a pack may lay an effect of its own over a sound's own one and offer a row of its own in a sound's list of LFOs, on synth and, since base 37, drum sounds (layers); since base 36 a page that keeps its picture may ask for only the parts that changed to be drawn again; since base 38 a pack paints nothing while the base's own top page is up, an effect switched off for its cost at a place gets another go when it is picked there again, and the runs of effects inside packs that no place runs any more make room for new ones; since base 39 a pack may have the unit put a cut lifted from the tape into the sample of a synth sound that plays one of the pack's own engines, kept over a restart as the unit keeps its sampler's, and read any sound's sample. Nothing in it is made for one pack: the four packs of open-field-packs use the same cards as anyone's. It also holds the door the install page talks to over USB MIDI. Its release, `release`, is what the start screen shows behind the words open-field. Not named on the start screen.",
+  "about": "The base: the shared pack every other pack relies on, the file base.pack, which every unit with open-field needs. It holds the interface for packs by anyone, levels 1 to 10 of a pack's card (docs/base.md): words and pictures on the unit's screens, a page of its own, painting and text on it, folders and files, a sequencer, sound stages and working memory, values kept with the tapes and the sounds, effects and synth engines in the unit's own lists, and the value as a sound plays it; and, since base 32, a pack's own settings in the unit's settings list; and, since base 33, a page that keeps its picture from one frame to the next, so that a pack paints only what moved. Since base 34 it also shows the unit's own log files as a folder `logs` in the disk mode. Since base 35 a pack may lay an effect of its own over a sound's own one and offer a row of its own in a sound's list of LFOs, on synth and, since base 37, drum sounds (layers); since base 36 a page that keeps its picture may ask for only the parts that changed to be drawn again; since base 38 a pack paints nothing while the base's own top page is up, an effect switched off for its cost at a place gets another go when it is picked there again, and the runs of effects inside packs that no place runs any more make room for new ones; since base 39 a pack may have the unit put a cut lifted from the tape into the sample of a synth sound that plays one of the pack's own engines, kept over a restart as the unit keeps its sampler's, and read any sound's sample; since base 40 the door reads its room and its most pack files from the loader's record when the loader offers one (op1f_loader_2), and the base offers a second, longer list of cards (op1f_cards_2), neither of which changes anything under today's loader; since base 41 a pack may ask for up to 32 MiB of working memory an ask and 64 asks in all, from the unit's spare memory first and then from its heap, and may name the mark op1f_memory_2 to be left out under an older base; since base 42 the base serves the cards of the second list, up to 128, when the loader fills it, and the first list's 32 as before under today's loader. Nothing in it is made for one pack: the four packs of open-field-packs use the same cards as anyone's. It also holds the door the install page talks to over USB MIDI. Its release, `release`, is what the start screen shows behind the words open-field. Not named on the start screen.",
   "name": "base",
-  "version": 39,
-  "release": "0.21",
+  "version": 42,
+  "release": "0.24",
   "interface": 3,
-  "build": "build_r17_base",
+  "build": "build_r20_base",
   "sources": [
     "module/m2_measure.s",
     "module/build_r2_measure.cpp",
@@ -46,6 +46,7 @@
     "module/build_r5_input.s",
     "module/build_m1_log.s",
     "module/build_m1_base_needs.s",
+    "module/build_r18_loader_2.s",
     "module/build_r6d_base_release.s",
     "module/build_r6d_base_table.s"
   ],
@@ -126,7 +127,9 @@
     "op1f_parts_1",
     "op1f_sample_drop",
     "op1f_sample_get",
-    "op1f_sample_1"
+    "op1f_sample_1",
+    "op1f_cards_2",
+    "op1f_memory_2"
   ],
   "pictures": [
     {

@@ -8,10 +8,49 @@
 
 #include "build_r3_card.h"
 
+// ---- R20 (base 42): the second list of cards, and a set of its slots, for every unit of the base ----
+
+// The loader N2 fills op1f_cards_2 beside op1f_cards: the same two words, then OP1F_SLOTS_MOST slots of three
+// (1,544 bytes). The base serves from it alone: under N1 the cards unit fills it from op1f_cards (op1f_cards_lists).
+// The public headers keep op1f_cards and its thirty-two (OP1F_CARDS_MOST): these names are the base's own, no pack's.
+enum { OP1F_SLOTS_MOST = 128, OP1F_SLOT_WORDS = OP1F_SLOTS_MOST / 32 };
+struct Op1fCards2 { unsigned count, more; Op1fCardSlot slots[OP1F_SLOTS_MOST]; };
+extern "C" Op1fCards2 op1f_cards_2 OP1F_NAMED("op1f_cards_2");
+
+// A set of slots of op1f_cards_2, a bit a slot (no heap; zeroed data or the stack). A slot at or past
+// OP1F_SLOTS_MOST is in no set: setting or clearing it does nothing.
+struct Op1fSlotSet { unsigned w[OP1F_SLOT_WORDS]; };
+static inline void op1f_slot_set(Op1fSlotSet* s, unsigned slot) {
+    if (slot < (unsigned)OP1F_SLOTS_MOST) s->w[slot >> 5] |= 1u << (slot & 31u);
+}
+static inline void op1f_slot_clear(Op1fSlotSet* s, unsigned slot) {
+    if (slot < (unsigned)OP1F_SLOTS_MOST) s->w[slot >> 5] &= ~(1u << (slot & 31u));
+}
+static inline int op1f_slot_test(const Op1fSlotSet* s, unsigned slot) {
+    return slot < (unsigned)OP1F_SLOTS_MOST && ((s->w[slot >> 5] >> (slot & 31u)) & 1u) != 0;
+}
+static inline int op1f_slot_any(const Op1fSlotSet* s) {
+    return (s->w[0] | s->w[1] | s->w[2] | s->w[3]) != 0;
+}
+static inline void op1f_slot_none(Op1fSlotSet* s) {
+    s->w[0] = s->w[1] = s->w[2] = s->w[3] = 0;
+}
+
+// Before a unit first reads op1f_cards_2: under N1 (the loader's word r18_loader_2_record 0) op1f_cards' count, more
+// and slots are copied into it, once, in one masked instant; under N2 nothing is done. From any thread; no line. Every
+// reader of op1f_cards_2 calls it first (or reads it only past op1f_cards_verdict, op1f_cards_slot or another name of
+// the cards unit's, which call it).
+extern "C" void op1f_cards_lists() OP1F_NAMED("op1f_cards_lists");
+
+// 1 when the base uses the card of a slot of op1f_cards_2 (the check made, the card in order), 0 otherwise; any slot,
+// up to OP1F_SLOTS_MOST. From any thread; no line. (op1f_cards_used answers the first thirty-two slots alone.)
+extern "C" int op1f_cards_in_use(unsigned slot) OP1F_NAMED("op1f_cards_in_use");
+
 // ---- from the cards unit (base 20's cards unit) ----
 
-// Whether the base uses the card of a slot of op1f_cards: 0 when it does, not 0 when it does not (no card there, or a
-// card that is not in order). It reads the slot and writes nothing, and says no line: from any thread.
+// Whether the base uses the card of a slot of op1f_cards_2 (R20; op1f_cards before base 42): 0 when it does, not 0
+// when it does not (no card there, or a card that is not in order). It calls op1f_cards_lists first (under N1 its
+// first call copies the first list into the second), writes nothing else, and says no line: from any thread.
 extern "C" int op1f_cards_verdict(unsigned slot) OP1F_NAMED("op1f_cards_verdict");
 
 // The calls the base makes into a pack outside its frame function. Each is recorded while it runs, so that a helper

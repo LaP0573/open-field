@@ -250,7 +250,7 @@ enum : u32 {
 enum {
     EFFECTS = OP1F_EFFECTS_MOST, VALUES = OP1F_EFFECT_VALUES_MOST, PLACES = 17, MASTER = OP1F_PLACE_MASTER, DRUM = OP1F_PLACE_DRUM,
     ID_FIRST = 15, NAME = OP1F_KIND_NAME, FIELD = 24, STOCK_COUNT = 11, TABLE_BYTES = 180, BLOCK_BYTES = 44, ENTRY_BYTES = 20,
-    RUN_BYTES = 36, FRAMES = 64, CARDS = OP1F_CARDS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, RACK_PLACES = OP1F_RACK_PLACES,
+    RUN_BYTES = 36, FRAMES = 64, CARDS = OP1F_SLOTS_MOST, CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, RACK_PLACES = OP1F_RACK_PLACES,
     RACKS = 64, ASIDES_KEPT = 16, RIDE_LINES = 32, PERIOD_FRAMES = 256, RECORD_BYTES = 52, SLOTS = 8, ROW_BYTES = 48, KNOB_BYTES = 6,
     KIND_INT = 1, KIND_UINT = 2, KIND_STRING = 4, KIND_ARRAY = 6, KIND_OBJECT = 7, KIND_AT = 4, MEMBER_ROOM = 96,
     NAMES_KIND_ENGINE = 0, NAMES_KIND_EFFECT = 2, STATE_ALIGN_LEAST = 4, CALL_SHOWN = OP1F_CALL_SHOWN
@@ -281,7 +281,8 @@ const u32 op1f_level_10 = 10;
 
 // ---- from the cards unit ----
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 // The card's slot + 1 while the base calls that card's frame function on the caller's stack, else 0.
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 
@@ -297,7 +298,7 @@ volatile unsigned op1f_stand_screens[2 * OP1F_STAND_ENTRIES];
 struct Effect {
     const Op1fEffect* table;
     u32 number;                                        // its place in the registry: its id less 15
-    u32 slot, ask;                                     // the card's slot in op1f_cards, the ask's number in its list
+    u32 slot, ask;                                     // the card's slot in op1f_cards_2, the ask's number in its list
     u32 type;                                          // the type of the unit's effect it stands on
     u32 ridden_id;                                     // that effect's row's id in the lists
     u32 flags, cycles, count, state_bytes, state_align;
@@ -527,11 +528,16 @@ static int rides_layer(u32 place) {
     return is_layer(riding(place));
 }
 
+// R20 (base 42): on the audio way (op1f_rack_run), so op1f_cards_lists is not called here before the count is read:
+// its first call takes a mask. A call that can succeed needs the effects registered (look_through, which has called
+// it) and a rack set by a pack's frame, both after the cards unit's check; before them the second list is zeroed data
+// under N1, the count 0, and the card is refused as base 41 refused it (OP1F_BAD_NAME). op1f_cards_verdict, called on
+// a match, calls op1f_cards_lists too, which by then is ready and takes no mask.
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -1113,10 +1119,11 @@ static u32 check(const Op1fAsk* ask, const Op1fCardSlot* slot, u32* a, u32* b) {
 
 // The asks of kind OP1F_ASK_EFFECT of the cards the base uses, in the list's order and each card's, held to their form.
 static void look_through() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;                                   // a card the base does not use
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 8u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
@@ -1224,7 +1231,7 @@ static void enrol(const void* list) {
         Op1fRackEntry* entry = &entries[n];
         entry->bytes = ENTRY_BYTES;
         entry->id = (u32)ID_FIRST + n;
-        entry->pack = op1f_cards.slots[e->slot].card->name;
+        entry->pack = op1f_cards_2.slots[e->slot].card->name;
         entry->effect = t;
         entry->rides = e->type;
         ++n;
@@ -1602,7 +1609,7 @@ static const char* aside_reason(const Aside* s) {
 static void first_frame() {
     for (u32 i = 0; i < aside_count; ++i) {
         const Aside* s = &asides[i];
-        const char* pack = op1f_cards.slots[s->slot].card->name;
+        const char* pack = op1f_cards_2.slots[s->slot].card->name;
         if (s->why == WHY_ORDER) op1f_log(2, LOG_FILE, 2, "effect: '%s' of '%s' is left aside: its table is not in order (%u, %u)", s->name, pack, s->a, s->b);
         else if (s->why == WHY_RIDES) op1f_log(2, LOG_FILE, 2, "effect: '%s' of '%s' is left aside: it stands on %s, which is not one an effect can stand on", s->name, pack, s->rides);
         else op1f_log(2, LOG_FILE, 2, "effect: '%s' of '%s' is left aside: %s", s->name, pack, aside_reason(s));
@@ -1612,7 +1619,7 @@ static void first_frame() {
     u32 n = op1f_effects_registered;
     for (u32 k = 0; k < n; ++k)
         op1f_log(3, LOG_FILE, 1, "effect: '%s' of '%s' stands on %s, entry %u of the lists, %u cycles a block declared", effects[k].name,
-                 op1f_cards.slots[effects[k].slot].card->name, is_layer(&effects[k]) ? "the unit's own effect, a layer" : effects[k].rides, (u32)ID_FIRST + k,
+                 op1f_cards_2.slots[effects[k].slot].card->name, is_layer(&effects[k]) ? "the unit's own effect, a layer" : effects[k].rides, (u32)ID_FIRST + k,
                  effects[k].cycles);
     if (n == 0) return;
     map_all();
@@ -2149,7 +2156,7 @@ enum { VALUED_KINDS = sizeof VALUED / sizeof VALUED[0] };
 
 // The row of the kind of the card's ask `ask`, or 0: the card has no such ask, or its kind has no values.
 static const Valued* valued(int slot, u32 ask) {
-    const Op1fCard* card = op1f_cards.slots[slot].card;
+    const Op1fCard* card = op1f_cards_2.slots[slot].card;
     if (card->bytes < (u32)CARD_4_BYTES || card->asks == 0 || ask >= card->ask_count || ask >= (u32)OP1F_ASKS_MOST) return 0;
     u32 kind = card->asks[ask].kind;
     for (u32 i = 0; i < (u32)VALUED_KINDS; ++i)
@@ -2326,7 +2333,7 @@ extern "C" void op1f_effects_frame() {
 
 // The kind of the card's ask `ask`, or 0 (the card's slot held already).
 static u32 ask_kind(int slot, u32 ask) {
-    const Op1fCard* card = op1f_cards.slots[slot].card;
+    const Op1fCard* card = op1f_cards_2.slots[slot].card;
     if (card->bytes < (u32)CARD_4_BYTES || card->asks == 0 || ask >= card->ask_count || ask >= (u32)OP1F_ASKS_MOST) return 0;
     return card->asks[ask].kind;
 }

@@ -1,4 +1,24 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// The door's build 8 (2026-11-26, step R20, base 42): `list` takes the start index 0 to 191 and lists up to
+// LIST_MOST, now 192 files (KEPT_MOST, the files user/pk may hold under the loader N2: its 128 packs and what else the
+// folder holds), out[0] up to 192 and out[1] the rest (beyond, at most 255). It reads up to RAW_ROOM names, and `order`
+// holds as many; `logs` and `abort 01` still stop at RAW_MOST, 96, and every answer's layout (the entries, the flags,
+// LIST_PAGE, the header, the removals) is build 7's. The same under both loaders. hello and the ready line say 8. The
+// cost: 384 bytes of zeroed data more (order, 96 words to 192).
+//
+// The door's build 7 (2026-11-25, step R18, base 40): the door
+// learns the room and the most pack files from the new loader N2's record when the loader offers it (the optional
+// name op1f_loader_2, read through the word of module/build_r18_loader_2.s), and under today's loader N1, which
+// offers none, it takes N1's numbers and answers every message as build 6 does but for the build in hello and in the
+// ready line. Once at its start (limits_take) the limits become values: the room's first address and bytes and the
+// most files (pack_base, pack_room, packs_most), used where build 6 used PACK_BASE, PACK_ROOM and PACKS_MOST: the
+// placing of a set (room_needed), the refusals for the count and the room, line 36, and the header's checks. A change
+// that does not raise the count of files is never refused for it, so a folder over its loader's most can still take
+// files off and take a new base.pack. KEPT_MOST 64 to 192, and kept_list's look at user/pk takes up to that many
+// names (RAW_ROOM; list, logs and abort 01 still stop at RAW_MOST, 96). hello 04 (and above) answers protocol 3's 68
+// bytes and a tail of 8: the loader's generation, the most files and the room's bytes (hello_payload says why the
+// tail never rides on hello 03). The protocol stays 3; hello 01, 02 and 03 answer as build 6's, field 58 says 7.
+//
 // The door's build 6 (2026-11-24, step R10, piece 14): two read-only commands for the firmware's own log files, the
 // folder logs/ at the top of the volume (door_protocol.md section 15). `0x2B logs` lists them newest first, eight a
 // message from an index; `0x2C logread` gives up to LOG_PIECE bytes of one from an offset, the file opened, placed, read
@@ -202,6 +222,8 @@ enum : u32 {
     // Build 4: where the loader places the packs, the room's first byte (build_m4_loader.cpp PACK_BASE: our own
     // reservation's first byte plus the loader's 64 KiB; 1.7.3's by the port's map), and the room's bytes (PACK_ROOM).
     // The door works out where the loader would place every pack of a set, as the loader does (commit_room).
+    // Build 7: these two (and PACKS_MOST) are the loader N1's, the values the door takes when no loader offers the
+    // record op1f_loader_2 (limits_take); after the door's start it uses pack_base, pack_room and packs_most.
     PACK_BASE = 0x8d2f4234u,
     PACK_ROOM = 0x001f0000u
 };
@@ -212,7 +234,7 @@ enum {
     RING_WORDS = 0x2000,
     RING_KEEP = 512,                    // words left for the firmware's own MIDI
 
-    PROTOCOL = 1, PROTOCOL_2 = 2, PROTOCOL_3 = 3, MARK = 1, DOOR_BUILD = 6,   // build 6 (R10): logs and logread; build 5 (S4a): the card, T-2, the note's window
+    PROTOCOL = 1, PROTOCOL_2 = 2, PROTOCOL_3 = 3, HELLO_TAIL = 4, MARK = 1, DOOR_BUILD = 8,   // build 8 (R20): list up to 192; build 7 (R18): the loader's record; build 6 (R10): logs and logread; build 5 (S4a): the card, T-2, the note's window
     START_SETTLE_MS = 4000,             // the start's window: no disk message taken until this long after its first frame was over
     TOTALS_MS = 300000,                 // the totals line's period: five minutes, through the quiet gate
     LONG_VISIT_MS = 60000,              // a visit that has gone on this long says so once
@@ -227,7 +249,9 @@ enum {
     START_REMOVALS = 4,                 // the start's emptying: removals a frame
     PAGE_REMOVALS = 3,                  // build 4: `abort 01`, removals a message (build 3 eight)
     REMOVALS_MOST = 32,                 // build 4: the removals that may be noted
-    HEADER3 = 96, PACK_ALIGN = 32, PACKS_MOST = 32, KEPT_MOST = 64, LIST_COUNTS = 6, ENTRY_BYTES = 20, ENTRIES_MOST = 4096,
+    // Build 7: PACKS_MOST is N1's most pack files (the record's word 4 in its place: packs_most); KEPT_MOST the files of
+    // user/pk the door keeps track of for an apply, N2's 128 and what else the folder holds (build 6: 64)
+    HEADER3 = 96, PACK_ALIGN = 32, PACKS_MOST = 32, KEPT_MOST = 192, LIST_COUNTS = 6, ENTRY_BYTES = 20, ENTRIES_MOST = 4096,
     NOTE_MOST = 24 + 40 * REMOVALS_MOST + 76 * WAITING_MOST + 4,  // the note's largest, 3,740 bytes
     NOTE_LEAST = 24 + 4, NOTE_FORMAT = 2,
     NOTE_HEAD = 24,                     // the review's N-3: the head carries the header sums of the base that wrote it and of the one it moves
@@ -241,7 +265,10 @@ enum {
     TAPE_HELD_MS = 10000,               // the tape moving this long during the second check stops the apply (outcome 8)
     START_NAMES = 32,                   // names taken from the folder at a time by the start's emptying
     SLICE = 16384,                      // a hash slice (build 2: 32,768 held main_task 23 ms on the unit)
-    LIST_PAGE = 8, LIST_MOST = 64, RAW_MOST = 96, RAW_NAME = 64, NAME_MOST = 39, NAME_LEAST = 6,
+    // Build 7: RAW_MOST stays the most names list, logs and abort 01 take of a folder; the apply's look at user/pk
+    // (kept_list) takes up to RAW_ROOM, KEPT_MOST, into the same table (build 6: RAW_MOST, 96, for both). Build 8: list
+    // takes up to RAW_ROOM too, and lists up to LIST_MOST, KEPT_MOST (build 7: 64); logs and abort 01 keep RAW_MOST
+    LIST_PAGE = 8, LIST_MOST = KEPT_MOST, RAW_MOST = 96, RAW_ROOM = KEPT_MOST, RAW_NAME = 64, NAME_MOST = 39, NAME_LEAST = 6,
     // Build 6 (section 15): logread's most bytes an answer, behind its head of 8 (the size, the offset). 2,056 bytes of
     // payload are 2,358 on the wire, 786 packets: with RING_KEEP's 512 that is 1,298 of the ring's 8,192 words, so the
     // answer's own check (answer) still leaves the firmware its share. A log's name is 8 to NAME_MOST characters, and
@@ -316,6 +343,38 @@ static const char BASE_NAME[] = "base";
 // Build 6: the firmware's log files, at the top of the volume (module/build_r10_logs.cpp's FOLDER and PREFIX), read only.
 static const char LOGS_FOLDER[] = "logs";               // listed without the slash, as the firmware's folder calls take it
 static const char LOGS_PREFIX[] = "logs/";
+
+// Build 7 (R18): the loader N2's record, through the word module/build_r18_loader_2.s holds: the address of the
+// optional name op1f_loader_2, 0 where no loader offers it (N1). The record's u32 words: [0] its bytes (24 for N2),
+// [1] the loader's generation (2), [2] the room's first address, [3] the room's bytes, [4] the most pack files the
+// loader looks at, [5] the most cards. Only the words its bytes cover are read; module/build_r6d_cards.cpp reads the
+// same word. No line of C++ names op1f_loader_2 itself: a strong name there would be one every loader must offer.
+extern "C" const u32* const r18_loader_2_record OP1F_NAMED("r18_loader_2_record");
+enum { RECORD_GENERATION = 1, RECORD_ROOM_FIRST = 2, RECORD_ROOM_BYTES = 3, RECORD_PACKS_MOST = 4 };
+
+// The limits the door judges a set by, taken once at the door's start (limits_take, from both entry points), before
+// any judgement: N1's numbers (PACK_BASE, PACK_ROOM, PACKS_MOST, generation 1) where the record is 0, else the
+// record's where its bytes cover them. The door mirrors the loader's checks with them and adds none.
+static u32 pack_base, pack_room, packs_most, loader_generation;
+static volatile u32 limits_taken;
+
+static void limits_take() {
+    if (limits_taken) return;
+    u32 first = PACK_BASE, room = PACK_ROOM, most = PACKS_MOST, generation = 1;
+    const u32* record = r18_loader_2_record;
+    if (record != 0) {
+        u32 bytes = record[0];
+        if (bytes >= 4u * (RECORD_GENERATION + 1)) generation = record[RECORD_GENERATION];
+        if (bytes >= 4u * (RECORD_ROOM_FIRST + 1)) first = record[RECORD_ROOM_FIRST];
+        if (bytes >= 4u * (RECORD_ROOM_BYTES + 1)) room = record[RECORD_ROOM_BYTES];
+        if (bytes >= 4u * (RECORD_PACKS_MOST + 1)) most = record[RECORD_PACKS_MOST];
+    }
+    pack_base = first;                                  // both threads may come here first: each writes the same values
+    pack_room = room;
+    packs_most = most;
+    loader_generation = generation;
+    limits_taken = 1;
+}
 
 // The mark of a base with the door (study section 11): no pack needs it today; a page or a pack of later steps can.
 extern "C" const u32 op1f_door_1 OP1F_NAMED("op1f_door_1");
@@ -685,8 +744,8 @@ static int header_takes(const u32* head, u32 size) {
 static int header_holds(const u32* head) {
     u32 align = head[H_ALIGN], body = head[H_BODY], lists = head[H_LISTS];
     int align_ok = align == 1 || align == 2 || align == 4 || align == 8 || align == 16 || align == (u32)PACK_ALIGN;
-    if ((head[H_LINK] & 3) != 0 || !align_ok || body == 0 || (body & 3) != 0 || body > (u32)PACK_ROOM || head[H_ZEROED] > (u32)PACK_ROOM ||
-        lists < 4u * LIST_COUNTS || (lists & 3) != 0 || lists > (u32)PACK_ROOM || head[H_EXTRA] > 0x40000000u ||
+    if ((head[H_LINK] & 3) != 0 || !align_ok || body == 0 || (body & 3) != 0 || body > pack_room || head[H_ZEROED] > pack_room ||
+        lists < 4u * LIST_COUNTS || (lists & 3) != 0 || lists > pack_room || head[H_EXTRA] > 0x40000000u ||
         head[H_COMPARE] == 0 || head[H_COMPARE] > body ||
         head[H_TABLE] < head[H_LINK] || head[H_TABLE_END] < head[H_TABLE] || head[H_TABLE_END] - head[H_LINK] > head[H_COMPARE] ||
         (head[H_TABLE] & 3) != 0 || head[H_TABLE_END] - head[H_TABLE] > (u32)ENTRIES_MOST * ENTRY_BYTES ||
@@ -956,9 +1015,9 @@ static DOOR_APART int pkin_remove(const char* name, int* answered, int* left) {
 
 // ---------------------------------------------------------------- list
 
-static char raw[RAW_MOST][RAW_NAME];
-static u32 raw_long[RAW_MOST];                          // the name was longer than RAW_NAME - 1 bytes
-static u32 order[RAW_MOST];
+static char raw[RAW_ROOM][RAW_NAME];                    // build 7: RAW_ROOM, kept_list's; build 8: list's too; logs and abort 01 stop at RAW_MOST
+static u32 raw_long[RAW_ROOM];                          // the name was longer than RAW_NAME - 1 bytes
+static u32 order[RAW_ROOM];                             // build 8: RAW_ROOM, list's (build 7: RAW_MOST); logs holds at most RAW_MOST
 
 static int before(const char* a, const char* b) {      // the order of the names: byte by byte, as the loader's
     while (*a && *a == *b) { ++a; ++b; }
@@ -1216,7 +1275,7 @@ static DOOR_APART u32 list_header(u32 at, const char* path, u32 flags, int size,
 
 static DOOR_APART u32 list(const u8* args, int count, u32* bytes) {
     *bytes = 0;
-    if ((count != 1 && count != 2 && count != 3) || args[0] > 63) return BAD;
+    if ((count != 1 && count != 2 && count != 3) || args[0] >= (u8)LIST_MOST) return BAD;   // build 8: 0 to 191 (build 7: 0 to 63)
     u32 folder_byte = count >= 2 ? args[1] : 0;
     if (folder_byte > 2 || (count == 3 && (args[2] == 0 || args[2] > 3))) return BAD;    // build 5: bit 1, the header (build 4: 01 only)
     u32 pkin = folder_byte == 1, removals = folder_byte == 2, more_bits = count == 3 && (args[2] & 1) != 0;
@@ -1237,7 +1296,7 @@ static DOOR_APART u32 list(const u8* args, int count, u32* bytes) {
             if (!entry) break;
             const char* name = entry + DIR_NAME_AT;
             if (name[0] == 0 || name[0] == '.') continue;
-            if (kept == RAW_MOST) {
+            if (kept == (u32)RAW_ROOM) {                // build 8: RAW_ROOM (build 7: RAW_MOST)
                 ++beyond;
                 continue;
             }
@@ -1523,7 +1582,12 @@ static u32 said_state() {
 }
 
 // hello's 44 bytes for protocol 1 (exactly build 2's, the base's version as this base has it); for `level` 2, protocol
-// 2's 60 with build 4's values; for 3, protocol 3's 68.
+// 2's 60 with build 4's values; for 3, protocol 3's 68. Build 7: for 4 (hello's one
+// byte 4 or more), protocol 3's 68 and a tail of 8, 76 bytes: [68] the loader's generation, [69] 0, [70..71] the most
+// pack files, [72..75] the room's bytes, as limits_take took them. The tail rides on hello 04 only, never on hello 03:
+// today's pages' parseHello (builder/door.mjs, and the PC's own copy of it) throw on any length but 44,
+// 60 and 68. A door before build 7 answers hello 04 with its plain 68 bytes (its test is >= 3), so a page that asks 04
+// and reads 68 bytes knows the loader N1's numbers: generation 1, 2,031,616 bytes, 32 files.
 static u32 hello_payload(u32 level) {
     u32 version = op1f_door_base_version;
     out[0] = (u8)(level >= 3 ? PROTOCOL_3 : level == 2 ? PROTOCOL_2 : PROTOCOL);
@@ -1557,7 +1621,14 @@ static u32 hello_payload(u32 level) {
     out[65] = (u8)apply.outcome;
     out[66] = 0;
     out[67] = 0;
-    return 68;
+    if (level < 4) return 68;
+    limits_take();
+    out[68] = (u8)loader_generation;
+    out[69] = 0;
+    out[70] = (u8)packs_most;
+    out[71] = (u8)(packs_most >> 8);
+    store32(out + 72, pack_room);
+    return 76;
 }
 
 // status's 36 bytes (protocol 1); for `level` 2, the transfer's block and its name (12.7); for 3, then the apply's
@@ -2237,7 +2308,7 @@ static u32 e_head(u32 e, u32 field) {
 static u32 room_needed(u32 s) {
     u32 n = kept_count + apply.moves_n;
     for (u32 i = 0; i < n; ++i) set_placed[i] = 0;
-    u32 next = PACK_BASE, end = PACK_BASE;
+    u32 next = pack_base, end = pack_base;            // build 7: the loader's room (limits_take)
     for (u32 oi = 0; oi < n; ++oi) {
         u32 i = set_order[oi];
         if (set_placed[i] || !e_there(i, s) || !e_takes(i)) continue;
@@ -2267,7 +2338,7 @@ static u32 room_needed(u32 s) {
             if (e_there(k, s) && e_takes(k) && same_name(e_pack(k), e_pack(best))) set_placed[k] = 1;
         }
     }
-    return end - PACK_BASE;
+    return end - pack_base;
 }
 
 // The pack names of user/pk after the first s changes.
@@ -2294,8 +2365,8 @@ static void kept_list() {
             if (!entry) break;
             const char* name = entry + DIR_NAME_AT;
             if (name[0] == 0 || name[0] == '.') continue;
-            if (names == RAW_MOST) {
-                kept_more = 1;                          // the review's N-3: entries the door cannot count
+            if (names == (u32)RAW_ROOM) {
+                kept_more = 1;                          // the review's N-3: entries the door cannot count (build 7: past 192)
                 continue;
             }
             u32 n = 0;
@@ -2580,8 +2651,10 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
         if (replaces) ++replaced_n;
         else ++new_n;
     }
-    u32 last = r + m, files = count_after(last);
-    if (files > (u32)PACKS_MOST) {
+    // Build 7: a change that does not raise the count of files is never refused for it: a folder
+    // already over the loader's most can still take files off and take a new base.pack.
+    u32 last = r + m, files = count_after(last), files_before = count_after(0);
+    if (files > packs_most && files > files_before) {
         apply_refuse(Q_COUNT, NO_ROOM, 6, "");
         out[0] = 6;
         out[1] = (u8)(files > 255 ? 255 : files);
@@ -2646,7 +2719,8 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
             if ((move_meets[j] >> b & 1) && s >= move_op[j]) return over ? base_too_large(b, bytes) : not_taken(8, apply.moves[j].name, bytes);
     }
     // The room at every point the apply can be cut at (the plan's 5.3): each state after one change more, as the
-    // loader places it. A state that holds more than 32 pack names (only while removals come first) is the unit's own.
+    // loader places it. A state that holds more than the loader's most pack names (only while removals come first) is
+    // the unit's own; build 7: but for one that holds no more than the folder held before the apply, which is judged.
     u32 total = kept_count + m, sorted = 0;
     for (u32 e = 0; e < total; ++e) {
         u32 at = sorted++;
@@ -2658,16 +2732,17 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
     }
     u32 needed = 0, after = 0;
     for (u32 s = 1; s <= last; ++s) {
-        if (count_after(s) > (u32)PACKS_MOST) continue;
+        u32 count_s = count_after(s);
+        if (count_s > packs_most && count_s > files_before) continue;
         u32 bytes_s = room_needed(s);
         if (bytes_s > needed) needed = bytes_s;
         if (s == last) after = bytes_s;
     }
-    if (needed > (u32)PACK_ROOM) {
+    if (needed > pack_room) {
         apply_refuse(Q_ROOM, NO_ROOM, 7, "");
         out[0] = 7;
         store32(out + 1, needed);
-        store32(out + 5, PACK_ROOM);
+        store32(out + 5, pack_room);
         *bytes = 9;
         return NO_ROOM;
     }
@@ -2702,7 +2777,7 @@ static DOOR_APART u32 commit_apply(u32 k, u32* bytes) {
     if (!change(IDLE, ASKS)) return ASKING;
     ++applies_total.asked;
     STOCK_LOG(3, LOG_FILE, 36, "door: an apply is asked%s: %u new, %u updated, %u removed, the base %s among them; %u bytes to check; after it %u pack files, %u of %u bytes of the room",
-              k ? " as a test (commit 02)" : "", new_n, replaced_n, r, apply.base ? "too" : "not", to_check, files, after, (u32)PACK_ROOM);
+              k ? " as a test (commit 02)" : "", new_n, replaced_n, r, apply.base ? "too" : "not", to_check, files, after, pack_room);
     out[0] = (u8)new_n;
     out[1] = (u8)replaced_n;
     out[2] = (u8)r;
@@ -2738,7 +2813,7 @@ static DOOR_APART void message(u32 buffer, int length) {
         // finish, 14; `hello` and `status` read words and make no file call, every other command does nothing at all.
         status = s == RESTARTS ? RESTARTING : BUSY_APPLYING;
         int b = one_byte(in, length);
-        if (command == CMD_HELLO) bytes = hello_payload(b >= PROTOCOL_3 ? 3u : b == PROTOCOL_2 ? 2u : 1u);
+        if (command == CMD_HELLO) bytes = hello_payload(b >= HELLO_TAIL ? 4u : b >= PROTOCOL_3 ? 3u : b == PROTOCOL_2 ? 2u : 1u);
         else if (command == CMD_STATUS) bytes = status_payload(b == PROTOCOL_3 ? 3u : b == PROTOCOL_2 ? 2u : 1u);
     } else if (command >= 0x40 || number >= 0x40) {
         status = BAD;
@@ -2767,7 +2842,7 @@ static DOOR_APART void message(u32 buffer, int length) {
         } else if (command == CMD_HELLO) {
             if (count == 1) {
                 status = status_now();
-                bytes = hello_payload(args_of[0] >= PROTOCOL_3 ? 3u : args_of[0] == PROTOCOL_2 ? 2u : 1u);
+                bytes = hello_payload(args_of[0] >= HELLO_TAIL ? 4u : args_of[0] >= PROTOCOL_3 ? 3u : args_of[0] == PROTOCOL_2 ? 2u : 1u);
             }
         } else if (command == CMD_STATUS) {
             if (count == 0 || (count == 1 && (args_of[0] == PROTOCOL_2 || args_of[0] == PROTOCOL_3))) {
@@ -2908,6 +2983,7 @@ static void tunnel_seen(u32 buffer, int length) {
 }
 
 extern "C" int op1f_door_sysex(u32 buffer, int length) {
+    limits_take();                                      // build 7: the loader's limits, before any judgement
     u32 s = state;
     int asking = s == ASKS || s == RESTARTS || s == APPLYING || s == UNFINISHED;   // the page is up: every other SysEx is dropped
     tunnel_seen(buffer, length);
@@ -4145,6 +4221,7 @@ static DOOR_APART void start_window(u32 ms) {
 // Once a frame, from the cards unit's frame call (base 18's cards unit), before the top page is placed.
 extern "C" void op1f_door_frame(u32 ms) OP1F_NAMED("op1f_door_frame");
 extern "C" void op1f_door_frame(u32 ms) {
+    limits_take();                                      // build 7: the loader's limits, before any judgement
     if (!start_settled) start_window(ms);
     if (!busy) {                                        // build 4: no file work while a message runs (4.3)
         if (!note_looked) start_note(ms);

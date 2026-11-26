@@ -135,7 +135,7 @@ typedef int (*RenameFn)(const char* from, const char* to);                   // 
 static const u32 DISK_OPEN = 0x84d25bccu;              // not 0 while the disk mode is open (mtp::init writes it, mtp::shutdown clears it)
 enum { ALL = 64, TEXT = OP1F_FOLDER_TEXT, NAME = OP1F_FILE_NAME, PATH = 64, FILES_MOST = 64, DIR_NAME_AT = 11, FS_FILE_BYTES = 0x40 };
 enum { FS_FILE_SLOTS = 12, FS_DELETE_SLOT = 7, FS_PATH_OWN = 8, FS_PATH_ROOM = 0x1c };
-enum { CARD_3_BYTES = OP1F_CARD_LEVEL_3_BYTES, MOST = OP1F_CARDS_MOST, LARGEST = 1 << 20, LINES_SAID = 16 };
+enum { CARD_3_BYTES = OP1F_CARD_LEVEL_3_BYTES, MOST = OP1F_SLOTS_MOST, LARGEST = 1 << 20, LINES_SAID = 16 };
 
 static const char LOG_FILE[] = "../src/main/op1f_folders.cpp";
 static const char ROOT[] = "user/pf/";                 // every pack's folders lie in it
@@ -153,8 +153,8 @@ static const char* const FIRMWARE_NAMES[] = { "synth", "drum", "tapes", "mixdown
 static const char LOADER_NAME[] = "packs";
 static const char LOGS_NAME[] = "logs";
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
-extern "C" u32 op1f_cards_used() OP1F_NAMED("op1f_cards_used");
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
 extern "C" int op1f_cards_slot(const Op1fCard* card) OP1F_NAMED("op1f_cards_slot");
 extern "C" u32 op1f_cards_calling() OP1F_NAMED("op1f_cards_calling");
 
@@ -265,7 +265,7 @@ static const char* refused(const Folder* f, u32 upto, const char** other, u32* k
     for (u32 j = 0; j < upto; ++j) {
         if (folders[j].kept && same_folded(f->place, folders[j].place)) {
             *kept = 0;
-            *other = op1f_cards.slots[folders[j].slot].card->name;
+            *other = op1f_cards_2.slots[folders[j].slot].card->name;
             return "NOT the pack's: its place is the place of an earlier folder, of";
         }
     }
@@ -276,7 +276,7 @@ static const char* refused(const Folder* f, u32 upto, const char** other, u32* k
     if (same_folded(f->name, LOGS_NAME)) return "NOT shown: the name is the base's";
     for (u32 j = 0; j < upto; ++j) {
         if (folders[j].shown && same_folded(f->name, folders[j].name)) {
-            *other = op1f_cards.slots[folders[j].slot].card->name;
+            *other = op1f_cards_2.slots[folders[j].slot].card->name;
             return "NOT shown: the name is an earlier folder's, of";
         }
     }
@@ -287,11 +287,12 @@ static const char* refused(const Folder* f, u32 upto, const char** other, u32* k
 extern "C" void op1f_folders_settle() OP1F_NAMED("op1f_folders_settle");
 extern "C" void op1f_folders_settle() {
     if (settled) return;
-    u32 used = op1f_cards_used(), seen = op1f_cards.count > (u32)MOST ? (u32)MOST : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)MOST ? (u32)MOST : op1f_cards_2.count;
     u32 cards = 0, shown = 0, hidden = 0, lost = 0, more = 0;
     for (u32 i = 0; i < seen; ++i) {
-        if (((used >> i) & 1u) == 0) continue;
-        const Op1fCard* card = op1f_cards.slots[i].card;
+        if (!op1f_cards_in_use(i)) continue;   // R20: any of the 128
+        const Op1fCard* card = op1f_cards_2.slots[i].card;
         u32 count = 0;
         const Op1fFolder* list = list_of(card, &count);
         if (list == 0 || count == 0) continue;                                       // most packs: no folder, nothing of the disk touched
@@ -356,7 +357,7 @@ static Folder* folder_of(const Op1fCard* card, u32 index, int* slot) {
 // ---------------------------------------------------------------- the files, for the packs
 
 static const char* pack_name(int slot) {
-    return op1f_cards.slots[slot].card->name;
+    return op1f_cards_2.slots[slot].card->name;
 }
 
 // May this pack's frame function work on this folder now? 0, or why not.

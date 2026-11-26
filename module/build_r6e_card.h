@@ -243,9 +243,9 @@
 //   call costs it at most, in the processor's cycles, and the base holds it to that: a stage whose calls go well over
 //   is switched off until the next start, and the sound then goes past it untouched.
 //
-//   Working memory. A pack asks for a block of memory, up to 16 MiB. The base takes it from the unit at its first
-//   frame, clears it to 0 over the frames that follow, and only then hands it over; it is never given back while the
-//   unit runs. Where it cannot be had, the base says so on the log by the pack's name, and the pack runs without it.
+//   Working memory. A pack asks for a block of memory, up to 32 MiB from base 41 (16 MiB before). The base takes it
+//   at its first frame, from the unit's spare memory first and then from its heap, clears it to 0 over the frames that
+//   follow, and only then hands it over; it is never given back while the unit runs. Where it cannot be had, the base says so on the log by the pack's name, and the pack runs without it.
 //   A stage may wait for a memory of its own card: it is not called before that memory is handed over, and never
 //   when it was refused.
 //
@@ -765,12 +765,18 @@ struct Op1fStage {
     void (*process)(const Op1fBlock* now);            // +40
 };   // 44 bytes at level 6
 
-// Level 6: working memory.
-//   OP1F_MEMORY_MOST        the most one ask may have, and all asks together
-//   OP1F_MEMORY_KEPT        what the unit keeps free: an ask after which less would stay free is refused
+// Level 6: working memory. From base 41 the base hands out the unit's spare memory first, and the unit's heap only for
+// an ask that no longer fits there; a base before 41 gave 16 MiB for one ask and for all asks together, all from the
+// heap, and 16 asks (a pack that counts on more names the mark op1f_memory_2).
+//   OP1F_MEMORY_MOST        the most one ask may have (before base 41: 16 MiB, for one ask and all asks together)
+//   OP1F_MEMORY_SPARE       base 41: the unit's spare memory in bytes, 95.75 MiB that the base hands out first for packs' working memory
+//   OP1F_MEMORY_HEAP_MOST   base 41: the most all asks together take from the heap
+//   OP1F_MEMORY_KEPT        what the unit keeps free of its heap: an ask after which less would stay free there is
+//                           refused
 //   OP1F_MEMORY_ALIGN_MOST  the most an ask's alignment may be
-//   OP1F_MEMORIES_MOST      how many asks of this kind the packs may make in all
-enum { OP1F_MEMORY_MOST = 16 << 20, OP1F_MEMORY_KEPT = 8 << 20, OP1F_MEMORY_ALIGN_MOST = 4096, OP1F_MEMORIES_MOST = 16 };
+//   OP1F_MEMORIES_MOST      how many asks of this kind the packs may make in all (before base 41: 16)
+enum { OP1F_MEMORY_MOST = 32 << 20, OP1F_MEMORY_KEPT = 8 << 20, OP1F_MEMORY_ALIGN_MOST = 4096, OP1F_MEMORIES_MOST = 64,
+       OP1F_MEMORY_SPARE = 100401152, OP1F_MEMORY_HEAP_MOST = 16 << 20 };
 
 // Working memory: what its ask points at. The head's `flags` is 0.
 //   bytes  1 to OP1F_MEMORY_MOST

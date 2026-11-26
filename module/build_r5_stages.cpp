@@ -101,8 +101,9 @@ static inline u32 cycles_now() {
 
 // ---- from the cards unit, and from the memory unit (base 24's memory unit) ----
 
-extern "C" Op1fCards op1f_cards OP1F_NAMED("op1f_cards");
-// 0 when the base uses the card of a slot of op1f_cards, not 0 when it does not. From any thread; no line.
+// R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
+// read past op1f_cards_lists (or a name of the cards unit's that calls it).
+// 0 when the base uses the card of a slot of op1f_cards_2, not 0 when it does not. From any thread; no line.
 extern "C" int op1f_cards_verdict(unsigned slot) OP1F_NAMED("op1f_cards_verdict");
 // What became of the memory a card's ask asked for: 1 handed over, 0 not yet (or the memory unit has not looked at
 // the asks yet), -1 never (refused, left aside, or no such ask). From any thread; no line.
@@ -117,7 +118,7 @@ static const u32 INSTRUMENT_RIGHT = 0x11902ca0u;
 static const u32 MASTER_LEFT = 0x119027a0u;            // the master's two, before and after its effect
 static const u32 MASTER_RIGHT = 0x119028a0u;
 
-enum { MOST = OP1F_STAGES_MOST, PLACES = 4, CARDS = OP1F_CARDS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 44, BLOCK_BYTES = 36,
+enum { MOST = OP1F_STAGES_MOST, PLACES = 4, CARDS = OP1F_SLOTS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 44, BLOCK_BYTES = 36,
        CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, FRAMES = 64, CYCLES_MOST = OP1F_STAGE_CYCLES_MOST, CYCLES_ALL = OP1F_STAGE_CYCLES_ALL,
        PERIOD_FRAMES = 256 };
 static const u32 CYCLES_OFF = (u32)OP1F_STAGE_CYCLES_OFF, OVER_CALLS = (u32)OP1F_STAGE_OVER_CALLS, SPARE = (u32)OP1F_STAGE_CYCLES_SPARE;
@@ -131,7 +132,7 @@ enum { RUNNING = 1, WAITING = 2, OFF = 3, ASIDE = 4 };
 
 struct Stage {
     void (*process)(const Op1fBlock* now);
-    u32 slot, ask;                                     // the card's slot in op1f_cards, the ask's number in its list
+    u32 slot, ask;                                     // the card's slot in op1f_cards_2, the ask's number in its list
     u32 point, cycles, listens;
     u32 memory;                                        // the memory ask's number + 1, 0 for none
     volatile u32 state;
@@ -239,10 +240,11 @@ extern "C" void op1f_stages_run(u32 place) {
 // ---------------------------------------------------------------- the helper, from any thread
 
 static int slot_of(const Op1fCard* card) {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     if (card == 0) return -1;
     for (u32 i = 0; i < seen; ++i)
-        if (op1f_cards.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
+        if (op1f_cards_2.slots[i].card == card) return op1f_cards_verdict(i) == 0 ? (int)i : -1;
     return -1;
 }
 
@@ -328,11 +330,12 @@ static int refused(const Op1fAsk* ask, const Op1fCard* card, const Op1fCardSlot*
 }
 
 static void enrol() {
-    u32 seen = op1f_cards.count > (u32)CARDS ? (u32)CARDS : op1f_cards.count;
+    op1f_cards_lists();                                                             // R20 (base 42)
+    u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
     u32 n = 0, declared = 0;
     for (u32 i = 0; i < seen; ++i) {
         if (op1f_cards_verdict(i) != 0) continue;                                   // a card the base does not use
-        const Op1fCardSlot* slot = &op1f_cards.slots[i];
+        const Op1fCardSlot* slot = &op1f_cards_2.slots[i];
         const Op1fCard* card = slot->card;
         if (card->bytes < (u32)CARD_4_BYTES || card->level < 6u || card->asks == 0) continue;
         u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
@@ -415,7 +418,7 @@ static u32 divided(u32 n, u32 d) {
 }
 
 static const char* pack_name(u32 slot) {
-    return op1f_cards.slots[slot].card->name;
+    return op1f_cards_2.slots[slot].card->name;
 }
 
 extern "C" void op1f_stages_frame() OP1F_NAMED("op1f_stages_frame");

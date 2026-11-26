@@ -149,7 +149,7 @@ Since R4 (module/build_r4_card.h) a card may be of level 6 or 7: a card of level
 Level 6 adds three, level 7 one more (each table begins with level 5's head, its `shown` 0):
   {"kind": "stage", "name": ..., "point": "instrument", "master_in" or "master_out", "cycles": 1 to 116000,
    "listens": false, "memory": the name of a memory ask of the card or null, "process": a function's symbol}
-  {"kind": "memory", "name": ..., "bytes": 1 to 16 MiB, "align": a power of two from 4 to 4096 (4 if left out)}
+  {"kind": "memory", "name": ..., "bytes": 1 to 32 MiB (16 MiB before R19, base 41), "align": a power of two from 4 to 4096 (4 if left out)}
   {"kind": "places", "name": ..., "names": [the names of the unit's own pictures this pack's pictures take the place of]}
   {"kind": "keeps", "name": ..., "changed": a function's symbol or null,
    "keys": [{"name": 1 to 31 characters of a-z, 0-9 and '_', "files": ["synth", "drum", "tape"], some of them}]}   (level 7)
@@ -161,7 +161,8 @@ keys of 36 bytes, a name in 32 and its files: 1 synth, 2 drum, 4 tape; the keys 
 card names op1f_level_6 or op1f_level_7. What a base would leave aside is refused: a kind of a later level, a key such
 an ask has not, a point or a cost or a size or an alignment out of range, a stage that names no memory ask of its card,
 more than sixteen stages or memory asks, stages whose costs come to more than 174000 cycles a block (a stage at the
-instrument counted twice: it is called for the synth and for the drum), memory asks of more than 16 MiB together, two
+instrument counted twice: it is called for the synth and for the drum), memory asks of more than 117,178,368 bytes
+together (since R19, base 41: its 95.75 MiB of spare memory and the 16 MiB it takes of the heap; 16 MiB before), two
 asks of places or of keeps, a name of a picture that is not plain or does not end in .svg, a name twice, a key named
 twice or with no file, and (since R4b, base.pack 26, the first base of level 7) a key that is a name the unit's own
 preset, slots or tape files hold at their top (name, type, fx_type, mixer_params, original_folder and the rest of
@@ -347,7 +348,13 @@ STAGE_POINTS = {"instrument": 1, "master_in": 2, "master_out": 3}
 STAGE_POINT_WORDS = {1: "the synth and the drum after their effects", 2: "the master before its effect", 3: "the master after its effect"}
 STAGE_LISTENS = 1                                                # a stage's flag
 STAGE_CYCLES_MOST, STAGE_CYCLES_ALL, STAGES_MOST = 116000, 174000, 16
-MEMORY_MOST, MEMORY_ALIGN_MOST, MEMORIES_MOST = 16 << 20, 4096, 16
+MEMORY_ALIGN_MOST, MEMORIES_MOST = 4096, 16
+# since R19 (base 41): one ask may have 32 MiB (16 MiB before), and a card's asks together the base's spare memory
+# (95.75 MiB, handed out first) and the 16 MiB it takes of the heap at most. A card holds sixteen asks: the count
+# stays that (base 41 takes 64 memory asks of all packs together).
+MEMORY_MOST = 32 << 20
+MEMORY_SPARE, MEMORY_HEAP_MOST = 100401152, 16 << 20                 # 95.75 MiB; the heap's part
+MEMORY_ALL_MOST = MEMORY_SPARE + MEMORY_HEAP_MOST                    # 117,178,368 bytes
 PLACES_MOST, PLACE_NAME = 256, 24
 KEEP_FILES = {"synth": 1, "drum": 2, "tape": 4}
 KEEP_WORDS = {1: "synth sounds", 2: "drum sounds", 4: "tapes"}
@@ -499,13 +506,35 @@ def guards_sources():
     return os.path.isdir(os.path.join(ROOT, "ports"))
 
 
+def profile_window(profile, key):
+    """A window a profile names (`pack_link`, `pack_room`): (first address, bytes). Taken as an object with the first
+    address under `base` (as the N2 profiles name it; or `address`, `first`, `start`) and the count under `bytes` (or `size`), or as a pair [address,
+    bytes]; each a number or a text ("0x8d2f4234", "0x1f0000", "2031616")."""
+    value = profile[key]
+    if isinstance(value, dict):
+        first = next((value[k] for k in ("base", "address", "first", "start") if k in value), None)
+        count = next((value[k] for k in ("bytes", "size") if k in value), None)
+    elif isinstance(value, (list, tuple)) and len(value) == 2:
+        first, count = value
+    else:
+        first = count = None
+    if first is None or count is None:
+        raise ValueError("The profile %s names %s without a first address and a byte count: %r" % (profile.get("id"), key, value))
+    first, count = (int(v, 0) if isinstance(v, str) else int(v) for v in (first, count))
+    if first % 4 or count <= 0:
+        raise ValueError("The profile %s names %s at 0x%08x, %d bytes: not a window" % (profile.get("id"), key, first, count))
+    return first, count
+
+
 def use_profile(profile):
     """Since the port to 1.7.3 (2026-11-19): the room of the profile's own reservation. The loader stands at the
     reservation's first byte (`module_base`) and the room behind its 64 KiB, to the reservation's end; the pack's
     linker script is linker/<the profile's id>-pack.ld, or where there is none linker/op1f-<its firmware_version>-pack.ld,
     which must name that room. For 1.7.0's profile every value is the
     one above, so nothing changes (whatever the profile is called); for another reservation ROOM_START, ROOM_BYTES,
-    LOADER_ADDRESS, PACK_SCRIPT and SCRIPT_ORIGIN are set for the rest of the run."""
+    LOADER_ADDRESS, PACK_SCRIPT and SCRIPT_ORIGIN are set for the rest of the run. Since the loader N2 (2026-11-25) a
+    profile may name its link window apart, `pack_link` (profile_window): its reservation is then the loader's own
+    block and the window is taken from the key; a profile without it derives the window as above. No profile needs it."""
     global ROOM_START, ROOM_BYTES, LOADER_ADDRESS, PACK_SCRIPT, SCRIPT_ORIGIN
     if "module_base" not in profile or "reserved_bytes" not in profile:
         # a profile that names no reservation (the public tree's example of trampolines): 1.7.0's room, said aloud, and
@@ -516,7 +545,12 @@ def use_profile(profile):
                          % (profile.get("id"), ROOM_START, os.path.relpath(PACK_SCRIPT, ROOT).replace("\\", "/")))
         return
     base, reserved = int(profile["module_base"], 16), int(profile["reserved_bytes"])
-    room, size = base + 0x10000, reserved - 0x10000
+    if "pack_link" in profile:
+        # since the loader N2: its profile's reservation is the loader's own
+        # block, and the link window is named apart; a profile without the key derives the window as before
+        room, size = profile_window(profile, "pack_link")
+    else:
+        room, size = base + 0x10000, reserved - 0x10000
     if (room, size, base) == (ROOM_START, ROOM_BYTES, LOADER_ADDRESS):
         return
     script = os.path.join(ROOT, "linker", "%s-pack.ld" % profile["id"])
@@ -858,19 +892,21 @@ def wanted_names(objects):
     return sorted(strong - defined), sorted(weak - strong - defined)
 
 
-def link3(objects, origin, out_base, needed, addresses=None, keep=True, cwd=ROOT):
+def link3(objects, origin, out_base, needed, addresses=None, keep=True, cwd=ROOT, room=None):
     """Link a pack's objects for `origin` into <out_base>.elf and .bin, with the linker's records kept (`keep`).
     Every needed name of another pack gets an address: its real one from `addresses`, or the origin as a
     placeholder a direct call can reach. An optional name gets its real address when `addresses` has one, and is
-    left to the linker otherwise, which puts zero. Answers the linked file and the binary's bytes."""
+    left to the linker otherwise, which puts zero. `room` (first address, bytes): the room the origin lies in, the
+    link window by default (another for the loader N2's room, n2_room). Answers the linked file and the binary's bytes."""
+    room_start, room_bytes = room or (ROOM_START, ROOM_BYTES)
     with open(PACK_SCRIPT, encoding="utf-8") as f:
         script = f.read()
     if SCRIPT_ORIGIN not in script:
         raise ValueError("The pack's linker script does not name the room as expected")
-    if origin % 4 or not ROOM_START <= origin < ROOM_START + ROOM_BYTES:
+    if origin % 4 or not room_start <= origin < room_start + room_bytes:
         raise ValueError("A pack is linked for an aligned address inside the room")
     with open(out_base + ".ld", "w", encoding="utf-8", newline="\n") as f:
-        f.write(script.replace(SCRIPT_ORIGIN, "ORIGIN = 0x%08x, LENGTH = 0x%x" % (origin, ROOM_BYTES - (origin - ROOM_START))))
+        f.write(script.replace(SCRIPT_ORIGIN, "ORIGIN = 0x%08x, LENGTH = 0x%x" % (origin, room_bytes - (origin - room_start))))
     command = [toolchain("bfin-elf-ld")] + (["-q"] if keep else []) + ["--unresolved-symbols=ignore-all", "-T", out_base + ".ld",
                                                                       "-Map=" + out_base + ".map", "-o", out_base + ".elf"]
     addresses = dict(addresses or {})
@@ -1007,16 +1043,32 @@ def objects_are(build, objects, out_dir=None):
         return json.load(f) == objects_manifest(objects)
 
 
-def places_of(packs):
+def n2_room(profile, loader_elf):
+    """What the PC's model needs to place packs as the loader N2 does: its
+    room, from the profile's `pack_room` (first address, bytes), and the address of its record, the answer for
+    op1f_loader_2, the symbol op1f_loader_record of N2's linked loader file. Answers (room, the record's address)."""
+    with open(loader_elf, "rb") as f:
+        found = [s["value"] for s in Elf(f.read()).symbols() if s["name"] == LOADER_2_NAME_RECORD and s["shndx"]]
+    if len(found) != 1:
+        raise ValueError("%s holds no one %s: not the loader N2's link" % (loader_elf, LOADER_2_NAME_RECORD))
+    return profile_window(profile, "pack_room"), found[0]
+
+
+LOADER_2_NAME, LOADER_2_NAME_RECORD = "op1f_loader_2", "op1f_loader_record"   # N2's second mark, and the symbol of the record it answers with
+
+
+def places_of(packs, room=None):
     """Where the base places packs of the new kind, given as the files' bytes in the order of their files' names:
     each at the next address a multiple of 32 from where it was linked, behind the pack before it, which takes its
-    body and the larger of its lists and its zeroed data (module/build_j5c_base.cpp: load3, run_new)."""
-    out, behind = [], ROOM_START
+    body and the larger of its lists and its zeroed data (module/build_j5c_base.cpp: load3, run_new). `room`: (first
+    address, bytes), the room of the loader N2 (n2_room); N1's, the link window, by default."""
+    room_start, room_bytes = room or (ROOM_START, ROOM_BYTES)
+    out, behind = [], room_start
     for data in packs:
         fields = parse(data)[0]
         place = behind + ((fields["load_address"] - behind) & (PACK_ALIGN - 1))
         foot = fields["body_bytes"] + max(fields["lists_bytes"], fields["bss_bytes"])
-        if place + foot > ROOM_START + ROOM_BYTES:
+        if place + foot > room_start + room_bytes:
             raise ValueError("No room is left for '%s' at 0x%08x" % (fields["name"], place))
         out.append(place)
         behind = place + ((foot + 3) & ~3)
@@ -1346,9 +1398,11 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card's stages would take %d cycles a block (a stage at the instrument counted twice, for the synth and the drum): "
                          "the base takes %d in all and leaves the later aside" % (cycles, STAGE_CYCLES_ALL))
     if len(memories) > MEMORIES_MOST:
-        raise ValueError("The card asks for memory %d times: the base takes %d such asks in all and leaves the next aside" % (len(memories), MEMORIES_MOST))
-    if sum(ask[4]["bytes"] for ask in out if ask[0] == 4) > MEMORY_MOST:
-        raise ValueError("The card's memory asks come to more than 16 MiB together: the base gives %d bytes in all and refuses the later" % MEMORY_MOST)
+        raise ValueError("The card asks for memory %d times: a card holds %d asks, and the base leaves the next aside" % (len(memories), MEMORIES_MOST))
+    asked = sum(ask[4]["bytes"] for ask in out if ask[0] == 4)
+    if asked > MEMORY_ALL_MOST:                             # since R19 (base 41): the spare memory and the heap's 16 MiB
+        raise ValueError("The card's memory asks come to %d bytes together, more than %d: the base gives %d bytes of its spare memory and "
+                         "%d of the heap in all, and refuses the later" % (asked, MEMORY_ALL_MOST, MEMORY_SPARE, MEMORY_HEAP_MOST))
     places_together(out)                                    # since R6h: a firm one, then one that gives way
     for what in (6, OPTIONS):                               # since R8 (base 32): the options too
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
@@ -1433,7 +1487,7 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
         extra = {"point": STAGE_POINTS[ask["point"]], "cycles": ask["cycles"], "memory": memory}
     elif what == 4:
         if not whole(ask.get("bytes"), 1, MEMORY_MOST):
-            raise ValueError("%s: its bytes are not between 1 and %d (16 MiB), %r; the base refuses it" % (said, MEMORY_MOST, ask.get("bytes")))
+            raise ValueError("%s: its bytes are not between 1 and %d (%d MiB), %r; the base refuses it" % (said, MEMORY_MOST, MEMORY_MOST >> 20, ask.get("bytes")))
         align = ask.get("align", 4)
         if not whole(align, 4, MEMORY_ALIGN_MOST) or align & (align - 1):
             raise ValueError("%s: its alignment is a power of two from 4 to %d, not %r; the base leaves it aside" % (said, MEMORY_ALIGN_MOST, align))
@@ -2319,7 +2373,8 @@ def ask_tables_6(data, level, layered=None):
             continue
         head_bytes, name, flags, shown = KIND_HEAD.unpack_from(body, at)
         text = name.split(b"\0")[0].decode("latin-1")
-        words = struct.unpack_from("<4I", body, at + KIND_HEAD.size)
+        # the four words behind the head, as far as the table holds them (since R19: a memory table, two words, may end the body)
+        words = struct.unpack("<4I", (bytes(body[at + KIND_HEAD.size:at + size]) + bytes(16))[:16])
         functions, extra, wrong = {"shown": shown}, {}, None
         if kind == 3:
             extra = {"point": words[0], "cycles": words[1], "memory": words[2]}
@@ -3075,7 +3130,23 @@ def from_root(path):
     return os.path.relpath(path, ROOT).replace("\\", "/") if inside else path
 
 
-def placed(recipes, folder, out_dir=None, listing=True, log=print, objects_dir=None, set_name=None, inside=None):
+def offered_names(parsed, places, loader_2=None):
+    """{name: address} that the loader hands packs placed at `places` (their parse()s in `parsed`): its own mark
+    op1f_loader_1, under N2 (`loader_2`, its record's address, n2_room) op1f_loader_2 too, then each pack's exports,
+    the first that offers a name keeping it. A pack that offers a name of the loader's family is refused."""
+    offered = {LOADER_NAME: LOADER_ADDRESS}                 # since M1 the loader answers for its own name, before it looks at the packs
+    if loader_2 is not None:
+        offered[LOADER_2_NAME] = loader_2                   # N2's second mark: the address of its record
+    for (fields, _body), place in zip(parsed, places):
+        for name, offset in fields["lists"]["exports"]:
+            if name.startswith(LOADER_FAMILY):
+                raise ValueError("'%s' offers the name %s, and the loader keeps every name that begins %s to itself: it leaves such a pack out"
+                                 % (fields["name"], name, LOADER_FAMILY))
+            offered.setdefault(name, place + offset)        # the first that offers a name: the base leaves a second one out
+    return offered
+
+
+def placed(recipes, folder, out_dir=None, listing=True, log=print, objects_dir=None, set_name=None, inside=None, room=None, loader_2=None):
     """The pack files of `folder` that these recipes built, as the base places them when they run together: for each
     the linker's own link for its place, with the other packs' names at their real addresses, written as
     <build>_placed.elf, .bin, .map and .ld (and .dis.txt, its listing) into the build folder. That link is what stands
@@ -3086,11 +3157,12 @@ def placed(recipes, folder, out_dir=None, listing=True, log=print, objects_dir=N
     file's path has it written by the base into its body: the sum that is printed, the one the base logs, is taken
     with the path of the file under its built name. `inside` is (its recipe, its file's path) of the pack the image
     holds itself (from image L5 on): it is the first of the set, at the room's first byte, whatever the files are
-    called, and it is no file of the folder, so its place in the answer has no file's name. Answers [(file, fields,
-    place, the link's bytes)]."""
+    called, and it is no file of the folder, so its place in the answer has no file's name. `room` and `loader_2`
+    model the loader N2 (n2_room): its room, and the address it answers op1f_loader_2 with; by default N1's, the link
+    window and no op1f_loader_2. Answers [(file, fields, place, the link's bytes)]."""
     from_the_root()
     out_dir = out_dir or os.path.join(ROOT, "build")
-    objects_dir = objects_dir or os.path.join(ROOT, "build")
+    objects_dir = objects_dir or os.path.join(ROOT, "build")         # or {a pack's name: its build folder}, for packs built apart
     files = sorted((recipe["name"] + ".pack", recipe) for recipe in recipes)       # the order of the files' names, as the base takes them
     packs = []
     for name, _recipe in files:
@@ -3100,32 +3172,26 @@ def placed(recipes, folder, out_dir=None, listing=True, log=print, objects_dir=N
         files.insert(0, (None, inside[0]))
         with open(inside[1], "rb") as f:
             packs.insert(0, f.read())
-    places = places_of(packs)
+    places = places_of(packs, room)
     parsed = [parse(data) for data in packs]
-    offered = {}
-    offered[LOADER_NAME] = LOADER_ADDRESS                   # since M1 the loader answers for its own name, before it looks at the packs
-    for (fields, _body), place in zip(parsed, places):
-        for name, offset in fields["lists"]["exports"]:
-            if name.startswith(LOADER_FAMILY):
-                raise ValueError("'%s' offers the name %s, and the loader keeps every name that begins %s to itself: it leaves such a pack out"
-                                 % (fields["name"], name, LOADER_FAMILY))
-            offered.setdefault(name, place + offset)        # the first that offers a name: the base leaves a second one out
+    offered = offered_names(parsed, places, loader_2)
     out = []
     for (file_name, recipe), (fields, body), place in zip(files, parsed, places):
-        objects = [from_root(path) for path in recipe_objects(recipe, objects_dir, compile_them=False)]
+        folder_of = objects_dir.get(recipe["name"]) if isinstance(objects_dir, dict) else objects_dir   # {pack: folder}: builds apart
+        objects = [from_root(path) for path in recipe_objects(recipe, folder_of, compile_them=False)]
         needed, _optional = wanted_names(objects)
         mine = {name for name, _offset in fields["lists"]["exports"]}
         addresses = {name: offered[name] for name, _needed in fields["lists"]["imports"] if name in offered and name not in mine}
         base_name = "%s_%s_placed" % (set_name, stem_of(fields["name"])) if set_name else recipe["build"] + "_placed"
         out_base = from_root(os.path.join(out_dir, base_name))
-        _elf, linked = link3(objects, place, out_base, needed, addresses=addresses, keep=False)
+        _elf, linked = link3(objects, place, out_base, needed, addresses=addresses, keep=False, room=room)
         linked += b"\0" * (-len(linked) % 4)
         if image(fields, body, place, addresses.get) != linked:
             raise ValueError("'%s', moved by its places and joined by its lists, is not the linker's own link for 0x%08x" % (fields["name"], place))
         if listing:
             with open(out_base + ".dis.txt", "wb") as f:
                 subprocess.run([toolchain("bfin-elf-objdump"), "-d", out_base + ".elf"], stdout=f, check=True)
-        if file_name is None and (place != ROOM_START or fields["path_place"]):
+        if file_name is None and (place != (room or (ROOM_START,))[0] or fields["path_place"]):
             raise ValueError("The image's own pack '%s' stands at the room's first byte and has no file's path" % fields["name"])
         there = image(fields, body, place, addresses.get, path=PACK_FOLDER + file_name if file_name else None)
         log("%s '%s': at 0x%08x to 0x%08x (body %d, zeroed %d), %d from where it was linked; its sum as linked %08x%s; %s"
@@ -3146,8 +3212,14 @@ def cmd_placed(args):
     else:
         sys.stderr.write("pack_build: no --profile: the packs are placed in the room of OS 1.7.0's, 0x%08x\n" % ROOM_START)
     inside = (read_recipe(args.inside_recipe), args.inside_pack) if args.inside_recipe else None
+    room = loader_2 = None
+    if args.n2_loader:                                      # since the loader N2: its room and its second mark
+        if not args.profile:
+            raise ValueError("--n2-loader takes the room from the profile's pack_room: name the profile with --profile")
+        with open(args.profile, encoding="utf-8") as f:
+            room, loader_2 = n2_room(json.load(f), args.n2_loader)
     placed([read_recipe(path) for path in args.recipe], args.folder, args.build_dir, set_name=args.name, inside=inside,
-           objects_dir=args.build_dir)
+           objects_dir=args.build_dir, room=room, loader_2=loader_2)
     return 0
 
 
@@ -3296,6 +3368,8 @@ def main(argv=None):
     pl.add_argument("--inside-pack", help="that pack's file, which is no file of the folder")
     pl.add_argument("--profile", help="the profile whose reservation the packs run in (default: 1.7.0's room; since the port to 1.7.3)")
     pl.add_argument("--build-dir", help="where the build left the objects and where the placed files go (default build/; since the port to 1.7.3)")
+    pl.add_argument("--n2-loader", help="the loader N2's linked file: the packs are placed as N2 places them, in the room of the profile's pack_room, "
+                                        "op1f_loader_2 answered with its record (default: N1's room and names)")
     pl.set_defaults(func=cmd_placed)
     pi = sub.add_parser("pictures", help="the source of a pack's directory of pictures, from its recipe")
     pi.add_argument("--recipe", required=True)
