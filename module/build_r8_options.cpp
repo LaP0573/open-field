@@ -4,7 +4,7 @@
 // turned as the unit's own items are. A unit of its own; no unit of base 31 changes but the cards unit, which calls this
 // one's frame work and counts its kind of ask as known.
 //
-// Base 43 (hasis): options of words (module/build_r6e_card.h, "Base 43"), behind the table's count where a base 42
+// Base 44 (hasis): options of words (module/build_r6e_card.h, "Base 44"), behind the table's count where a base 43
 // does not read: their words from the pack's function at run time (the display thread only), up to 32; the file keeps
 // the chosen word, and each frame a word kept that is not the value's is looked for among the words (found: its
 // number taken, `changed` told). They show on their pack's page under PACKS only.
@@ -179,7 +179,7 @@ static struct State {
     void* screen;
     u32 row_added, row_failed;
     void* cat_row[CATEGORIES];                          // KEYBOARD's, SYSTEM's and MIDI's rows, noted at the start
-    // base 43, the display thread's: each option of words with the word it keeps (the file's, then the owner's)
+    // base 44, the display thread's: each option of words with the word it keeps (the file's, then the owner's)
     // ponytail: eight on the unit in all; one more is not kept over a start (a line says so)
     struct { u8 slot, option; char word[NAME]; } live[LIVE_MOST];
     u32 live_count;
@@ -189,7 +189,7 @@ static char text[TEXT_MOST + 1];                        // the file as read: lin
 
 // ---------------------------------------------------------------- an option
 
-// Base 43: an option of words, its function (in its choices' first four bytes) and how many words it gives now.
+// Base 44: an option of words, its function (in its choices' first four bytes) and how many words it gives now.
 static Op1fOptionWord word_fn(const Op1fOption* p) { return *(const Op1fOptionWord*)(const void*)p->choices; }
 static u32 words_of(const Op1fOption* p) {
     Op1fOptionWord f = word_fn(p);
@@ -199,7 +199,7 @@ static u32 words_of(const Op1fOption* p) {
 }
 
 static u32 top_of(const Op1fOption* p) {                // the highest value: a switch 1, a list its count - 1, a number high - low
-    if (p->kind == (u8)OP1F_OPTION_WORDS) { u32 n = words_of(p); return n ? n - 1u : 0u; }      // base 43: the words now
+    if (p->kind == (u8)OP1F_OPTION_WORDS) { u32 n = words_of(p); return n ? n - 1u : 0u; }      // base 44: the words now
     if (p->kind == (u8)OP1F_OPTION_NUMBER) return (u32)((int)(signed char)p->choices[0][1] - (int)(signed char)p->choices[0][0]);
     return (u32)p->count - 1u;
 }
@@ -232,7 +232,7 @@ static int pack_function(const Op1fCardSlot* slot, const void* f) {     // 0, or
     return a == 0 || (a >= slot->first && a < slot->end && (a & 1u) == 0);
 }
 
-// Base 43: the options of a table, `count` and the options of words behind them (a base 42 reads only `count`).
+// Base 44: the options of a table, `count` and the options of words behind them (a base 43 reads only `count`).
 static u32 all_of(const Op1fOptions* o) {
     u32 n = o->count;
     while (n < (u32)OPTIONS && o->options[n].kind == (u8)OP1F_OPTION_WORDS) ++n;
@@ -259,10 +259,10 @@ static const Op1fOptions* table_of(u32 slot, const char** why, OpenPageFn* open)
         const Op1fOptions* o = (const Op1fOptions*)a->what;
         OpenPageFn f = a->bytes >= (u32)OP1F_OPTIONS_BYTES ? o->open : 0;
         const char* fault = 0;
-        if (o->count > (u32)OPTIONS || all_of(o) == 0) fault = "it lists no option, or more than eight";     // base 43: words only is fine
+        if (o->count > (u32)OPTIONS || all_of(o) == 0) fault = "it lists no option, or more than eight";     // base 44: words only is fine
         for (u32 n = 0; fault == 0 && n < o->count; ++n)
             if (!in_order(&o->options[n])) fault = "an option is not in order";
-        for (u32 n = o->count; fault == 0 && n < all_of(o); ++n)                // base 43
+        for (u32 n = o->count; fault == 0 && n < all_of(o); ++n)                // base 44
             if (!words_in_order(place, &o->options[n])) fault = "an option of words is not in order";
         if (fault == 0 && !pack_function(place, (const void*)o->changed)) fault = "its changed is not a function of the pack";
         if (fault == 0 && !pack_function(place, (const void*)f)) fault = "its open is not a function of the pack";
@@ -365,7 +365,7 @@ static int same_to(const char* a, const char* b, u32 n) {       // the first n b
     return i == n && b[i] == 0;
 }
 
-// The value the file holds for <pack>/<option>, or -1. A line ends at LF; a CR before it is not part of it. Base 43:
+// The value the file holds for <pack>/<option>, or -1. A line ends at LF; a CR before it is not part of it. Base 44:
 // `word`, when not 0, takes the text behind the `=` instead (up to 15 characters), for an option of words.
 static int kept(const char* pack, const char* option, char* word = 0) {
     for (u32 at = 0; at < s.text_bytes;) {
@@ -402,7 +402,7 @@ static void place() {
         if (o == 0) continue;
         u32 sent = 0, full = 0;                                 // full: a bit for each category found full
         for (u32 n = 0; n < all_of(o); ++n) {
-            u32 cat = o->options[n].kind == (u8)OP1F_OPTION_WORDS ? 0u : (u32)(o->options[n].where & (u8)OP1F_OPTION_CATEGORY) >> 4;     // base 43: words under PACKS
+            u32 cat = o->options[n].kind == (u8)OP1F_OPTION_WORDS ? 0u : (u32)(o->options[n].where & (u8)OP1F_OPTION_CATEGORY) >> 4;     // base 44: words under PACKS
             if (cat >= (u32)IN_KEYBOARD && cat <= (u32)IN_MIDI && s.cat_count[cat] < ROOM[cat]) {
                 s.cat_slot[cat][s.cat_count[cat]] = (u8)slot;
                 s.cat_option[cat][s.cat_count[cat]] = (u8)n;
@@ -443,7 +443,7 @@ static void read_file() {
         s.open[slot] = open;
         ++packs;
         for (u32 n = 0; n < all_of(o); ++n) {
-            if (o->options[n].kind == (u8)OP1F_OPTION_WORDS) {          // base 43: its first now, its word looked for at each frame
+            if (o->options[n].kind == (u8)OP1F_OPTION_WORDS) {          // base 44: its first now, its word looked for at each frame
                 value[slot][n] = o->options[n].first;
                 if (s.live_count >= (u32)LIVE_MOST) {
                     STOCK_LOG(1, LOG_FILE, 8, "options: '%s/%s': more than %u options of words on the unit: its choice is NOT kept over a start", op1f_cards_2.slots[slot].card->name, o->options[n].name, (u32)LIVE_MOST);
@@ -470,7 +470,7 @@ static void read_file() {
               s.row_added ? "is in the list" : s.row_failed ? "could NOT be made" : "is not in the list");
 }
 
-// Base 43: the word an option of words keeps, or 0 (none kept for it).
+// Base 44: the word an option of words keeps, or 0 (none kept for it).
 static char* word_of(u32 slot, u32 option) {
     for (u32 k = 0; k < s.live_count; ++k)
         if (s.live[k].slot == slot && s.live[k].option == option) return s.live[k].word;
@@ -545,7 +545,7 @@ static void write_file() {
         for (u32 n = 0; n < all_of(o); ++n) {
             char digits[NAME + 2];
             u32 d = 0;
-            if (o->options[n].kind == (u8)OP1F_OPTION_WORDS) {          // base 43: the word kept, or no line
+            if (o->options[n].kind == (u8)OP1F_OPTION_WORDS) {          // base 44: the word kept, or no line
                 const char* w = word_of((u32)slot, n);
                 while (w && w[d] && d + 1u < (u32)NAME) { digits[d] = w[d]; ++d; }
                 if (d == 0) continue;
@@ -594,7 +594,7 @@ static void tell(u32 slot, u32 option) {                       // a value change
     const Op1fOptions* o = s.table[slot];
     s.dirty = 1;
     s.changed_ms = op1f_ms();
-    word_again(slot, option);                                    // base 43: an option of words keeps its word
+    word_again(slot, option);                                    // base 44: an option of words keeps its word
     if (o && o->changed && used(slot)) o->changed(option, (u32)value[slot][option]);
 }
 
@@ -654,7 +654,7 @@ static void take_keys() {
 extern "C" void op1f_options_frame() OP1F_NAMED("op1f_options_frame");
 extern "C" void op1f_options_frame() {
     if (!s.read_done) read_file();
-    words_follow();                                             // base 43
+    words_follow();                                             // base 44
     take_keys();
     for (u32 cat = (u32)IN_KEYBOARD; cat <= (u32)IN_MIDI; ++cat)        // the categories' lines the key thread changed
         for (u32 k = 0; k < s.cat_count[cat]; ++k) {
@@ -752,7 +752,7 @@ extern "C" int op1f_option_set(const Op1fCard* card, unsigned option, unsigned p
     if (o == 0 || option >= all_of(o) || position > top_of(&o->options[option])) return OP1F_BAD_NAME;
     if (position == (u32)value[slot][option]) return 0;
     value[slot][option] = (u8)position;
-    word_again((u32)slot, option);                              // base 43: an option of words keeps its word
+    word_again((u32)slot, option);                              // base 44: an option of words keeps its word
     s.dirty = 1;                                                // the file, as after a change in the settings
     s.changed_ms = op1f_ms();
     line_again((u32)slot, option);

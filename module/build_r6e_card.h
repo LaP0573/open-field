@@ -2050,8 +2050,8 @@ static_assert(sizeof(Op1fDrumEngine) == 28, "a drum engine's table is the head, 
 // kind OP1F_ASK_DRUM_ENGINE names it, so that a base before 43 leaves it out.
 extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 
-// Base 43 (hasis, on top of base 42): lists whose words the pack names while it runs. Up to here every word is the
-// earlier bases'; this part only adds behind it, and a pack built for base 42 or earlier is not touched by it.
+// Base 44 (hasis, on top of base 43): lists whose words the pack names while it runs. Up to here every word is the
+// earlier bases'; this part only adds behind it, and a pack built for base 43 or earlier is not touched by it.
 //
 // A list of fixed words lives in the pack's card, which nothing changes while the unit runs: it cannot list what is
 // only known then (the looks other packs hand the pack at their first frame, say). An option of kind
@@ -2060,11 +2060,11 @@ extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 // are asked for. The base calls it on the display thread only (its frame work, the settings' draw, a turn, and
 // op1f_option_set from the pack's frame function); it answers from what the pack holds and does no more.
 //
-// Where it stands: behind the table's `count` options, in the places a base 42 or earlier leaves unread
+// Where it stands: behind the table's `count` options, in the places a base 43 or earlier leaves unread
 // (options[count] and on, one after another, as long as their kind is OP1F_OPTION_WORDS). So an older base sees only
 // the `count` options before them and runs the ask as it was; for it the pack's op1f_option(card, i) of such an option
 // answers OP1F_BAD_NAME (the pack does without it there); an ask of such options only has `count` 0, which an older
-// base leaves aside. In order, base 43 takes `count` + these options together,
+// base leaves aside. In order, base 44 takes `count` + these options together,
 // at most OP1F_OPTIONS_MOST; their numbers for op1f_option, op1f_option_set and `changed` follow `count`'s.
 //
 // Such an option: its name, kind OP1F_OPTION_WORDS, `count` 0, `first` the choice it starts at, `where` 0 (it shows on

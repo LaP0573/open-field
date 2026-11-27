@@ -181,7 +181,7 @@ def asks_options(data):
 
 
 def asks_option_words(data):
-    """Whether the file's card asks for options of words (OP1F_OPTION_WORDS, base 43) in its ask of options."""
+    """Whether the file's card asks for options of words (OP1F_OPTION_WORDS, base 44) in its ask of options."""
     card = pack_build.card_in(data)
     if card is None or card["level"] < PLACES_KIND:
         return False
@@ -196,7 +196,7 @@ def asks_option_words(data):
 BASE_SINCE = (
     ("places that give way", 31, gives_way),
     ("options", 32, asks_options),
-    ("options of words", 43, asks_option_words),
+    ("options of words", 44, asks_option_words),
 )
 
 

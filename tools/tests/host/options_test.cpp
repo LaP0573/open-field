@@ -1,4 +1,4 @@
-// Host test of the base's options (module/build_r8_options.cpp, base 32 and base 43's options of words): the values
+// Host test of the base's options (module/build_r8_options.cpp, base 32 and base 44's options of words): the values
 // read from the base's file, the row "packs" and a pack's page under it, the 4th knob changing a value, `changed`
 // told, op1f_option and op1f_option_set, the file written (by word for an option of words) with the lines of packs not
 // here kept. Built for a 32-bit target (the card header holds four-byte addresses): emscripten and node,
@@ -49,7 +49,7 @@ static void option(Op1fOption* o, const char* name, unsigned kind, unsigned coun
     for (unsigned i = 0; choices && i < count; ++i) strncpy(o->choices[i], choices[i], 7);
 }
 static void words(Op1fOption* o, const char* name, unsigned first, const char* (*f)(unsigned)) {
-    option(o, name, 3, 0, first, 0); memcpy(o->choices, &f, 4);                  // 3: OP1F_OPTION_WORDS, base 43
+    option(o, name, 3, 0, first, 0); memcpy(o->choices, &f, 4);                  // 3: OP1F_OPTION_WORDS, base 44
 }
 static void card(Op1fCard* c, const char* name, Op1fAsk* asks, Op1fOptions* o) {
     memset(c, 0, sizeof *c); c->mark = OP1F_CARD_MARK; c->bytes = OP1F_CARD_LEVEL_7_BYTES; c->level = 7;
@@ -82,7 +82,7 @@ int main() {
     words(&THEMES_OPTIONS.options[0], "theme", 0, even(theme_n<0>, theme_n<1>, theme_n<2>, theme_n<3>));
     OLD_OPTIONS.head.bytes = sizeof(Op1fOptions); strcpy(OLD_OPTIONS.head.name, "old"); OLD_OPTIONS.count = 1;
     option(&OLD_OPTIONS.options[0], "snap", 1, 3, 0, SNAP);
-    // bad: an option of words without its function: the whole ask left aside on base 43
+    // bad: an option of words without its function: the whole ask left aside on base 44
     BAD_OPTIONS.head.bytes = sizeof(Op1fOptions); strcpy(BAD_OPTIONS.head.name, "bad"); BAD_OPTIONS.count = 1;
     option(&BAD_OPTIONS.options[0], "x", 0, 2, 0, 0);
     words(&BAD_OPTIONS.options[1], "y", 0, 0);

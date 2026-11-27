@@ -196,7 +196,7 @@ int depth = p < 0 ? 50 : p;                       // below 0: no such option her
 
 In the header: the ask is `OP1F_ASK_OPTIONS`, its table an `Op1fOptions` (712 bytes, `open` at +708; a table of 708 bytes has no `open`), each option an `Op1fOption`, and `op1f_options_1` is the mark of a base that carries the ask out.
 
-### Words your pack names while it runs (base 43)
+### Words your pack names while it runs (base 44)
 
 A list's words sit in your card, which nothing changes while the unit runs. When the choices are only known then (the looks other packs hand yours at their first frame, the themes installed), give the option a function instead of words:
 
@@ -213,7 +213,7 @@ extern "C" const char* my_look_word(unsigned choice) { return choice < count ? n
 
 **The file keeps the word**, `<pack>/<option>=<word>`, not its number. At the first frame, before the other packs have handed yours anything, the option stands at `first`; at each frame after, while the word kept is not the word of the value, the base looks for it among the words and, found, takes its number and tells `changed`. So adding or removing a pack whose words come before it doesn't move the choice, and a word that is gone (its pack taken off) keeps its line until the owner picks another.
 
-**Options of words come last** in the ask. The table's `count` holds only the options before them; they stand behind it, where a base 42 or earlier doesn't read. So **an older base runs the ask without them**: your other options show as before and `op1f_option` of an option of words answers below 0 there. An ask of options of words only has a `count` of 0, which an older base leaves aside, with its line. Base 43 checks each: a name of 1 to 15 characters, `count` 0, `first` below 32, its function one of your pack's (the whole ask left aside otherwise). It keeps the word of eight such options on the unit in all; a ninth works but starts at `first` each time. In the header: `OP1F_OPTION_WORDS` (kind 3), its function in the option's first four bytes of `choices`.
+**Options of words come last** in the ask. The table's `count` holds only the options before them; they stand behind it, where a base 43 or earlier doesn't read. So **an older base runs the ask without them**: your other options show as before and `op1f_option` of an option of words answers below 0 there. An ask of options of words only has a `count` of 0, which an older base leaves aside, with its line. Base 44 checks each: a name of 1 to 15 characters, `count` 0, `first` below 32, its function one of your pack's (the whole ask left aside otherwise). It keeps the word of eight such options on the unit in all; a ninth works but starts at `first` each time. In the header: `OP1F_OPTION_WORDS` (kind 3), its function in the option's first four bytes of `choices`.
 
 ## How `dub` works
 

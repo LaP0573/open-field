@@ -1,4 +1,4 @@
-"""The base's options (module/build_r8_options.cpp, base 32, and base 43's options of words) on the PC:
+"""The base's options (module/build_r8_options.cpp, base 32, and base 44's options of words) on the PC:
 tools/tests/host/options_test.cpp built with emscripten for a 32-bit target and run with node. Its old-base half runs
 the same cards on base 38's unit (from the history, commit c3e6ccf, release 0.20; the unit is base 32's), which must not see the options of words. Skipped
 where either tool, or for the old half that commit, is missing."""
