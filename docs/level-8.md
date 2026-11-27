@@ -267,6 +267,26 @@ Three things to keep in mind:
 
 The pack tool then writes the ask's table 184 bytes long, with the picture's address at +180. A base of level 8 accepts the longer table as it is. The picture is at most 80 by 64 pixels: one byte per pixel, each byte an index into up to 256 RGB565 colours, index 0 see-through. Draw it the way the train's own characters are drawn: line art in `#A2A4A6`, near-black `#000005` fills that hide what lies behind, its soft edges already mixed on black. A train paints it on the frame's canvas where the character would stand. It follows the wagon's moves and sways a little on the line, and it's all dim grey on the siding. Without the field, or with a picture outside the header's limits, the wagon is drawn as the effect it stands on, as before.
 
+## Your effect on a wagon: its own page and settings (base 44)
+
+From base 44 a train can show your effect's own page for one of its wagons, and keep settings of your effect with each wagon. The header's part "Base 44: hosted pages" (`module/build_r6e_card.h`) has every word of it.
+
+**Declare wagons in every new effect pack.** Add `"wagons": true` to the effect's ask:
+
+```json
+{"kind": "effect", "name": "boost", "rides": "punch", "wagons": true, ...}
+```
+
+The pack tool then writes the ask's table 188 bytes long: the picture's word at +180 (0 when you name no `"wagon"`), and `OP1F_HOSTED_WAGONS` at +184. It's a field, not a flag, so a base before 44 reads the table as level 8's and runs your effect as before: the same file works on base 43 too. Your effect then learns of each instance on a wagon by its own number `n` (0 to 63):
+
+- `process`, `reset` and `shown` get the place `OP1F_PLACE_HOSTED + n`, and `op1f_param_get`, `op1f_param_heard` and `op1f_param_set` answer that wagon's values at that place. `op1f_param_set` works while that wagon's page is up.
+- `op1f_value_get` and `op1f_value_set` with `where` `OP1F_KEEP_HOSTED` and `which` `n` read and write the wagon's own settings: members of one small object, at most 44 bytes in all (so that the three wagons of a sound always fit its saved train). Any member name of a key's form will do. The train saves it with the wagon, in its files and its saved trains.
+- When the train hands another wagon's settings, the `changed` of your keeps ask is told `changed(OP1F_KEEP_HOSTED, n, 0)` before your frame function.
+
+**Packs written before base 44 keep working: the fallback.** An effect without the field still gets its page on a wagon. While the wagon's sound rides the train, the base answers your pack as if that sound rode your effect: `process`, `reset` and `shown` get the sound's place, `op1f_riding` has its bit, and the value helpers at that place answer the wagon whose page is up. Its extra settings (level 7) stay the sound's own, so two wagons of one sound with your effect share them. The fallback is only meant for packs written before base 44. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then loses its page on wagons, nothing worse.
+
+**A train of your own** calls three helpers from its frame function, and names the mark `op1f_hosted_1`: `op1f_rack_place` says which sound a wagon plays for and hands it its kept settings, before `op1f_rack_ready`; `op1f_rack_kept` gives back what the effect's pack wrote, to save with the wagon; `op1f_rack_page` asks for the effect's page for one wagon, once a frame, and hands the knob words that page changed.
+
 ## Two packs, and your pack's own places
 
 - **Two effects of two packs** play together at two places: one on a sound and one on the master, or each on different sounds. At one place there's one effect, as on the unit.
