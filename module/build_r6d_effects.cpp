@@ -2624,6 +2624,7 @@ extern "C" int op1f_layer_page(const Op1fCard* card, unsigned ask, unsigned whic
     const Effect* e = layer_of(slot, ask);
     if (e == 0 || (which != (u32)OP1F_LAYER_PAGE_UNIT && which != (u32)OP1F_LAYER_PAGE_OWN) || !from_frame(slot)) return 0;
     effects[e->number].page = which;
+    if (page.host == (u32)slot + 1u && page.ask == ask) page.host = 0;             // R22 (base 45): a hosted page on that layer ends at once
     return 1;
 }
 
