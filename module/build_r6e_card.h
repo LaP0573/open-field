@@ -1985,49 +1985,6 @@ extern "C" int op1f_sample_get(const Op1fCard* card, unsigned place, Op1fSample*
 // that also runs without it asks for op1f_sample_drop and op1f_sample_get weakly and calls them only when their address
 // is not 0.
 extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
-// Base 44 (hasis, on top of base 43): files per tape. Up to here every word is the earlier bases'; this part only adds
-// behind it, and a pack built for base 43 or earlier is not touched by it.
-//
-// A pack that keeps something for each tape that does not fit level 7's 4 KiB a tape (a tape's notes, its markers)
-// keeps it in files of one of its folders named tape<N>.<anything>, N being the tape's number, 1 to 8 (the unit's
-// tape index and 1). The unit does not know these files: when it copies a tape the copy would start with none, and
-// when it deletes one, a tape made later in its place would find the old ones. One ask of kind OP1F_ASK_TAPES, on a
-// card of level 7 or later, names the folder whose files the base keeps with the tapes:
-//   - the unit copies a tape (the tape list's copy, shift and T3): every tape<from>.<rest> of the folder is copied to
-//     tape<to>.<rest>, through the base's temporary file and a rename as a write lands, and a tape<to>.<rest> the
-//     source has not is removed;
-//   - the unit makes a tape anew (T3 in the tape list on an empty slot, after a delete, or a unit's first tape):
-//     every tape<N>.<rest> of the folder is removed, so the new tape never finds a deleted one's files.
-// Other names are left alone (tape10.txt, a folder inside). The base does it on the display thread, at its frame,
-// before any frame function, and never while the disk mode is open: a tape made then waits for it to close. Then it
-// calls the ask's `changed`, before the frame functions of that frame.
-//
-// The kind of ask a base 44 knows beside the earlier bases', for a card of level 7 or later. A base that does not know
-// it (base 43 and earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
-//   OP1F_ASK_TAPES  the files of one folder kept with the tapes: what `what` points at is an Op1fTapes
-enum { OP1F_ASK_TAPES = 9 };
-
-// What `changed` is told (`how`), with the tapes' numbers, 1 to 8:
-//   OP1F_TAPES_COPIED   tape `from` was copied to tape `to`, and the files with it
-//   OP1F_TAPES_DELETED  tape `from` was made anew, and its slot's old files removed (`to` is `from`)
-enum { OP1F_TAPES_COPIED = 1, OP1F_TAPES_DELETED = 2 };
-
-// Files per tape: what its ask points at; one such ask a card. The head's `flags` is 0 and its `shown` 0.
-//   folder   the number of the card's folder (level 3's list, from 0) whose tape<N>.* files follow the tapes
-//   changed  called on the display thread, outside the pack's frame function, before the frame functions of the frame
-//            at which the base carried a copy or a tape made into the folder. Like level 7's `changed`, it notes what it
-//            is told and does no more: the frame function then reads the mounted tape's file again, and drops what it
-//            holds unsaved for that tape, since a write would bring the file back. 0 for none
-struct Op1fTapes {
-    Op1fKindHead head;                                // +0
-    unsigned folder;                                  // +28
-    void (*changed)(unsigned how, unsigned from, unsigned to);   // +32
-};   // 36 bytes in base 44
-static_assert(sizeof(Op1fTapes) == 36 && OP1F_PLACE_IN(Op1fTapes, changed) == 32, "the table of files per tape is 36 bytes");
-
-// The mark of a base that carries out an ask of kind OP1F_ASK_TAPES (a constant 1). A pack that must know whether its
-// files follow the tapes imports it as optional: 0 under a base that does not know the kind.
-extern "C" const unsigned op1f_tapes_1 OP1F_NAMED("op1f_tapes_1");
 
 // Base 43: a drum engine. Up to here every word is the earlier bases' (base 39's sample last); this part only adds
 // behind it, and a pack that does not ask for it is not touched by it.
@@ -2091,5 +2048,49 @@ static_assert(sizeof(Op1fDrumEngine) == 28, "a drum engine's table is the head, 
 // The mark of a base that adds a pack's drum engine to the drum's engine list (a constant 1). A pack with an ask of
 // kind OP1F_ASK_DRUM_ENGINE names it, so that a base before 43 leaves it out.
 extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
+
+// Base 44 (hasis, on top of base 43): files per tape. Up to here every word is the earlier bases'; this part only adds
+// behind it, and a pack built for base 43 or earlier is not touched by it.
+//
+// A pack that keeps something for each tape that does not fit level 7's 4 KiB a tape (a tape's notes, its markers)
+// keeps it in files of one of its folders named tape<N>.<anything>, N being the tape's number, 1 to 8 (the unit's
+// tape index and 1). The unit does not know these files: when it copies a tape the copy would start with none, and
+// when it deletes one, a tape made later in its place would find the old ones. One ask of kind OP1F_ASK_TAPES, on a
+// card of level 7 or later, names the folder whose files the base keeps with the tapes:
+//   - the unit copies a tape (the tape list's copy, shift and T3): every tape<from>.<rest> of the folder is copied to
+//     tape<to>.<rest>, through the base's temporary file and a rename as a write lands, and a tape<to>.<rest> the
+//     source has not is removed;
+//   - the unit makes a tape anew (T3 in the tape list on an empty slot, after a delete, or a unit's first tape):
+//     every tape<N>.<rest> of the folder is removed, so the new tape never finds a deleted one's files.
+// Other names are left alone (tape10.txt, a folder inside). The base does it on the display thread, at its frame,
+// before any frame function, and never while the disk mode is open: a tape made then waits for it to close. Then it
+// calls the ask's `changed`, before the frame functions of that frame.
+//
+// The kind of ask a base 44 knows beside the earlier bases', for a card of level 7 or later. A base that does not know
+// it (base 43 and earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
+//   OP1F_ASK_TAPES  the files of one folder kept with the tapes: what `what` points at is an Op1fTapes
+enum { OP1F_ASK_TAPES = 9 };
+
+// What `changed` is told (`how`), with the tapes' numbers, 1 to 8:
+//   OP1F_TAPES_COPIED   tape `from` was copied to tape `to`, and the files with it
+//   OP1F_TAPES_DELETED  tape `from` was made anew, and its slot's old files removed (`to` is `from`)
+enum { OP1F_TAPES_COPIED = 1, OP1F_TAPES_DELETED = 2 };
+
+// Files per tape: what its ask points at; one such ask a card. The head's `flags` is 0 and its `shown` 0.
+//   folder   the number of the card's folder (level 3's list, from 0) whose tape<N>.* files follow the tapes
+//   changed  called on the display thread, outside the pack's frame function, before the frame functions of the frame
+//            at which the base carried a copy or a tape made into the folder. Like level 7's `changed`, it notes what it
+//            is told and does no more: the frame function then reads the mounted tape's file again, and drops what it
+//            holds unsaved for that tape, since a write would bring the file back. 0 for none
+struct Op1fTapes {
+    Op1fKindHead head;                                // +0
+    unsigned folder;                                  // +28
+    void (*changed)(unsigned how, unsigned from, unsigned to);   // +32
+};   // 36 bytes in base 44
+static_assert(sizeof(Op1fTapes) == 36 && OP1F_PLACE_IN(Op1fTapes, changed) == 32, "the table of files per tape is 36 bytes");
+
+// The mark of a base that carries out an ask of kind OP1F_ASK_TAPES (a constant 1). A pack that must know whether its
+// files follow the tapes imports it as optional: 0 under a base that does not know the kind.
+extern "C" const unsigned op1f_tapes_1 OP1F_NAMED("op1f_tapes_1");
 
 #endif
