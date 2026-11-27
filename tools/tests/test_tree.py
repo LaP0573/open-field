@@ -560,8 +560,8 @@ class TheInstaller(unittest.TestCase):
 
 class ThePageSBase(unittest.TestCase):
     """builder/base.pack: the base the install page puts on every unit it installs, and builder/base-pack.json, the
-    size and SHA-256 the page holds it to. The one finished pack file in the tree; the build holds it to
-    packs/built.json and to what it builds."""
+    size and SHA-256 the page holds it to. The one finished pack file in the tree, the released base: the build holds
+    it to packs/built.json's base.pack, and the base the build makes may be ahead of it."""
 
     @classmethod
     def setUpClass(cls):
@@ -573,8 +573,18 @@ class ThePageSBase(unittest.TestCase):
     def test_it_is_the_file_base_pack_json_names_and_packs_built_json_keeps(self):
         held = {"bytes": len(self.data), "sha256": hashlib.sha256(self.data).hexdigest()}
         self.assertEqual({key: self.named[key] for key in held}, held)
-        self.assertEqual(load("packs", "built.json")["files"]["base.pack"], held)
+        self.assertEqual({key: load("packs", "built.json")["files"]["base.pack"][key] for key in held}, held)
         self.assertEqual(self.named["file"], "base.pack")
+
+    def test_packs_built_json_keeps_the_inputs_of_the_released_base_and_of_nothing_else(self):
+        """Beside the released base's size and SHA-256, packs/built.json keeps `inputs`, the SHA-256 over the files its
+        build read (tools/build_all.py, base_inputs()). Every other file it keeps is a size and a SHA-256 alone, and the
+        file the page holds base.pack to says nothing of the inputs."""
+        kept = load("packs", "built.json")["files"]
+        self.assertEqual(sorted(kept["base.pack"]), ["bytes", "inputs", "sha256"])
+        self.assertRegex(kept["base.pack"]["inputs"], r"^[0-9a-f]{64}$")
+        self.assertEqual({name: sorted(entry) for name, entry in kept.items() if name != "base.pack" and sorted(entry) != ["bytes", "sha256"]}, {})
+        self.assertNotIn("inputs", self.named)
 
     def test_what_base_pack_json_says_is_what_the_file_says_of_itself(self):
         pack_build = tool("pack_build")
@@ -852,6 +862,17 @@ class TheBuild(unittest.TestCase):
         cls.folder = tempfile.mkdtemp(prefix="open-field-build-")
         cls.out = os.path.join(cls.folder, "out")
         cls.done = subprocess.run([sys.executable, "-I", os.path.join("tools", "build_all.py"), "--out", cls.out], cwd=ROOT, capture_output=True, text=True)
+        # The base's sources on main may be ahead of the released base, packs/built.json's: the built base.pack differs
+        # from it, and so do the files its build read. The same files giving other bytes is a fault, never "ahead".
+        cls.released = load("packs", "built.json")["files"]["base.pack"]
+        built = os.path.join(cls.out, "packs", "base.pack")
+        cls.built_base = None
+        if os.path.isfile(built):
+            with open(built, "rb") as f:
+                cls.built_base = f.read()
+        cls.ahead = (cls.built_base is not None
+                     and (len(cls.built_base), hashlib.sha256(cls.built_base).hexdigest()) != (cls.released["bytes"], cls.released["sha256"])
+                     and tool("build_all").base_inputs(PROFILE) != cls.released["inputs"])
 
     @classmethod
     def tearDownClass(cls):
@@ -868,12 +889,20 @@ class TheBuild(unittest.TestCase):
 
     def test_the_build_holds_the_page_s_base_pack_and_the_file_that_names_it(self):
         self.assertIn("the same  builder/base.pack, byte for byte, and builder/base-pack.json names it", self.done.stdout)
-        with open(os.path.join(self.out, "packs", "base.pack"), "rb") as f, open(os.path.join(ROOT, "builder", "base.pack"), "rb") as g:
-            self.assertEqual(f.read(), g.read())
+        with open(os.path.join(ROOT, "builder", "base.pack"), "rb") as f:
+            page = f.read()
+        self.assertEqual((len(page), hashlib.sha256(page).hexdigest()), (self.released["bytes"], self.released["sha256"]))      # always the released base
+        if self.ahead:
+            self.assertRegex(self.done.stdout, r"(?m)^ahead     base\.pack .*: the sources are ahead of it")
+            self.assertIn("but base.pack, whose sources are ahead of the released base", self.done.stdout)
+        else:
+            self.assertIsNotNone(self.built_base, "the build made no base.pack")
+            self.assertEqual((len(self.built_base), hashlib.sha256(self.built_base).hexdigest()), (len(page), hashlib.sha256(page).hexdigest()))
 
     def test_every_pack_and_example_is_built(self):
         for name in PACKS:
-            self.assertRegex(self.done.stdout, r"the same  %s\.pack " % re.escape(name))
+            word = "ahead" if name == "base" and self.ahead else "the same"
+            self.assertRegex(self.done.stdout, r"(?m)^%-9s %s\.pack " % (word, re.escape(name)))
         for name in EXAMPLES + ("trampolines",):
             self.assertRegex(self.done.stdout, r"the same  examples/%s\.pack " % name)
 

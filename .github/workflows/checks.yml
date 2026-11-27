@@ -30,7 +30,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
+      # The whole history: a pull request is held to the commit it merges into (tools/build_all.py --pull-request).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -54,8 +57,23 @@ jobs:
           git -C open-xy checkout --detach f10f6bdc397b2766bb02ee68041687fcc478bdd1
           python open-xy/sdk.py toolchain fetch
 
+      # On main the base's sources may be ahead of the released base: the build says so, and that is no fault. A pull
+      # request may change the base's sources but not the release's own files (builder/base.pack, builder/base-pack.json,
+      # catalog/packs/base.json, packs/built.json's base.pack, the base's version and release): a release is the
+      # maintainer's own pull request, from a branch of this repository, which only the maintainer can make. A pull
+      # request runs on the merge commit the host makes, whose first parent is the commit it merges into. A fork's pull
+      # request runs its own copy of this file and of the tools: the check it cannot change is guard.yml.
       - name: The build, held to packs/built.json
+        if: github.event_name != 'pull_request'
         run: python -I tools/build_all.py
+
+      - name: The build, held to packs/built.json, and the release's own files to the commit the pull request merges into
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: python -I tools/build_all.py --pull-request "$(git rev-parse HEAD^1)"
+
+      - name: The build, held to packs/built.json, and a release from a branch of this repository held whole
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: python -I tools/build_all.py --pull-request "$(git rev-parse HEAD^1)" --release-allowed
 
       - name: The tree's own tests
         run: python -I -m unittest discover -s tools/tests
