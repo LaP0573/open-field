@@ -1,0 +1,19 @@
+{
+  "id": "theme_89mph",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for themes: 89MPH, a car head unit's segment readouts and dot-matrix lanes on the tape screen, the face and the mixer.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/theme_89mph.pack",
+  "follow": "main",
+  "version": 5,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/theme_89mph/picture.png"
+  }
+}

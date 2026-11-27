@@ -1,0 +1,24 @@
+{
+  "id": "markers",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "tape"
+  ],
+  "description": "markers: up to 16 markers on the tape, one a key: set, name, cue, jump, loop a section, move a section. Kept in the tape.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/markers.pack",
+  "follow": "main",
+  "version": 96,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [
+    {
+      "name": "markers",
+      "place": "markers"
+    }
+  ],
+  "picture": {
+    "path": "packs/markers/picture.png"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "perform",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "tape"
+  ],
+  "description": "perform: the 4th knob's click flips the tape screen to PERFORM, the markers as a set list, and a song arranger. Needs markers.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/perform.pack",
+  "follow": "main",
+  "version": 6,
+  "firmware": "1.7.3",
+  "needs": [
+    "markers"
+  ],
+  "folders": [
+    {
+      "name": "perform",
+      "place": "perform"
+    }
+  ],
+  "picture": {
+    "path": "packs/perform/picture.png"
+  }
+}
