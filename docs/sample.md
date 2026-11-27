@@ -1,5 +1,7 @@
 # Your engine's sample (base 39)
 
+**A drum sound (base 43).** With your card's [drum engine](drum-engine.md) ask, `op1f_sample_drop(card, ask, OP1F_PLACE_DRUM + slot)` drops into a drum sound that rides that engine. The unit does what the drop key on the drum sampler's page does, in its own turn: the cut goes into the drum sampler's sample, as it does with that key. The checks, the answers, the ticket and `done` are the synth's; the bound is the drum's memory, 1,764,000 halfwords (882,000 stereo frames). The unit keeps a drum sampler's sample over a restart itself, so after a restart `dropped` reads 0 and the sample is the one the unit loaded. The base's lines say `drum` where they say `synth`.
+
 Every synth sound and every drum sound of the unit has a sample of its own, whatever engine it plays. The unit's sampler plays it, and the drop key on the sampler's page puts into it what the tape has lifted. From base 39 a sound that plays your engine ([level 9](level-9.md)) can take a lifted cut the same way. `op1f_sample_drop` asks the unit to put the cut into the sample of a synth sound that plays one of your card's engines. The unit does the work in its own turn, a few frames later, as it does for its sampler, and keeps the cut over a restart as it keeps the sampler's. `op1f_sample_get` reads the sample of any synth or drum sound, whatever it plays, so that your `render` can play it.
 
 This is not a level. The level stays 10 and the card keeps its fields. Base 39 adds two helpers, two answers and a mark, `op1f_sample_1` ([below](#the-mark)). A pack that calls neither helper runs as before, and the unit's own sampler and its drop key work as they always did.
@@ -61,7 +63,7 @@ extern "C" void grain_frame(const Op1fFrame* now) {
 | --- | --- |
 | 1 or more | The ticket. The unit does the drop in its own turn: watch `done` |
 | `OP1F_NOT_NOW` | The call did not come from your card's input function, or came for an event whose `thread` is not `OP1F_KEY_THREAD` (a key that plays notes, 13 to 53, or shift: [level 4](level-4.md#the-thread-an-event-came-on)); the disk mode is open; the sound's sample is being put back after a start |
-| `OP1F_BAD_NAME` | Your card has no ask of kind engine with that number, or the place is not a synth sound's. On base 39 a drum sound's place, `OP1F_PLACE_DRUM` + slot, answers this |
+| `OP1F_BAD_NAME` | Your card has no ask of kind engine with that number, or the place is not a synth sound's. On base 39 a drum sound's place, `OP1F_PLACE_DRUM` + slot, answers this. From base 43 a drum sound's place is taken with the number of your card's [drum engine](drum-engine.md) ask (kind 12); any other ask for it answers this |
 | `OP1F_NOT_HERE` | The sound does not play that engine now, or a sound loaded there is not told to the base yet |
 | `OP1F_BUSY` | A drop is under way, yours or another pack's, or the unit has other clipboard work waiting. Ask again at a later press |
 | `OP1F_EMPTY` | No cut of the tape is lifted: nothing, or a copied sound in its place (the lift key on the sampler's page copies one) |
@@ -140,7 +142,7 @@ Sounds are said as `synth 1` to `synth 8`. The tag is `op1f_sample` for the drop
 
 | | |
 | --- | --- |
-| Where a drop goes | A synth sound, 0 to 7, that plays one of your card's engines now. A drum sound's place answers `OP1F_BAD_NAME` on base 39 |
+| Where a drop goes | A synth sound, 0 to 7, that plays one of your card's engines now. From base 43 also a drum sound, `OP1F_PLACE_DRUM` + slot, that rides your card's drum engine now (base 39: `OP1F_BAD_NAME`) |
 | What `op1f_sample_get` reads | Every synth and drum sound, whatever it plays |
 | A synth sound's memory, `room` | 264,600 frames stereo, 529,200 mono |
 | The frames put in | At most `capacity`, the unit's own count for the sound |

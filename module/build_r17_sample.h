@@ -57,8 +57,9 @@ enum {
     OP1F_SAMPLE_NOT_INPUT = 1,     // not inside the card's own input function, for an event on the key thread
     OP1F_SAMPLE_DISK = 2,          // the disk mode is open
     OP1F_SAMPLE_NO_PLACE = 3,      // a place that is no sound's
-    OP1F_SAMPLE_DRUM = 4,          // a drum sound's place: base 39 drops into synth sounds only
-    OP1F_SAMPLE_NO_ASK = 5,        // no ask of kind engine with that number
+    OP1F_SAMPLE_DRUM = 4,          // a drum sound's place on a base that drops into synth sounds only (39); from base 43 a
+                                   // drum place is taken when the ask is the card's drum engine (kind 12)
+    OP1F_SAMPLE_NO_ASK = 5,        // no ask of kind engine with that number (of kind drum engine for a drum place, base 43)
     OP1F_SAMPLE_RESTORING = 6,     // the place's sample is being put back after the start
     OP1F_SAMPLE_NOT_RIDING = 7,    // the place does not ride that engine now
     OP1F_SAMPLE_UNTOLD = 8,        // a sound loaded there is not told yet
@@ -97,6 +98,8 @@ enum { OP1F_SAMPLE_RIDES_NOT = 0, OP1F_SAMPLE_RIDES = 1, OP1F_SAMPLE_RIDES_UNTOL
 //   capacity     the object's frames (+0xd768)
 //   stereo       1 when its channels byte (+0xd770) is not 0, else 0
 //   length       the clipboard's length in frames
+//   drums        base 43: 1 when a drum place may be dropped into (the base has drum engines); `engine` and `ride` are
+//                then the drum engine's for a drum place (kind 12, the drum unit's ride), and the bound is the drum's pool
 struct Op1fSampleScene {
     unsigned turn, keyed, disk, place, engine, ride, restoring, ticket;
     unsigned queue_read, queue_write, many, patch;
@@ -104,6 +107,7 @@ struct Op1fSampleScene {
     const unsigned* tracks_end;
     unsigned char head[8];
     unsigned data, pool, capacity, stereo, length;
+    unsigned drums;
 };
 
 // The frames the unit's render writes into the slot: the cut's length, cut at the slot's capacity.
@@ -131,12 +135,19 @@ static inline int op1f_sample_head_is_stock(const unsigned char* head) {
     return op1f_sample_crc8(head) == OP1F_SAMPLE_IMPORT_CRC ? 1 : 0;
 }
 
+// Base 43: the same bound against a pool of `pool` halfwords (a drum slot's, 1,764,000).
+static inline int op1f_sample_fits_pool(unsigned length, unsigned capacity, unsigned stereo, unsigned pool) {
+    unsigned n = op1f_sample_frames(length, capacity);
+    if (n > pool) return 0;
+    return (n << (stereo ? 1 : 0)) <= pool ? 1 : 0;
+}
+
 // The checks, in the table's order (above): why the drop cannot go on, or OP1F_SAMPLE_PASSED.
 static inline unsigned op1f_sample_check(const Op1fSampleScene* s) {
     if (!s->turn && !s->keyed) return OP1F_SAMPLE_NOT_INPUT;
     if (s->disk) return OP1F_SAMPLE_DISK;
     if (s->place >= 16u) return OP1F_SAMPLE_NO_PLACE;
-    if (s->place >= 8u) return OP1F_SAMPLE_DRUM;
+    if (s->place >= 8u && !s->drums) return OP1F_SAMPLE_DRUM;
     if (!s->turn && !s->engine) return OP1F_SAMPLE_NO_ASK;
     if (s->restoring) return OP1F_SAMPLE_RESTORING;
     if (s->ride == (unsigned)OP1F_SAMPLE_RIDES_UNTOLD) return OP1F_SAMPLE_UNTOLD;
@@ -147,7 +158,8 @@ static inline unsigned op1f_sample_check(const Op1fSampleScene* s) {
     if (s->tracks_end < s->tracks || (unsigned)(s->tracks_end - s->tracks) > (unsigned)OP1F_SAMPLE_TRACKS_MOST) return OP1F_SAMPLE_LIST;
     if (s->tracks_end == s->tracks) return OP1F_SAMPLE_NO_TRACK;
     if (s->data == 0 || s->data != s->pool) return OP1F_SAMPLE_OBJECT;
-    if (!op1f_sample_fits(s->length, s->capacity, s->stereo)) return OP1F_SAMPLE_LARGE;
+    if (!op1f_sample_fits_pool(s->length, s->capacity, s->stereo, s->place >= 8u ? (unsigned)OP1F_SAMPLE_DRUM_POOL : (unsigned)OP1F_SAMPLE_POOL))
+        return OP1F_SAMPLE_LARGE;
     if (op1f_sample_head_is_stock(s->head))
         for (const unsigned* t = s->tracks; t != s->tracks_end; ++t)
             if (*t >= (unsigned)OP1F_SAMPLE_TRACKS_STOCK) return OP1F_SAMPLE_TRACK;
@@ -175,7 +187,7 @@ static inline const char* op1f_sample_why_words(unsigned why) {
     case OP1F_SAMPLE_DISK: return "the disk mode is open";
     case OP1F_SAMPLE_NO_PLACE: return "no sound has that place";
     case OP1F_SAMPLE_DRUM: return "a drum sound: this base drops into synth sounds only";
-    case OP1F_SAMPLE_NO_ASK: return "no ask of kind engine with that number";
+    case OP1F_SAMPLE_NO_ASK: return "no ask of kind engine (drum engine) with that number";
     case OP1F_SAMPLE_RESTORING: return "its sample is being put back after the start";
     case OP1F_SAMPLE_NOT_RIDING: return "the sound does not play that engine now";
     case OP1F_SAMPLE_UNTOLD: return "a sound loaded there is not told yet";

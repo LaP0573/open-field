@@ -4,7 +4,7 @@ Every place where the loader and the base of open-field change OS 1.7.3+0 of the
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 69 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 67 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
+There are 71 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 69 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
 
 ## In the firmware file, by the builder
 
@@ -27,7 +27,7 @@ The loader's own three changes: the loader is our small piece inside the firmwar
 | `0x8fcafc0a` | a call | `op1f_base_populate_stub` | In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it. | A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own. |
 | `0x8c0b43e4` | a call | `op1f_base_text_stub` | In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address. | A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock. |
 
-### The base, `base.pack` (64)
+### The base, `base.pack` (66)
 
 The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).
 
@@ -97,6 +97,8 @@ The pack `base`, the file base.pack: the shared pack every other pack relies on.
 | `0x8d4f7a34` | a jump, with a trampoline of 8 bytes | `op1f_layer_eh_stub` | The entry of the function that gives the row a sound's list of effects opens on. The lists of synth and drum sounds both call it, and nothing else does. | A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. |
 | `0x8d4f7ad0` | a jump, with a trampoline of 8 bytes | `op1f_layer_lh_stub` | The entry of the function that gives the row a sound's list of LFOs opens on. The lists of synth and drum sounds both call it, and nothing else does. | A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. |
 | `0x8f00b7b0` | a jump, with a trampoline of 8 bytes | `op1f_sample_sd_stub` | The entry of the function that puts what the tape has lifted into a synth sound's sample: the drop key on the sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work. Nothing else calls it. | A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline. |
+| `0x8d4eb160` | a jump, with a trampoline of 8 bytes | `op1f_drum_pick_entry` | The entry of the function that puts an engine picked in the unit's list on a drum sound. | A jump to ours, which puts a pack's drum engine on a drum sound that plays the drum sampler (the sound stays as it is) or takes it off, and lets the firmware's function run (through a trampoline) for every other pick. |
+| `0x8f00ba38` | a jump, with a trampoline of 8 bytes | `op1f_sample_dd_stub` | The entry of the function that puts what the tape has lifted into a drum sound's sample: the drop key on the drum sampler's page asks for it, and the unit runs it later in its own turn, on the task that does its clipboard work. | A jump to our stub. A drop a pack asked for into a drum sound that rides its drum engine (op1f_sample_drop) is done by ours, in the unit's turn; every other, the drum page's own drop key's among them, goes on in the firmware's function through a trampoline. |
 
 ## Words
 

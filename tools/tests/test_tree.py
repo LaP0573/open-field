@@ -186,6 +186,95 @@ class TheRecipes(unittest.TestCase):
             self.assertIn(mark, base["exports"])
         self.assertFalse(base["named"])                         # the start screen shows its release, not its name
 
+    def test_the_drum_engine_is_a_kind_of_its_own_and_the_base_offers_its_mark(self):
+        header = text("module", "build_r6e_card.h")
+        kinds = [int(n) for n in re.findall(r"OP1F_ASK_[A-Z_]+ = (\d+)", header)]
+        self.assertIn("OP1F_ASK_DRUM_ENGINE = 12", header)
+        self.assertNotIn("OP1F_ASK_DRUM_PAGE", header)                  # kind 12 is the drum engine
+        self.assertEqual(len(kinds), len(set(kinds)), "no two kinds of ask share a number")
+        exports = load("packs", "base.json")["exports"]
+        self.assertIn("op1f_drum_engine_1", exports)
+        self.assertNotIn("op1f_drum_page_1", exports)
+        self.assertIn("docs/drum-engine.md", pages())
+
+    def test_the_drum_s_pick_is_a_place_of_the_profile_with_the_synth_s_pick_s_sum(self):
+        """The drum's engine pick begins with the same eight bytes as the synth's: one sum, two places, each its own room."""
+        profile = load(PROFILE)
+        sums = {p["address"]: p for p in profile["patches"]}
+        self.assertEqual(sums["0x8d4eb160"]["sum"], sums["0x8d4eb3e8"]["sum"])
+        self.assertEqual(sums["0x8d4eb160"]["length"], 8)
+        entries = {e["address"]: e for t in profile["tables"] for e in t["entries"]}
+        self.assertEqual(entries["0x8d4eb160"]["target"], "op1f_drum_pick_entry")
+        self.assertEqual(entries["0x8d4eb160"]["room"], "op1f_drum_pick_room")
+        self.assertEqual(entries["0x8d4eb160"]["copies"], 8)
+        self.assertIn("module/build_r21_drum.s", load("packs", "base.json")["sources"])
+        self.assertIn("module/build_r21_drum.cpp", load("packs", "base.json")["sources"])
+
+    def test_the_drum_s_drop_job_is_a_place_with_the_synth_s_drop_job_s_sum(self):
+        """Base 43: DD, the head of the drum's drop job, begins with the same eight bytes as SD, the synth's."""
+        profile = load(PROFILE)
+        sums = {p["address"]: p for p in profile["patches"]}
+        self.assertEqual(sums["0x8f00ba38"]["sum"], sums["0x8f00b7b0"]["sum"])
+        entries = {e["address"]: e for t in profile["tables"] for e in t["entries"]}
+        self.assertEqual((entries["0x8f00ba38"]["target"], entries["0x8f00ba38"]["room"], entries["0x8f00ba38"]["copies"]),
+                         ("op1f_sample_dd_stub", "op1f_sample_dd_room", 8))
+
+    @unittest.skipUnless(shutil.which("c++"), "a C++ compiler on the computer")
+    def test_the_drop_s_checks_take_a_drum_place_that_rides_and_its_pool(self):
+        """module/build_r17_sample.h compiled on the computer: base 43 takes a drum place riding the drum engine, holds
+        it to the drum's pool, and still refuses a drum place where `drums` is 0 (base 39's answer)."""
+        source = r'''
+#include <cstdio>
+#include "build_r17_sample.h"
+int main() {
+    unsigned tracks[1] = {0};
+    Op1fSampleScene s = {};
+    s.turn = 0; s.keyed = 1; s.place = 9; s.engine = 1; s.ride = OP1F_SAMPLE_RIDES; s.queue_read = s.queue_write = 3;
+    s.tracks = tracks; s.tracks_end = tracks + 1; s.data = s.pool = 0x8d518598u + 0x35d540u; s.capacity = 882000; s.stereo = 1;
+    s.length = 800000; s.drums = 1;
+    int a = (int)op1f_sample_check(&s);
+    s.length = 882001; s.capacity = 900000; int b = (int)op1f_sample_check(&s);
+    s.length = 800000; s.capacity = 882000; s.drums = 0; int c = (int)op1f_sample_check(&s);
+    s.drums = 1; s.ride = OP1F_SAMPLE_RIDES_NOT; int d = (int)op1f_sample_check(&s);
+    s.ride = OP1F_SAMPLE_RIDES; s.place = 2; s.length = 300000; int e = (int)op1f_sample_check(&s);
+    std::printf("%d %d %d %d %d\n", a, b, c, d, e);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "t.cpp")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(source)
+            exe = os.path.join(folder, "t")
+            subprocess.run(["c++", "-std=c++11", "-I", os.path.join(ROOT, "module"), "-o", exe, path], check=True)
+            out = subprocess.run([exe], check=True, capture_output=True, text=True).stdout.split()
+        self.assertEqual(out, ["0", "15", "4", "7", "15"])          # passed; too large; base 39; not riding; a synth pool's bound
+
+    def test_the_base_offers_the_drum_mark_for_a_sample_a_pack_wrote(self):
+        """Base 43: op1f_sample_changed is offered, declared in the header and said on the drum engine's page."""
+        self.assertIn("op1f_sample_changed", load("packs", "base.json")["exports"])
+        self.assertIn('int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place)', text("module", "build_r6e_card.h"))
+        self.assertIn("op1f_sample_changed", text("docs", "drum-engine.md"))
+        source = text("module", "build_r17_sample.cpp")
+        self.assertIn("ticket.mark = 1", source)
+        self.assertIn("STOCK_DRUM_MARK(slot)", source)
+
+    def test_a_drum_engine_s_ask_is_read_from_a_recipe_as_the_base_holds_it(self):
+        pb = tool("pack_build")
+        ask = pb.drum_page_of_card(1, {"kind": "drum engine", "name": "chop", "shown": "chop_shown"}, [])
+        self.assertEqual(ask, (12, "chop", 0, {"shown": "chop_shown"}, {}))
+        self.assertEqual(pb.ask_words(*ask[:4]), "drum engine 'chop', rides the drum sampler, shown")
+        self.assertTrue(pb.has_drum_page([ask]))
+        for name in ("dbox", "sampler", "drum sampler"):
+            with self.assertRaisesRegex(ValueError, "unit's own drum engines"):
+                pb.drum_page_of_card(1, {"kind": "drum engine", "name": name, "shown": None}, [])
+        with self.assertRaisesRegex(ValueError, "twice"):
+            pb.drum_page_of_card(2, {"kind": "drum engine", "name": "chop2", "shown": None}, [ask])
+        with self.assertRaisesRegex(ValueError, "which such an ask has not"):
+            pb.drum_page_of_card(1, {"kind": "drum engine", "name": "chop", "shown": None, "listed": True}, [])
+        self.assertEqual(pb.DRUM_PAGE_MARK, "op1f_drum_engine_1")
+        self.assertEqual(pb.KIND_WORDS_6[12], "drum engine")
+
     def test_every_picture_is_a_set_of_instructions_and_not_a_picture(self):
         """A pack carries how the unit is to put a picture together, never the picture."""
         for folder, _folders, names in os.walk(os.path.join(ROOT, "pictures")):
