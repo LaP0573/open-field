@@ -1,0 +1,30 @@
+{
+  "id": "guitar",
+  "author": "atticusmas",
+  "status": "listed",
+  "categories": [
+    "synths"
+  ],
+  "description": "An acoustic guitar engine on TE's amp engine: your guitar's pickup on the line input, made to sound as if a mic recorded it.",
+  "repository": "https://github.com/atticusmas/open-field-guitar",
+  "commit": "d6b32836918ba50a428f3a7cfedac32057613fea",
+  "path": "guitar.pack",
+  "sha256": "79551ed10be393ee898fbe0f65ca6f81f6a1dae1b93c1bcd34f3229eb95765da",
+  "bytes": 56751,
+  "version": 3,
+  "firmware": "1.7.3",
+  "places": 1,
+  "needs": [],
+  "level": 7,
+  "folders": [
+    {
+      "name": "guitar",
+      "place": "guitar"
+    }
+  ],
+  "picture": {
+    "path": "thumbs/guitar.png",
+    "sha256": "8488f4a46409d0eb263b9a867a2d0454622f2415260af70120f58c08b961beae",
+    "bytes": 14644
+  }
+}
