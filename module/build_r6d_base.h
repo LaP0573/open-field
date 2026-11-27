@@ -37,14 +37,14 @@ extern "C" int op1f_param_heard(const Op1fCard* card, unsigned ask, unsigned pla
 // The mark of a base of level 10 (a constant 10): a pack that calls op1f_param_heard names it.
 extern "C" const unsigned op1f_level_10 OP1F_NAMED("op1f_level_10");
 
-// ---- R22 (base 45): hosted pages, for packs (as module/build_r6e_card.h words them, "Base 45: hosted pages") ----
+// ---- R22 (base 44): hosted pages, for packs (as module/build_r6e_card.h words them, "Base 44: hosted pages") ----
 
 extern "C" int op1f_rack_place(const Op1fCard* card, unsigned which, unsigned place, const char* kept) OP1F_NAMED("op1f_rack_place");
 extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, unsigned room) OP1F_NAMED("op1f_rack_kept");
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
 extern "C" const unsigned op1f_hosted_1 OP1F_NAMED("op1f_hosted_1");
 
-// ---- R22 (base 45): hosted pages, from the effects unit for the cards unit and the values unit ----
+// ---- R22 (base 44): hosted pages, from the effects unit for the cards unit and the values unit ----
 
 // The hosted page for `place`, the place on the screen: 1 and `out` filled while a host wants it there (its
 // op1f_rack_page at this frame or the one before, for that place, which still rides the host's layer, the instance

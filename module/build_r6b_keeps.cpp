@@ -2230,7 +2230,7 @@ static int value_get_at(u32 index, u32 name, char* out, unsigned room) {
     return (int)t.used;
 }
 
-// R22 (base 45): `where` OP1F_KEEP_HOSTED (16), an instance's kept text, is the effects unit's (module/build_r6d_base.h).
+// R22 (base 44): `where` OP1F_KEEP_HOSTED (16), an instance's kept text, is the effects unit's (module/build_r6d_base.h).
 // Weak: away, it is no place (OP1F_BAD_NAME).
 enum { KEEP_HOSTED = 16 };
 #if defined(OP1F_HOST)

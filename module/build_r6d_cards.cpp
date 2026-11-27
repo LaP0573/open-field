@@ -1,5 +1,5 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
-// Base 45 (R22), the base pack: base 38's cards, edited in place, with hosted pages (module/build_r6e_card.h, "Base 45:
+// Base 44 (R22), the base pack: base 38's cards, edited in place, with hosted pages (module/build_r6e_card.h, "Base 44:
 // hosted pages"), for every pack alike. Where the effects unit answers a layer's own page for the place on the screen
 // and that place's host asked for a wagon's page there (op1f_effects_hosted, weak: away, nothing of it), the wagon's
 // effect stands in instead, for the same mode and screen (its document set with op1f_page_stand_in, else the base's
@@ -745,7 +745,7 @@ extern "C" int __attribute__((weak)) op1f_effects_standing(Op1fStanding* out, un
 // unit is in rides an effect whose type word still holds the type it stands on; 0 otherwise. No line, nothing of a
 // pack's called. Weak: away, the entry of an effect's screen lives with its stand-in alone.
 extern "C" int __attribute__((weak)) op1f_effects_ahead(Op1fStanding* out, unsigned* mode, unsigned* screen) OP1F_NAMED("op1f_effects_ahead");
-// R22 (base 45): the effects unit's hosted page (module/build_r6d_base.h): whether one stands for the place on the
+// R22 (base 44): the effects unit's hosted page (module/build_r6d_base.h): whether one stands for the place on the
 // screen, told when it came on the screen or left it, and a knob's turn no pack took while it is up. Weak: away, no
 // hosted page.
 extern "C" int __attribute__((weak)) op1f_effects_hosted(unsigned place, Op1fStanding* out) OP1F_NAMED("op1f_effects_hosted");
@@ -1053,9 +1053,9 @@ static struct {
     u32 ahead_where;                                    // R6b: the synth sound it was for
     u32 ready_away;                                     // R6b: the entry kept ready is an engine away's: the base's own page
     u32 away_on, away_said;                             // R6b: its page was on the screen at the last frame; its line said so many times
-    u32 asked_hosted;                                   // R22 (base 45): this frame's answer is a hosted page, in a layer's place
-    u32 placed_hosted;                                  // R22 (base 45): the stand-in placed is a hosted page
-    volatile u32 hosted_up;                             // R22 (base 45): op1f_effects_hosted_up was told 1 (the key thread reads it)
+    u32 asked_hosted;                                   // R22 (base 44): this frame's answer is a hosted page, in a layer's place
+    u32 placed_hosted;                                  // R22 (base 44): the stand-in placed is a hosted page
+    volatile u32 hosted_up;                             // R22 (base 44): op1f_effects_hosted_up was told 1 (the key thread reads it)
 } fx;
 
 // R6d: the base's own page for an engine away, of its picture away.svg. The display thread's.
@@ -2670,7 +2670,7 @@ static OP1F_APART int lfo_ahead(u32 mode, Op1fStanding* out, u32* screen) {
     return m == mode ? 1 : 0;
 }
 
-// R22 (base 45): the effects unit's answer for a place (`s->where`, the place for a layer's own page) given way to the
+// R22 (base 44): the effects unit's answer for a place (`s->where`, the place for a layer's own page) given way to the
 // hosted page there, when one stands: the effect's slot, ask, `where` and `how` in its place, for the same mode and
 // screen. 1 when it did.
 static OP1F_APART u32 hosted_over(Op1fStanding* s) {
@@ -2686,13 +2686,13 @@ static OP1F_APART u32 hosted_over(Op1fStanding* s) {
 // Does an effect's page stand in now? Asked where the sequencer unit says no page stands in: what the effects unit
 // says of the mode and the screen is kept for stand_frame.
 // R11 (base 35): where neither the effects unit nor the engines unit says so, the LFO unit is asked.
-// R22 (base 45): a layer's own page gives way to the hosted page of the same place (hosted_over).
+// R22 (base 44): a layer's own page gives way to the hosted page of the same place (hosted_over).
 static OP1F_APART int effect_standing(Op1fStanding* s) {
     u32 mode = 0, screen = 0;
     fx.asked_engine = 0;                                                            // R6
-    fx.asked_hosted = 0;                                                            // R22 (base 45)
+    fx.asked_hosted = 0;                                                            // R22 (base 44)
     if (&op1f_effects_standing != 0 && op1f_effects_standing(s, &mode, &screen)) {
-        fx.asked_hosted = hosted_over(s);                                           // R22 (base 45)
+        fx.asked_hosted = hosted_over(s);                                           // R22 (base 44)
     } else {
         const char* name = 0;                                                       // R6: else an engine's page, of a card (an engine away has none)
         if (&op1f_engines_standing == 0 || !op1f_engines_standing(s, &mode, &screen, &name) || s->slot >= (u32)OP1F_SLOTS_MOST) return lfo_standing(s);   // R11 (base 35)
@@ -2711,7 +2711,7 @@ static OP1F_APART int ahead_of(u32 mode, Op1fStanding* out, u32* screen) {
     fx.ahead_engine = 0;                                                            // R6
     fx.ahead_away = 0;                                                              // R6b
     if (&op1f_effects_ahead != 0 && op1f_effects_ahead(out, &m, screen)) {
-        hosted_over(out);                                                           // R22 (base 45): the hosted page of the place, as effect_standing has it
+        hosted_over(out);                                                           // R22 (base 44): the hosted page of the place, as effect_standing has it
     } else {
         const char* name = 0;                                                       // R6: else an engine's page, of a card
         if (&op1f_engines_ahead == 0 || !op1f_engines_ahead(out, &m, screen, &name)) return lfo_ahead(mode, out, screen);   // R11 (base 35): else an LFO layer's
@@ -2928,7 +2928,7 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
     ++stand.placed;
     fx.placed = fx.asked;                                                           // R5
     fx.placed_engine = fx.asked ? fx.asked_engine : 0u;                             // R6
-    fx.placed_hosted = fx.asked ? fx.asked_hosted : 0u;                             // R22 (base 45)
+    fx.placed_hosted = fx.asked ? fx.asked_hosted : 0u;                             // R22 (base 44)
     if (fx.asked) fx.ready = 0;                                                     // R5: an entry kept ready is the stand-in's now
     if (stand.said_up >= (u32)STAND_SAID) return;
     ++stand.said_up;
@@ -2984,7 +2984,7 @@ static OP1F_APART void stand_told(u32 screen) {
         stand.told = 0;
         tell_shown(stand.told_slot, stand.told_ask, stand.told_where, 0);
     }
-    u32 hosted = up && fx.placed && fx.placed_hosted ? 1u : 0u;                     // R22 (base 45): the hosted page is the page on the screen
+    u32 hosted = up && fx.placed && fx.placed_hosted ? 1u : 0u;                     // R22 (base 44): the hosted page is the page on the screen
     if (hosted != fx.hosted_up) {                                                   // up before its `shown`, down after the old one's
         fx.hosted_up = hosted;
         if (&op1f_effects_hosted_up != 0) op1f_effects_hosted_up(hosted);
@@ -3058,7 +3058,7 @@ static inline __attribute__((always_inline)) int taken(u32 i, Op1fInput* e) {
     return 0;
 }
 
-// R22 (base 45): a knob's turn, click or press that no pack took while the hosted page is up (fx.hosted_up, 77 the
+// R22 (base 44): a knob's turn, click or press that no pack took while the hosted page is up (fx.hosted_up, 77 the
 // screen): a turn handed to the effects unit, which moves the instance's word, a click (54 to 57) or a press (61 to 64)
 // dropped; either is taken, so the unit's own effect under the layer never sees it. Every other key goes on as before.
 // From the key thread: nothing said.
@@ -3137,7 +3137,7 @@ extern "C" int op1f_input_down(const u32* record, int shifted) {
     event_of(&e, shifted ? (u32)OP1F_DOWN_SHIFT : (u32)OP1F_DOWN, key, 0, record);
     u32 who = offer(&e);
     if (who == 0) {
-        if (key >= (u32)HELD_KEYS || !hosted_takes(&e)) return 0;                  // R22 (base 45): a knob's click or press under the hosted page
+        if (key >= (u32)HELD_KEYS || !hosted_takes(&e)) return 0;                  // R22 (base 44): a knob's click or press under the hosted page
         input.held[key] = (u8)HOSTED_HELD;                                          // its up taken too
         return 1;
     }
@@ -3159,7 +3159,7 @@ extern "C" int op1f_input_up(int key) {
     tell_watchers((u32)key, who);                                                   // R1: those that watched its down first
     if (who == 0) return 0;                                                         // the firmware had the down
     input.held[key] = 0;
-    if (who == (u32)HOSTED_HELD) return 1;                                          // R22 (base 45): the hosted page took the down
+    if (who == (u32)HOSTED_HELD) return 1;                                          // R22 (base 44): the hosted page took the down
     if (who <= state.seen && op1f_slot_test(&state.inputs, (who - 1))) {
         Op1fInput e;
         event_of(&e, OP1F_UP, (u32)key, 0, 0);
@@ -3180,7 +3180,7 @@ extern "C" int op1f_input_turn(int knob, int turn) {
     Op1fInput e;
     event_of(&e, OP1F_TURN, (u32)knob, turn, 0);
     u32 who = offer(&e);
-    if (who == 0) return hosted_takes(&e);                                          // R22 (base 45): a knob's turn under the hosted page
+    if (who == 0) return hosted_takes(&e);                                          // R22 (base 44): a knob's turn under the hosted page
     count(&input.took_turn[who - 1]);
     count(&input.taken);
     return 1;

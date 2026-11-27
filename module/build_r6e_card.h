@@ -2077,15 +2077,15 @@ extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 enum { OP1F_OPTION_WORDS = 3, OP1F_WORDS_MOST = 32 };
 typedef const char* (*Op1fOptionWord)(unsigned choice);
 
-// Base 45: hosted pages. Up to here every word is the earlier bases' (base 44's lists of words last); this part only
-// adds behind it, and a pack built for base 44 or earlier runs as before: a host that does not call the three helpers
+// Base 44: hosted pages. Up to here every word is the earlier bases' (base 44's lists of words last); this part
+// only adds behind it, and a pack built for base 43 or earlier runs as before: a host that does not call the three helpers
 // below, and an effect that does not declare wagons, are not touched by it.
 //
 // Words. A host is a pack that runs another pack's effect at a place of its own, `which` (op1f_rack_ready,
 // op1f_rack_run): a chain's wagon, a mixer's lane. An instance is one of the base's 64 records of such runs: a host, its
 // `which` and an effect. Each instance has a number n, 0 to 63, which no other instance of any host has while it lives.
 //
-// What base 45 adds. A host may say which of the unit's places a run plays for (op1f_rack_place), keep for each wagon
+// What base 44 adds. A host may say which of the unit's places a run plays for (op1f_rack_place), keep for each wagon
 // the settings the effect's pack writes for it (op1f_rack_kept), and show the effect's own page for a wagon in the place
 // of its own page (op1f_rack_page). An effect's pack may declare that it knows wagons: each instance then gets its own
 // place number and its own kept settings. The mark op1f_hosted_1 says these helpers; no new level (level stays 10).
@@ -2093,7 +2093,7 @@ typedef const char* (*Op1fOptionWord)(unsigned choice);
 // For a host (from its frame function only).
 //
 // The effect at the host's `which` plays for the unit's `place` (0 to 15, or OP1F_PLACE_MASTER; OP1F_PLACE_NONE for
-// none, as before base 45), and `kept` is that wagon's kept text for its effect (what op1f_rack_kept gave; 0 or "" for
+// none, as before base 44), and `kept` is that wagon's kept text for its effect (what op1f_rack_kept gave; 0 or "" for
 // none; a JSON object of at most OP1F_HOSTED_KEPT_MOST bytes). Call it before op1f_rack_ready whenever the wagon at
 // `which` changes: a start, another sound played, a wagon moved there, a train loaded. The next op1f_rack_ready at
 // `which` takes the text for its effect; a ready of another effect at `which` with no call between drops it. Answers 0,
@@ -2131,8 +2131,8 @@ extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which
 
 // For an effect's pack: the declaration of wagons. An effect knows wagons when its table is OP1F_EFFECT_HOSTED_BYTES
 // long (or more) and the word at OP1F_EFFECT_HOSTED_AT holds OP1F_HOSTED_WAGONS. It is a field behind level 8's 180
-// bytes and the picture's word at +180 (op1f_wagon_art.h; 0 for no picture), not a flag: a base before 45 reads level
-// 8's table and runs the effect as a plain effect, so a pack built for base 45 runs on base 43 and 44 too. The pack tool
+// bytes and the picture's word at +180 (op1f_wagon_art.h; 0 for no picture), not a flag: a base before 44 reads level
+// 8's table and runs the effect as a plain effect, so a pack built for base 44 runs on base 43 and 44 too. The pack tool
 // writes it: "wagons": true in the effect's ask. A shorter table, or 0 there, is the fallback below. A layer's is read
 // as 0.
 enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1 };
@@ -2148,8 +2148,8 @@ enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_
 //     its files and its saved trains. When the host hands another text, a pack whose card has an ask of kind
 //     OP1F_ASK_KEEPS with `changed` is told changed(OP1F_KEEP_HOSTED, n, 0) at the next frame, before its frame function.
 //     Without a host that calls op1f_rack_place the text is still the instance's, until another effect takes the place.
-//   - Not declared (every effect pack written before base 45): the fallback, only meant for packs written before base
-//     45. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then
+//   - Not declared (every effect pack written before base 44): the fallback, only meant for packs written before base
+//     44. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then
 //     loses its page on wagons, nothing worse. While the place a host lent the instance (op1f_rack_place) rides a layer
 //     of the host's own card (checked at each use: never the master under such a train, and a pick of another effect
 //     there ends it), the base answers the effect's pack as if that place rode the effect: `process` and `reset` get the
@@ -2164,7 +2164,7 @@ enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_
 enum { OP1F_KEEP_HOSTED = 16 };
 
 // The mark of a base that carries out hosted pages (a constant 1): a host that calls the three helpers above names it,
-// so that a base before 45 leaves it out. An effect that declares wagons needs no mark.
+// so that a base before 44 leaves it out. An effect that declares wagons needs no mark.
 extern "C" const unsigned op1f_hosted_1 OP1F_NAMED("op1f_hosted_1");
 
 #endif
