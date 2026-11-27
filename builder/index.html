@@ -212,10 +212,11 @@
   .room .lab b, .room .lab span span { white-space: nowrap; }
   .room .lab .warn, .room .lab .warn b { color: var(--red); }
   .room .meter { position: relative; height: 24px; border: 1px solid var(--ink); background: var(--white); overflow: hidden; }
-  .room .meter i { position: absolute; top: 0; bottom: 0; min-width: 1px; box-shadow: inset -1px 0 var(--white); background: var(--blue); color: var(--on-accent);
+  .room .meter i { position: absolute; top: 0; bottom: 0; min-width: 1px; box-shadow: inset -1px 0 var(--white); background-color: var(--c, var(--blue)); color: #fff;
     font: 10px/22px var(--mono); font-style: normal; padding: 0 4px; white-space: nowrap; overflow: hidden; cursor: default; }
-  .room .meter i.new { background: var(--ochre); }
-  .room .meter i.off { background: var(--red); }
+  /* each pack has its own colour (--c, set by renderRoom); a pack going on is hatched in white, one coming off in red */
+  .room .meter i.new, .room .keys .new .dot { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, .45) 0 3px, transparent 3px 7px); }
+  .room .meter i.off, .room .keys .off .dot { background-image: repeating-linear-gradient(135deg, var(--red) 0 3px, transparent 3px 7px); }
   .room .meter i.by { background: var(--grey); opacity: .6; }
   .room .meter i.hi, .room .keys span.hi { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 1; }
   .room .meter .end { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--red); z-index: 2; }
@@ -1943,6 +1944,11 @@
   }
   const roomFit = "ResizeObserver" in window ? new ResizeObserver((all) => { for (const e of all) fitNames(e.target); }) : null;
 
+  // Each pack has its own colour in the room window, the same in both bars and in the keys, so a pack is easy to follow
+  // from one to the other. The colours go to the packs by name, in order; the base is grey. White text reads on each.
+  const ROOM_COLOURS = ["#3C6087", "#8A653C", "#5E7F4E", "#9A4E5C", "#4F7F7A", "#6B5B8C", "#A07A3A", "#5D7590", "#8C5A3C", "#4C6E50", "#7A6A90", "#906A6A", "#3F6F8F", "#7F7A45"];
+  const ROOM_BASE_COLOUR = "#6F7173";
+
   // The room window: the bar of the room now and, with changes waiting, after them; each pack's room; the pack files,
   // engines and effects against what the unit takes. Shown only while the page talks to a unit.
   function renderRoom(fig) {
@@ -1953,6 +1959,10 @@
     if (!fig) return;
     const { room, plan, now, after } = fig;
     const set = after || now;
+    const colours = new Map();
+    let next = 0;
+    for (const name of [...new Set([...now.placed, ...(after ? after.placed : [])].filter((q) => !q.standsBy).map((q) => q.pack))].sort())
+      colours.set(name, name === "base" ? ROOM_BASE_COLOUR : ROOM_COLOURS[next++ % ROOM_COLOURS.length]);
     const low = (s) => String(s).toLowerCase();
     const pc = (x) => ((x / room.bytes) * 100).toFixed(1) + "%";
     const least = (s) => (s.unknown.length ? "at least " : "");
@@ -1974,6 +1984,7 @@
       for (const q of s.placed) {
         const state = q.standsBy ? "by" : later ? (q.sent ? "new" : "") : removed.has(low(q.file)) || replaced.has(low(q.file)) ? "off" : "";
         const seg = el("i", state);
+        if (!q.standsBy && colours.has(q.pack)) seg.style.setProperty("--c", colours.get(q.pack));
         seg.style.left = at(q.start);
         seg.style.width = at(q.foot);
         seg.title = q.pack + " v" + q.version + " (" + q.file + "): " + kb(q.foot) + ", " + pc(q.foot) + " of the room" +
@@ -1995,8 +2006,11 @@
       if (pack) hover(k, pack);
       keys.append(k);
     };
-    for (const q of set.placed.filter((x) => !x.standsBy).sort((x, y) => y.foot - x.foot)) key(after && q.sent ? "var(--ochre)" : "var(--blue)", q.pack + " v" + q.version, kb(q.foot) + " · " + pc(q.foot), "", q.pack);
-    if (after) for (const q of now.placed) if (!q.standsBy && removed.has(low(q.file))) key("var(--red)", q.pack + " v" + q.version, "coming off · " + kb(q.foot), "off", q.pack);
+    for (const q of set.placed.filter((x) => !x.standsBy).sort((x, y) => y.foot - x.foot)) {
+      const going = after && q.sent;
+      key(colours.get(q.pack) || "var(--blue)", q.pack + " v" + q.version, kb(q.foot) + " · " + pc(q.foot) + (going ? " · going on" : ""), going ? "new" : "", q.pack);
+    }
+    if (after) for (const q of now.placed) if (!q.standsBy && removed.has(low(q.file))) key(colours.get(q.pack) || "var(--red)", q.pack + " v" + q.version, "coming off · " + kb(q.foot), "off", q.pack);
     for (const q of set.placed) if (q.standsBy) key("var(--grey)", q.pack + " v" + q.version, "stands by · " + kb(q.foot), "", q.pack);
     for (const f of set.unknown) key("var(--soft)", f.replace(/\.pack$/i, ""), "room not known");
     const free = room.bytes - set.bytes;
