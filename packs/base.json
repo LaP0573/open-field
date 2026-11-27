@@ -133,7 +133,11 @@
     "op1f_cards_2",
     "op1f_memory_2",
     "op1f_drum_engine_1",
-    "op1f_sample_changed"
+    "op1f_sample_changed",
+    "op1f_rack_place",
+    "op1f_rack_kept",
+    "op1f_rack_page",
+    "op1f_hosted_1"
   ],
   "pictures": [
     {

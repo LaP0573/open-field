@@ -2230,7 +2230,21 @@ static int value_get_at(u32 index, u32 name, char* out, unsigned room) {
     return (int)t.used;
 }
 
+// R22 (base 45): `where` OP1F_KEEP_HOSTED (16), an instance's kept text, is the effects unit's (module/build_r6d_base.h).
+// Weak: away, it is no place (OP1F_BAD_NAME).
+enum { KEEP_HOSTED = 16 };
+#if defined(OP1F_HOST)
+static int (*const r22_none_hosted_get)(const Op1fCard* card, unsigned which, const char* key, char* out, unsigned room) = 0;
+#define op1f_effects_hosted_get (*r22_none_hosted_get)
+static int (*const r22_none_hosted_set)(const Op1fCard* card, unsigned which, const char* key, const char* text) = 0;
+#define op1f_effects_hosted_set (*r22_none_hosted_set)
+#else
+extern "C" int op1f_effects_hosted_get(const Op1fCard* card, unsigned which, const char* key, char* out, unsigned room) OP1F_NAMED("op1f_effects_hosted_get") __attribute__((weak));
+extern "C" int op1f_effects_hosted_set(const Op1fCard* card, unsigned which, const char* key, const char* text) OP1F_NAMED("op1f_effects_hosted_set") __attribute__((weak));
+#endif
+
 extern "C" int op1f_value_get(const Op1fCard* card, unsigned where, unsigned which, const char* key, char* out, unsigned room) {
+    if (where == (unsigned)KEEP_HOSTED) return &op1f_effects_hosted_get != 0 ? op1f_effects_hosted_get(card, which, key, out, room) : (int)OP1F_BAD_NAME;   // R22
     u32 index = 0, name = 0;
     int why = named(card, where, which, key, &index, &name);
     if (why) return why;
@@ -2289,6 +2303,7 @@ static int value_set_at(u32 index, u32 name, const char* text, int when) {
 }
 
 extern "C" int op1f_value_set(const Op1fCard* card, unsigned where, unsigned which, const char* key, const char* text) {
+    if (where == (unsigned)KEEP_HOSTED) return &op1f_effects_hosted_set != 0 ? op1f_effects_hosted_set(card, which, key, text) : (int)OP1F_BAD_NAME;   // R22
     u32 index = 0, name = 0;
     int why = named(card, where, which, key, &index, &name);
     if (why) return why;

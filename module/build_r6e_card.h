@@ -2077,4 +2077,91 @@ extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 enum { OP1F_OPTION_WORDS = 3, OP1F_WORDS_MOST = 32 };
 typedef const char* (*Op1fOptionWord)(unsigned choice);
 
+// Base 45: hosted pages. Up to here every word is the earlier bases' (base 44's lists of words last); this part only
+// adds behind it, and a pack built for base 44 or earlier runs as before: a host that does not call the three helpers
+// below, and an effect that does not declare wagons, are not touched by it.
+//
+// Words. A host is a pack that runs another pack's effect at a place of its own, `which` (op1f_rack_ready,
+// op1f_rack_run): a chain's wagon, a mixer's lane. An instance is one of the base's 64 records of such runs: a host, its
+// `which` and an effect. Each instance has a number n, 0 to 63, which no other instance of any host has while it lives.
+//
+// What base 45 adds. A host may say which of the unit's places a run plays for (op1f_rack_place), keep for each wagon
+// the settings the effect's pack writes for it (op1f_rack_kept), and show the effect's own page for a wagon in the place
+// of its own page (op1f_rack_page). An effect's pack may declare that it knows wagons: each instance then gets its own
+// place number and its own kept settings. The mark op1f_hosted_1 says these helpers; no new level (level stays 10).
+//
+// For a host (from its frame function only).
+//
+// The effect at the host's `which` plays for the unit's `place` (0 to 15, or OP1F_PLACE_MASTER; OP1F_PLACE_NONE for
+// none, as before base 45), and `kept` is that wagon's kept text for its effect (what op1f_rack_kept gave; 0 or "" for
+// none; a JSON object of at most OP1F_HOSTED_KEPT_MOST bytes). Call it before op1f_rack_ready whenever the wagon at
+// `which` changes: a start, another sound played, a wagon moved there, a train loaded. The next op1f_rack_ready at
+// `which` takes the text for its effect; a ready of another effect at `which` with no call between drops it. Answers 0,
+// or less than 0: OP1F_BAD_NAME (no such card, `which` or place, or a text that is not a JSON object), OP1F_TOO_LARGE
+// (a longer text, or 64 places of all hosts hold a place or a text already), OP1F_NOT_NOW (not from the pack's frame
+// function). What the effect's pack is told of its place: "Declared or not", below.
+enum : unsigned { OP1F_PLACE_NONE = 0xffffffffu };
+enum { OP1F_HOSTED_KEPT_MOST = 128 };
+extern "C" int op1f_rack_place(const Op1fCard* card, unsigned which, unsigned place, const char* kept) OP1F_NAMED("op1f_rack_place");
+
+// The kept text the effect's pack wrote for the instance at `which`, when it changed since the last call: written into
+// `out` with a zero behind it, and its bytes answered (2 or more: an object, "{}" when it holds no member any more). 0:
+// unchanged. Or less than 0: OP1F_NOT_HERE (no instance at `which`, or its effect does not declare wagons),
+// OP1F_TOO_LARGE (`room` too small for it and its zero: nothing written, and the next call answers it again),
+// OP1F_BAD_NAME, OP1F_NOT_NOW (not from the pack's frame function). The host saves it with the wagon, and hands it back
+// by op1f_rack_place. Ask it once a frame.
+extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, unsigned room) OP1F_NAMED("op1f_rack_kept");
+
+// The page of the effect at `which`, for the place on the screen while it rides the host's layer `ask` (an effect of
+// the card with OP1F_EFFECT_LAYER): T3's page becomes the effect's own page for that instance (its page that stands
+// in, or the base's blank page with its name), a third choice beside OP1F_LAYER_PAGE_UNIT and _OWN. Call it once a
+// frame while the host wants that page; a frame without the call, or op1f_layer_page, ends it. `words` is four ints, in
+// and out, as OP1F_RACK_WORDS has them (the unit's knob words of the effect the pack's stands on): in, the instance's
+// four words as the host keeps them (as set, not moved by an LFO); out, the words the page changed since the last
+// call (the effect's op1f_param_set at the instance's place, or a knob turn no pack took, moved as the unit's knob of
+// the effect it stands on would move it), the others as they came in. The host applies them to its wagon and keeps them
+// as it keeps a turn. Answers a mask: bits 0 to 3 the words changed, with OP1F_HOSTED_PAGE_UP while the page is on the
+// screen; or less than 0: OP1F_NOT_HERE (no ready instance at `which`, or the place on the screen does not ride the
+// layer), OP1F_BAD_NAME (no such layer of the card, `which`, or `words` 0), OP1F_NOT_NOW (not from the pack's frame
+// function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
+// move the unit's effect under the layer): a turn moves the instance's word, a click or a press is dropped.
+enum { OP1F_HOSTED_PAGE_UP = 256 };
+extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
+
+// For an effect's pack: the declaration of wagons. An effect knows wagons when its table is OP1F_EFFECT_HOSTED_BYTES
+// long (or more) and the word at OP1F_EFFECT_HOSTED_AT holds OP1F_HOSTED_WAGONS. It is a field behind level 8's 180
+// bytes and the picture's word at +180 (op1f_wagon_art.h; 0 for no picture), not a flag: a base before 45 reads level
+// 8's table and runs the effect as a plain effect, so a pack built for base 45 runs on base 43 and 44 too. The pack tool
+// writes it: "wagons": true in the effect's ask. A shorter table, or 0 there, is the fallback below. A layer's is read
+// as 0.
+enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1 };
+//
+// Declared or not.
+//   - Declared. Every instance of the effect plays at its own place, OP1F_PLACE_HOSTED + n (32 to 95): `place` in
+//     `process` and `reset`, `where` in `shown`, and `place` in op1f_param_get, op1f_param_heard and op1f_param_set,
+//     which answer that instance's values (op1f_param_set while its page is up; OP1F_NOT_HERE otherwise). Its kept text:
+//     op1f_value_get and op1f_value_set with `where` OP1F_KEEP_HOSTED and `which` n read and write a member of the
+//     instance's object, its name `key` (1 to 31 characters of a-z, 0-9 and '_', which the pack's ask of kind
+//     OP1F_ASK_KEEPS need not list), its value a JSON text of the kinds level 7 keeps; the whole object at most
+//     OP1F_HOSTED_KEPT_MOST bytes (op1f_value_set answers OP1F_TOO_LARGE beyond). The host keeps it with the wagon, in
+//     its files and its saved trains. When the host hands another text, a pack whose card has an ask of kind
+//     OP1F_ASK_KEEPS with `changed` is told changed(OP1F_KEEP_HOSTED, n, 0) at the next frame, before its frame function.
+//     Without a host that calls op1f_rack_place the text is still the instance's, until another effect takes the place.
+//   - Not declared (every effect pack written before base 45): the fallback, only meant for packs written before base
+//     45. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then
+//     loses its page on wagons, nothing worse. While the place a host lent the instance (op1f_rack_place) rides a layer
+//     of the host's own card (checked at each use: never the master under such a train, and a pick of another effect
+//     there ends it), the base answers the effect's pack as if that place rode the effect: `process` and `reset` get the
+//     place (not OP1F_PLACE_HOSTED + which); op1f_riding has its bit for as long as the wagon is lent; `shown` its
+//     `where`; op1f_param_get, op1f_param_heard and op1f_param_set at the place answer the instance whose page is up,
+//     else the first lent instance of that effect there (op1f_param_set answers OP1F_NOT_HERE while no hosted page is
+//     up; op1f_param_get without a page answers the values of its last run). op1f_value_get and op1f_value_set at that
+//     place stay the sound's own: two wagons of one sound with the same effect share them. op1f_rack_at(place) still
+//     answers the layer. Without op1f_rack_place, every run is as base 44 has it: OP1F_PLACE_HOSTED + which, no page.
+enum { OP1F_KEEP_HOSTED = 16 };
+
+// The mark of a base that carries out hosted pages (a constant 1): a host that calls the three helpers above names it,
+// so that a base before 45 leaves it out. An effect that declares wagons needs no mark.
+extern "C" const unsigned op1f_hosted_1 OP1F_NAMED("op1f_hosted_1");
+
 #endif

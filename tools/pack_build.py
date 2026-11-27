@@ -380,9 +380,11 @@ CARD_LEVELS = CARD_LEVELS + (8,)
 ASK_KINDS_OF_LEVEL[8] = dict(ASK_KINDS_OF_LEVEL[7], effect=7)
 KIND_WORDS_6[7] = "effect"
 TABLE_BYTES_6[7] = 180
-ASK_KEYS_6[7] = ("kind", "name", "rides", "mono", "tails", "cycles", "state_bytes", "state_align", "process", "reset", "shown", "params", "wagon")
+ASK_KEYS_6[7] = ("kind", "name", "rides", "mono", "tails", "cycles", "state_bytes", "state_align", "process", "reset", "shown", "params", "wagon",
+                 "wagons")
 ASK_ADDRESSES_6[7] = (("shown", 24), ("process", 56), ("reset", 60), ("wagon", 180))
 EFFECT_WAGON_BYTES = 184                                         # an effect that names a wagon's picture (module/op1f_wagon_art.h): its address at +180
+EFFECT_HOSTED_BYTES, HOSTED_WAGONS = 188, 1                      # base 45: an effect that declares wagons, OP1F_HOSTED_WAGONS at +184 (module/build_r6e_card.h)
 KINDS_COUNTED = {6: "five", 7: "six", 8: "seven"}                # how many kinds of ask a level knows, as a refusal says it
 EFFECT_MONO, EFFECT_TAILS = 1, 2                                 # an effect's flags
 EFFECT_VALUES_MOST, EFFECT_CYCLES_MOST, EFFECT_STATE_MOST = 4, 84000, 8 << 20
@@ -1677,6 +1679,10 @@ def effect_of_card(number, ask, earlier):
     if state and (not EFFECT_ALIGN_LEAST <= align <= MEMORY_ALIGN_MOST or align & (align - 1)):
         raise ValueError("%s: its working memory's alignment is a power of two from %d to %d, not %r: its table is not in order (%d, %d), and %s"
                          % (said, EFFECT_ALIGN_LEAST, MEMORY_ALIGN_MOST, align, align, MEMORY_ALIGN_MOST, aside))
+    if not isinstance(ask.get("wagons", False), bool):      # base 45: the declaration of wagons, a field older bases leave unread
+        raise ValueError("%s: its wagons is true or false, not %r" % (said, ask["wagons"]))
+    if flags & EFFECT_LAYER and ask.get("wagons"):
+        raise ValueError("%s: a layer runs on no wagon: its wagons is false or left out" % said)
     if flags & EFFECT_LAYER:                                # since R11 (base 35): the rest of a layer's check
         return layer_of_card(said, aside, ask, name, flags, state, align, earlier)
     params = ask.get("params")
@@ -1715,6 +1721,8 @@ def effect_of_card(number, ask, earlier):
     extra = {"rides": rides, "cycles": cycles, "state_bytes": state, "state_align": align, "params": held}
     if ask.get("wagon"):                                    # a wagon's picture for a train that draws it, behind the 180 bytes
         extra["wagon"] = ask["wagon"]
+    if ask.get("wagons"):                                   # base 45: wagons declared, behind the picture's word (0 for none)
+        extra["wagons"] = True
     return 7, name, flags, functions, extra
 
 
@@ -1997,7 +2005,8 @@ def ask_words(what, name, flags, functions, extra=None):
         if extra["state_bytes"]:
             said += ", %d bytes of memory on %d" % (extra["state_bytes"], extra["state_align"])
         said += ", %d value(s): %s" % (len(extra["params"]), "; ".join("%s %d..%d from %d" % p for p in extra["params"]))
-        return said + "".join(", " + key for key in ("reset", "shown") if functions.get(key)) + (", a wagon's picture" if extra.get("wagon") else "")
+        return (said + "".join(", " + key for key in ("reset", "shown") if functions.get(key)) + (", a wagon's picture" if extra.get("wagon") else "")
+                + (", wagons" if extra.get("wagons") else ""))
     if what == 3:
         said = "stage '%s' at %s, %d cycles a call" % (name, STAGE_POINT_WORDS.get(extra["point"], "the point %d" % extra["point"]), extra["cycles"])
         said += ", listens" if flags & STAGE_LISTENS else ""
@@ -2113,6 +2122,8 @@ def ask_table_words(ask, address_of=None):
         for value_name, low, high, start in extra["params"]:
             words += [value_name.encode("ascii").ljust(16, b"\0"), low, high, start]
         left = EFFECT_VALUES_MOST - len(extra["params"])
+        if extra.get("wagons"):                             # base 45: the picture's word (0 for none), then OP1F_HOSTED_WAGONS
+            return words + ([bytes(left * PARAM.size)] if left else []) + [address(extra.get("wagon") or None), HOSTED_WAGONS]
         return words + ([bytes(left * PARAM.size)] if left else []) + ([address(extra["wagon"])] if extra.get("wagon") else [])
     words = [address(functions["changed"]), len(extra["keys"])]
     for key, bits in extra["keys"]:
@@ -2167,6 +2178,8 @@ def table_bytes_of(ask):
     effect that names a wagon's picture (hasis), 184."""
     if ask[0] == OPTIONS and ask[3].get("open"):
         return OPTIONS_OPEN_BYTES
+    if ask[0] == 7 and ask[4].get("wagons"):                # base 45: wagons declared, 188
+        return EFFECT_HOSTED_BYTES
     if ask[0] == 7 and ask[4].get("wagon"):
         return EFFECT_WAGON_BYTES
     return TABLE_BYTES_6[ask[0]] if ask[0] > 2 else ASK_TABLE_BYTES[ask[0]]
@@ -2665,6 +2678,10 @@ def effect_table(fields, body, size, what, earlier, layered=False):
             "params": [(p[0].split(b"\0")[0].decode("latin-1"), p[1], p[2], p[3]) for p in params]})
     if size >= EFFECT_WAGON_BYTES and inside(what, EFFECT_WAGON_BYTES):          # a wagon's picture behind the 180 bytes
         ask[4]["wagon"] = struct.unpack_from("<I", bytes(body[what - first + table:what - first + EFFECT_WAGON_BYTES]).ljust(4, b"\0"))[0]
+    if size >= EFFECT_HOSTED_BYTES and inside(what, EFFECT_HOSTED_BYTES):        # base 45: wagons declared behind the picture's word
+        word = struct.unpack_from("<I", bytes(body[what - first + EFFECT_WAGON_BYTES:what - first + EFFECT_HOSTED_BYTES]).ljust(4, b"\0"))[0]
+        if word == HOSTED_WAGONS:
+            ask[4]["wagons"] = True
     wrong = None
     known = EFFECT_MONO | EFFECT_TAILS | (EFFECT_LAYER if layered else 0)     # since R11: and a layer, in a pack for base 35
     layer = flags & EFFECT_LAYER if layered else 0

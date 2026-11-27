@@ -153,6 +153,12 @@ typedef u32 (*LookupFn)(u32 database, const char* key, const void* name, void* o
 #ifndef OP1F_BUILD_R6E_CARD_H
 enum { OP1F_EFFECT_LAYER = 4, OP1F_ASK_LFO = 11, OP1F_LAYER_PAGE_UNIT = 0, OP1F_LAYER_PAGE_OWN = 1 };
 #endif
+// R22 (base 45): the words of base 45's part "hosted pages" this unit uses.
+#ifndef OP1F_BUILD_R6E_CARD_H
+enum : unsigned { OP1F_PLACE_NONE = 0xffffffffu };
+enum { OP1F_HOSTED_KEPT_MOST = 128, OP1F_HOSTED_PAGE_UP = 256, OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1,
+       OP1F_KEEP_HOSTED = 16 };
+#endif
 
 // The room of the pick's entry (module/build_r5_effects.s): the firmware's pick as it always was. The other two rooms
 // are the entries' alone.
@@ -312,6 +318,7 @@ struct Effect {
     u32 screen;                                        // the effect screen of the type it stands on
     volatile u32 calls, sum, most, over;               // this period's, all places: the audio thread writes, the display thread reads and clears masked
     volatile u32 page;                                 // R11: a layer's page choice, OP1F_LAYER_PAGE_UNIT or _OWN
+    u32 hosted;                                        // R22 (base 45): it declares wagons (OP1F_HOSTED_WAGONS at +184)
 };
 static Effect effects[EFFECTS];
 static Op1fRackEntry entries[EFFECTS];
@@ -1215,6 +1222,9 @@ static void enrol(const void* list) {
             if (!layer && at < (u32)NAME && RD8((u32)name + at) == 0 && t->rides[at] == 0) e->type = RD32(EFFECT_NAMES + 8u * k + 4u);
         }
         e->flags = t->head.flags;
+        const Op1fCardSlot* held = &op1f_cards_2.slots[e->slot];                     // R22 (base 45): wagons declared behind the picture's word
+        e->hosted = !layer && held->card->asks[e->ask].bytes >= (u32)OP1F_EFFECT_HOSTED_BYTES && inside((u32)t, held, (u32)OP1F_EFFECT_HOSTED_BYTES) &&
+                    ((const u32*)t)[(u32)OP1F_EFFECT_HOSTED_AT >> 2] == (u32)OP1F_HOSTED_WAGONS ? 1u : 0u;
         e->cycles = t->cycles;
         e->count = t->count;
         e->state_bytes = t->state_bytes;
@@ -1860,6 +1870,205 @@ static u32 rack_wipe(u32 i, u32 room) {
     return room;
 }
 
+// ---------------------------------------------------------------- R22 (base 45): hosted pages
+
+// A host's place lent or given a kept text (op1f_rack_place), found by the host's slot + 1 and its `which`: the unit's
+// place + 1 (0 for none) and the kept text of the wagon's effect, `effect` that effect's number + 1, 0 while the text
+// waits for the place's next ready; `told`, `changed` owed to the effect's pack; `wrote`, the pack wrote it since the
+// host's last op1f_rack_kept. The display thread's, but for `place` copied into rack_lent.
+enum { LENDS = RACKS, KEPT_MOST = OP1F_HOSTED_KEPT_MOST, MEMBERS_MOST = 32, KEEPS_BYTES = 324, DEPTH_MOST = 4 };
+struct Lend { u16 host; u8 which, place, effect, told, wrote, length; char text[KEPT_MOST]; };   // 136 bytes
+static_assert(sizeof(Lend) == 136 && sizeof(Op1fKeeps) == KEEPS_BYTES, "a lend's 136 bytes, and level 7's table");
+static Lend lends[LENDS];
+static volatile u8 rack_lent[RACKS];                   // a record's lent place + 1, 0 for none (the audio thread reads it)
+static volatile u8 rack_on[RACKS];                     // the `on` of a record's last run
+static volatile int rack_values[RACKS][VALUES];        // the values of a record's last run, in the effect's numbers
+static volatile u32 rack_stamp[RACKS];                 // the cycle counter at that run
+
+// The hosted page a host asks for (op1f_rack_page): its slot + 1 (0 for none), its layer's ask, its `which`, the
+// record + 1, the place on the screen, the frame of its last ask; `up` as the cards unit says it; the four words held
+// and those the page changed; the turns noted on the key thread, not yet moved.
+static struct {
+    volatile u32 host, record;
+    u32 ask, which, place, asked, changed;
+    volatile u32 up;
+    u32 words[4];
+    volatile int turns[4];
+} page;
+
+static EFFECTS_APART Lend* lend_of(u32 slot, u32 which) {                       // apart: inlined, it walked the lends with an index register
+    for (u32 i = 0; i < (u32)LENDS; ++i)
+        if (lends[i].host == slot + 1u && lends[i].which == which) return &lends[i];
+    return 0;
+}
+
+static EFFECTS_APART Lend* lend_free() {
+    for (u32 i = 0; i < (u32)LENDS; ++i)
+        if (lends[i].host == 0) return &lends[i];
+    return 0;
+}
+
+// Does the place + 1 `lent` ride a layer of the host's card `slot`? Any thread: a few reads.
+static int lent_ok(u32 lent, u32 slot) {
+    if (lent == 0 || lent > (u32)PLACES) return 0;
+    const Effect* l = riding(lent - 1u);
+    return is_layer(l) && l->slot == slot;
+}
+
+// The place record i's effect is told (`process`, `reset`, `shown`, the helpers): its own for an effect that declares
+// wagons, the lent place in the fallback while it rides the host's layer, else as before base 45. Any thread.
+static u32 run_place(u32 i) {
+    const Rack* k = &racks[i];
+    if (effects[k->effect].hosted) return (u32)OP1F_PLACE_HOSTED + i;
+    u32 lent = rack_lent[i];
+    return lent_ok(lent, k->slot) ? lent - 1u : (u32)OP1F_PLACE_HOSTED + k->which;
+}
+
+// Is record i the one its host's place runs now?
+static int rack_live(u32 i) {
+    return i < rack_count && rack_current[racks[i].slot][racks[i].which] == i + 1u;
+}
+
+// Does the page stand: asked at this frame or the one before, its record current and ready, and the place on the screen
+// its place, riding the host's layer.
+static int page_live() {
+    u32 host = page.host, record = page.record;
+    if (host == 0 || record == 0 || unit.frames - page.asked > 1u || !rack_live(record - 1u) || racks[record - 1u].in.status != (u32)READY) return 0;
+    const Effect* l = riding(page.place);
+    return is_layer(l) && l->slot == host - 1u && l->ask == page.ask && shown_place(RD32(CURRENT_MODE)) == page.place;
+}
+
+// Is record i's page the one on the screen?
+static int page_holds(u32 i) {
+    return page.up && page.record == i + 1u && page_live();
+}
+
+// The turns noted moved onto the page's words, as the unit's knob would move them: a 128th of the knob's row a step,
+// held to the row (the display thread).
+static EFFECTS_APART void page_move() {
+    u32 record = page.record;
+    if (record == 0 || record > rack_count) return;
+    int steps[4];
+    u32 mask;
+    MASK_OFF(mask);
+    for (u32 i = 0; i < 4u; ++i) {
+        int t = page.turns[i];
+        steps[i] = t >= 0 ? (t >> 10) : -((-t) >> 10);
+        page.turns[i] = t - steps[i] * 1024;
+    }
+    MASK_ON(mask);
+    const Effect* e = &effects[racks[record - 1u].effect];
+    for (u32 i = 0; i < e->count; ++i) {
+        if (steps[i] == 0 || e->fixed[i]) continue;
+        int low = e->row_low[i], high = e->row_high[i];
+        int step = (high - low) >> 7;
+        if (step < 1) step = 1;
+        int v = low < 0 ? ((int)page.words[i] >> 16) : (int)(page.words[i] >> 16);
+        v += steps[i] * step;
+        if (v < low) v = low;
+        if (v > high) v = high;
+        page.words[i] = (u32)v << 16;
+        page.changed |= 1u << i;
+    }
+}
+
+// `changed(OP1F_KEEP_HOSTED, n, 0)` of the effect's card's ask of kind OP1F_ASK_KEEPS, when it has one with `changed`,
+// recorded as a call of its pack (the display thread, before the cards' frame functions).
+static EFFECTS_APART void tell_kept(const Effect* e, u32 n) {
+    const Op1fCardSlot* s = &op1f_cards_2.slots[e->slot];
+    const Op1fCard* card = s->card;
+    u32 asks = card->ask_count > (u32)OP1F_ASKS_MOST ? (u32)OP1F_ASKS_MOST : card->ask_count;
+    for (u32 k = 0; k < asks; ++k) {
+        const Op1fAsk* a = &card->asks[k];
+        if (a->kind != (u32)OP1F_ASK_KEEPS) continue;
+        if (a->bytes < (u32)KEEPS_BYTES || !inside((u32)a->what, s, (u32)KEEPS_BYTES) || ((u32)a->what & 3u) != 0) return;
+        const Op1fKeeps* t = (const Op1fKeeps*)a->what;
+        u32 f = (u32)t->changed;
+        if (f == 0 || !inside(f, s, 2u) || (f & 1u) != 0) return;
+        Op1fCallKept kept;
+        op1f_cards_call_in((u32)CALL_SHOWN, e->slot, &kept);
+        t->changed((u32)OP1F_KEEP_HOSTED, n, 0);
+        op1f_cards_call_out((u32)CALL_SHOWN, &kept);
+        return;
+    }
+}
+
+// The texts handed or dropped since the last frame told to the packs of the effects that declare wagons.
+static EFFECTS_APART void lends_tell() {
+    for (u32 i = 0; i < (u32)LENDS; ++i) {
+        Lend* d = &lends[i];
+        if (d->host == 0 || !d->told || d->effect == 0) continue;
+        u32 r = rack_current[d->host - 1u][d->which];
+        if (r == 0 || r > rack_count || racks[r - 1u].effect + 1u != d->effect) continue;
+        d->told = 0;
+        const Effect* e = &effects[d->effect - 1u];
+        if (e->hosted) tell_kept(e, r - 1u);
+    }
+}
+
+// A ready at a host's place: the record's lent place, and the kept text taken for its effect (the text handed since the
+// last ready), kept (the same effect), or dropped (another). The display thread, before the record's `reset`.
+static EFFECTS_APART void lend_bind(u32 slot, u32 which, u32 i, u32 effect) {
+    Lend* d = lend_of(slot, which);
+    rack_lent[i] = d ? d->place : (u8)0;
+    if (d == 0 || d->effect == effect + 1u) return;
+    if (d->effect != 0) {                                                           // another effect: its text dropped
+        if (d->length) d->told = 1;
+        d->length = 0;
+        d->wrote = 0;
+    }
+    d->effect = (u8)(effect + 1u);
+}
+
+// A place that begins to run record i: its last run's values at their starts, on.
+static EFFECTS_APART void rack_begun(u32 slot, u32 which, u32 i, const Effect* e) {
+    for (u32 v = 0; v < e->count; ++v) rack_values[i][v] = e->start[v];
+    rack_on[i] = 1;
+    rack_stamp[i] = cycles_now() - HEARD_CYCLES - 1u;
+    Lend* d = lend_of(slot, which);
+    if (d && e->hosted) d->told = 1;                                                // a new instance: its pack reads its text
+}
+
+// The values of record i's run kept, with the time (the audio thread; apart, so that op1f_rack_run's own code stays).
+static EFFECTS_APART void rack_ran(u32 i, const Effect* e, const int* values) {
+    for (u32 v = 0; v < e->count; ++v) rack_values[i][v] = values[v];
+    rack_stamp[i] = cycles_now();
+}
+
+// The instance of `e` the helpers answer at `place`, into `found`: an instance's own place for an effect that declares
+// wagons; in the fallback, at a lent place, the instance whose page is up, else the first lent one. 0 for none.
+static EFFECTS_APART int instance_at(const Effect* e, u32 place, u32* found) {
+    if (e->hosted) {
+        u32 i = place - (u32)OP1F_PLACE_HOSTED;
+        if (place < (u32)OP1F_PLACE_HOSTED || i >= rack_count || racks[i].effect != e->number || !rack_live(i)) return 0;
+        *found = i;
+        return 1;
+    }
+    if (place >= (u32)PLACES) return 0;
+    u32 record = page.record;
+    if (record != 0 && record <= rack_count && racks[record - 1u].effect == e->number && page_holds(record - 1u) && run_place(record - 1u) == place) {
+        *found = record - 1u;
+        return 1;
+    }
+    for (u32 i = 0; i < rack_count; ++i)
+        if (racks[i].effect == e->number && rack_live(i) && rack_lent[i] == place + 1u && lent_ok(place + 1u, racks[i].slot)) {
+            *found = i;
+            return 1;
+        }
+    return 0;
+}
+
+// The places lent to instances of `e` that ride their hosts' layers now, a bit a place (the fallback).
+static EFFECTS_APART u32 lent_riding(const Effect* e) {
+    u32 bits = 0;
+    if (e->hosted) return 0;
+    for (u32 i = 0; i < rack_count; ++i) {
+        u32 lent = rack_lent[i];
+        if (racks[i].effect == e->number && rack_live(i) && lent_ok(lent, racks[i].slot)) bits |= 1u << (lent - 1u);
+    }
+    return bits;
+}
+
 static void frame_work() {
     if (!unit.first_done) {
         unit.first_done = 1;
@@ -1870,6 +2079,8 @@ static void frame_work() {
     if (n == 0) return;
     ++unit.frames;
     rack_look();                                                                    // R16 (hasis): which runs the packs' places still have
+    page_move();                                                                    // R22 (base 45): the hosted page's turns
+    lends_tell();                                                                   // R22: the kept texts handed, told
     u32 mask;
     MASK_OFF(mask);
     u32 began = picked, stopped = ended, loaded = told, by_load = told_load;         // R6d: by_load
@@ -2045,7 +2256,12 @@ struct Valued { u32 kind, places; ValuedGetFn get; ValuedSetFn set; ValuedRiding
 static int effect_get(const Valued* row, int slot, u32 ask, u32 place, u32 index, int* out) {
     const Effect* e = effect_of(slot, ask);
     if (e == 0 || index >= e->count || out == 0) return OP1F_BAD_NAME;
-    if (place >= row->places || riding(place) != e) return OP1F_NOT_HERE;
+    if (place >= row->places || riding(place) != e) {
+        u32 i = 0;                                                                  // R22 (base 45): an instance's place, or a lent one
+        if (!instance_at(e, place, &i)) return OP1F_NOT_HERE;
+        *out = page_holds(i) ? value_of(e, index, page.words[index]) : rack_values[i][index];
+        return 0;
+    }
     *out = value_of(e, index, RD32(place_words(place) + 4u * index));
     return 0;
 }
@@ -2055,7 +2271,13 @@ static int effect_get(const Valued* row, int slot, u32 ask, u32 place, u32 index
 static int effect_heard(const Valued* row, int slot, u32 ask, u32 place, u32 index, int* out) {
     const Effect* e = effect_of(slot, ask);
     if (e == 0 || index >= e->count || out == 0) return OP1F_BAD_NAME;
-    if (place >= row->places || riding(place) != e) return OP1F_NOT_HERE;
+    if (place >= row->places || riding(place) != e) {
+        u32 i = 0;                                                                  // R22 (base 45): the last run's, or as set on the page
+        if (!instance_at(e, place, &i)) return OP1F_NOT_HERE;
+        int stale = cycles_now() - rack_stamp[i] > HEARD_CYCLES;
+        *out = stale && page_holds(i) ? value_of(e, index, page.words[index]) : rack_values[i][index];
+        return 0;
+    }
     const Heard* h = &heard[place];
     for (u32 tries = 0; tries < (u32)HEARD_TRIES; ++tries) {
         u32 seq = h->seq;
@@ -2075,7 +2297,13 @@ static int effect_heard(const Valued* row, int slot, u32 ask, u32 place, u32 ind
 static int effect_set(const Valued* row, int slot, u32 ask, u32 place, u32 index, int value) {
     const Effect* e = effect_of(slot, ask);
     if (e == 0 || index >= e->count) return OP1F_BAD_NAME;
-    if (place >= row->places || riding(place) != e) return OP1F_NOT_HERE;
+    if (place >= row->places || riding(place) != e) {
+        u32 i = 0;                                                                  // R22 (base 45): the page's word, while it is up
+        if (!instance_at(e, place, &i) || !page_holds(i)) return OP1F_NOT_HERE;
+        page.words[index] = word_of(e, index, value);
+        page.changed |= 1u << index;
+        return 0;
+    }
     u32 four[4] = {0, 0, 0, 0};
     four[index] = word_of(e, index, value);
     set_words(place, four, 1u << index);
@@ -2088,7 +2316,7 @@ static u32 effect_riding(const Valued* row, int slot, u32 ask) {
     u32 bits = 0;
     for (u32 p = 0; p < row->places; ++p)
         if (riding(p) == e) bits |= 1u << p;
-    return bits;
+    return bits | lent_riding(e);                                                   // R22 (base 45): the fallback's lent places
 }
 
 // R6: kind 8, an engine: a place is a synth sound's slot (0 to 7); the engines unit answers, the card and the thread
@@ -2272,6 +2500,7 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
     if (record == 0) return OP1F_FAILED;
     Rack* k = &racks[record - 1u];
     rack_was[record - 1u] = 2;                                                      // R16 (the review): its place asks for it
+    lend_bind((u32)slot, which, record - 1u, effect);                               // R22 (base 45): the lend before any `reset`
     const Effect* e = &effects[effect];
     u32 status = make_ready(&k->in, e, k->whose);
     if (status == (u32)CLEARING) return OP1F_NOT_NOW;
@@ -2281,7 +2510,7 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
     if (k->budget.off) {                                                            // R16 (hasis): another go on a new pick
         if (rack_current[slot][which] == record) {
             if (unit.frames - asked <= (u32)RACK_PAUSE || unit.frames - tried <= (u32)RACK_PAUSE) return OP1F_NOT_HERE;
-            if (e->table->reset) call_reset(e, (u32)OP1F_PLACE_HOSTED + which, k->in.state);   // asked again after a pause: `reset`
+            if (e->table->reset) call_reset(e, run_place(record - 1u), k->in.state);   // asked again after a pause: `reset` (R22: its place)
             k->fresh = 1;                                                           // returned while `off` keeps the audio thread out
             BARRIER();                                                              // (the review), then the go
             budget_rearm(&k->budget);
@@ -2290,7 +2519,8 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
         budget_rearm(&k->budget);                                                   // picked again after another: the place names it
     }                                                                               // only once its `reset` has returned, below
     if (rack_current[slot][which] != record) {                                      // the place held another effect, or none
-        if (e->table->reset) call_reset(e, (u32)OP1F_PLACE_HOSTED + which, k->in.state);
+        rack_begun((u32)slot, which, record - 1u, e);                               // R22 (base 45)
+        if (e->table->reset) call_reset(e, run_place(record - 1u), k->in.state);    // R22: the instance's place, or the lent one
         k->fresh = 1;
         BARRIER();
         rack_current[slot][which] = (u8)record;
@@ -2310,6 +2540,7 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
     Rack* k = &racks[record - 1u];
     if (k->effect != r->id - (u32)ID_FIRST || k->in.status != (u32)READY || k->budget.off) return OP1F_NOT_HERE;
     Effect* e = &effects[k->effect];
+    rack_on[record - 1u] = r->on ? 1u : 0u;                                         // R22 (base 45): for the hosted page
     if (r->on == 0 && (e->flags & (u32)OP1F_EFFECT_TAILS) == 0) return 0;           // switched off, and nothing to ring out
     int values[VALUES];
     for (u32 i = 0; i < e->count; ++i) {
@@ -2320,7 +2551,8 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
     }
     u32 fresh = r->fresh || k->fresh;
     k->fresh = 0;
-    run(e, (u32)OP1F_PLACE_HOSTED + which, r->left, r->right, values, r->on ? 1u : 0u, fresh, k->in.state, &k->budget);
+    rack_ran(record - 1u, e, values);                                               // R22: the last run's values, as heard
+    run(e, run_place(record - 1u), r->left, r->right, values, r->on ? 1u : 0u, fresh, k->in.state, &k->budget);   // R22: its place
     return 0;
 }
 
@@ -2398,3 +2630,362 @@ extern "C" int op1f_layer_page(const Op1fCard* card, unsigned ask, unsigned whic
 // The mark of a base that carries out layers (base 35).
 extern "C" const u32 op1f_layer_1 OP1F_NAMED("op1f_layer_1");
 const u32 op1f_layer_1 = 1;
+
+// ---------------------------------------------------------------- R22 (base 45): hosted pages, the helpers
+
+// The mark of a base that carries out hosted pages (base 45).
+const u32 op1f_hosted_1 = 1;
+
+// JSON texts of the kinds level 7 keeps, for the kept texts: whole numbers of 32 bits, true, false, null, texts, and
+// lists and objects of these, at most DEPTH_MOST deep. The end of the value at `at` (spaces before it passed), or 0.
+static u32 past_space(const char* s, u32 at, u32 n) {
+    while (at < n && (s[at] == ' ' || s[at] == '\t' || s[at] == '\n' || s[at] == '\r')) ++at;
+    return at;
+}
+
+static int hex_digit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static u32 word_end(const char* s, u32 at, u32 n, const char* word) {
+    for (; *word; ++word, ++at)
+        if (at >= n || s[at] != *word) return 0;
+    return at;
+}
+
+static u32 text_end(const char* s, u32 at, u32 n) {
+    for (++at; at < n; ++at) {
+        char c = s[at];
+        if (c == '"') return at + 1u;
+        if ((u8)c < 0x20u) return 0;
+        if (c != '\\') continue;
+        if (++at >= n) return 0;
+        c = s[at];
+        if (c == 'u') {
+            for (u32 h = 0; h < 4u; ++h)
+                if (++at >= n || !hex_digit(s[at])) return 0;
+        } else if (c != '"' && c != '\\' && c != '/' && c != 'b' && c != 'f' && c != 'n' && c != 'r' && c != 't') {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static u32 number_end(const char* s, u32 at, u32 n) {
+    int minus = s[at] == '-';
+    u32 first = minus ? at + 1u : at, end = first;
+    while (end < n && s[end] >= '0' && s[end] <= '9') ++end;
+    u32 digits = end - first;
+    if (digits == 0 || digits > 10u || (digits > 1u && s[first] == '0')) return 0;
+    if (end < n && (s[end] == '.' || s[end] == 'e' || s[end] == 'E')) return 0;    // no fraction, no exponent
+    if (digits == 10u) {
+        const char* most = minus ? "2147483648" : "2147483647";
+        for (u32 k = 0; k < 10u; ++k) {
+            if (s[first + k] == most[k]) continue;
+            if (s[first + k] > most[k]) return 0;
+            break;
+        }
+    }
+    return end;
+}
+
+static u32 json_end(const char* s, u32 at, u32 n, u32 depth) {
+    at = past_space(s, at, n);
+    if (at >= n) return 0;
+    char c = s[at];
+    if (c == '"') return text_end(s, at, n);
+    if (c == '-' || (c >= '0' && c <= '9')) return number_end(s, at, n);
+    if (c == 't') return word_end(s, at, n, "true");
+    if (c == 'f') return word_end(s, at, n, "false");
+    if (c == 'n') return word_end(s, at, n, "null");
+    if ((c != '{' && c != '[') || depth >= (u32)DEPTH_MOST) return 0;
+    char close = c == '{' ? '}' : ']';
+    at = past_space(s, at + 1u, n);
+    if (at < n && s[at] == close) return at + 1u;
+    for (;;) {
+        if (c == '{') {
+            if (at >= n || s[at] != '"') return 0;
+            at = past_space(s, text_end(s, at, n), n);
+            if (at == 0 || at >= n || s[at] != ':') return 0;
+            ++at;
+        }
+        at = json_end(s, at, n, depth + 1u);
+        if (at == 0) return 0;
+        at = past_space(s, at, n);
+        if (at >= n) return 0;
+        if (s[at] == close) return at + 1u;
+        if (s[at] != ',') return 0;
+        at = past_space(s, at + 1u, n);
+    }
+}
+
+// A member's name: 1 to 31 characters of a-z, 0-9 and '_' (a key's).
+static int plain_member(const char* s, u32 n) {
+    if (n == 0 || n >= (u32)OP1F_KEY_BYTES) return 0;
+    for (u32 i = 0; i < n; ++i) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return 0;
+    }
+    return 1;
+}
+
+static u32 length_most(const char* s, u32 most) {
+    u32 n = 0;
+    while (n < most && s[n]) ++n;
+    return n;
+}
+
+// The members of a kept text (an object, or "" for none): their names and values as places in it. Answers how many,
+// or -1 when it is not an object of plainly named members.
+struct Member { u8 name, name_bytes, value, value_bytes; };
+static int members_of(const char* s, u32 n, Member* m) {
+    u32 at = past_space(s, 0, n), count = 0;
+    if (at == n) return 0;
+    if (s[at] != '{') return -1;
+    at = past_space(s, at + 1u, n);
+    if (at < n && s[at] == '}') return past_space(s, at + 1u, n) == n ? 0 : -1;
+    for (;;) {
+        if (count == (u32)MEMBERS_MOST || at >= n || s[at] != '"') return -1;
+        u32 end = text_end(s, at, n);
+        if (end == 0 || !plain_member(s + at + 1u, end - at - 2u)) return -1;
+        m[count].name = (u8)(at + 1u);
+        m[count].name_bytes = (u8)(end - at - 2u);
+        at = past_space(s, end, n);
+        if (at >= n || s[at] != ':') return -1;
+        u32 first = past_space(s, at + 1u, n);
+        end = json_end(s, first, n, 1u);
+        if (end == 0) return -1;
+        m[count].value = (u8)first;
+        m[count].value_bytes = (u8)(end - first);
+        ++count;
+        at = past_space(s, end, n);
+        if (at >= n) return -1;
+        if (s[at] == '}') return past_space(s, at + 1u, n) == n ? (int)count : -1;
+        if (s[at] != ',') return -1;
+        at = past_space(s, at + 1u, n);
+    }
+}
+
+// A name against a member's: less than 0, 0 or more than 0, as their bytes sort.
+static int name_order(const char* a, u32 an, const char* b, u32 bn) {
+    for (u32 i = 0; i < an && i < bn; ++i)
+        if (a[i] != b[i]) return (int)(u8)a[i] - (int)(u8)b[i];
+    return (int)an - (int)bn;
+}
+
+static int put_bytes(char* out, u32* at, const char* s, u32 n) {
+    if (*at + n > (u32)KEPT_MOST) return 0;
+    for (u32 i = 0; i < n; ++i) out[*at + i] = s[i];
+    *at += n;
+    return 1;
+}
+
+static int put_member(char* out, u32* at, const char* name, u32 name_bytes, const char* value, u32 value_bytes) {
+    if (*at > 1u && !put_bytes(out, at, ",", 1u)) return 0;
+    return put_bytes(out, at, "\"", 1u) && put_bytes(out, at, name, name_bytes) && put_bytes(out, at, "\":", 2u) && put_bytes(out, at, value, value_bytes);
+}
+
+// The kept text of instance `which` of a declared effect of the card at `slot`, or 0 (no such instance); `make`, a lend
+// made for it when its place has none. `*why` the answer for 0.
+static Lend* kept_of(int slot, u32 which, int make, int* why) {
+    *why = OP1F_BAD_NAME;
+    if (!rack_live(which)) return 0;
+    const Rack* k = &racks[which];
+    const Effect* e = &effects[k->effect];
+    if (!e->hosted || e->slot != (u32)slot) return 0;
+    Lend* d = lend_of(k->slot, k->which);
+    if (d == 0 && make && (d = lend_free()) != 0) {
+        d->host = (u16)(k->slot + 1u);
+        d->which = (u8)k->which;
+        d->place = 0;
+        d->effect = (u8)(k->effect + 1u);
+        d->told = 0;
+        d->wrote = 0;
+        d->length = 0;
+    }
+    *why = make ? (d == 0 ? OP1F_TOO_LARGE : OP1F_NOT_NOW) : OP1F_NO_FILE;
+    return d != 0 && d->effect == k->effect + 1u ? d : 0;
+}
+
+extern "C" int op1f_effects_hosted_get(const Op1fCard* card, unsigned which, const char* key, char* out, unsigned room) {
+    int slot = slot_of(card);
+    if (slot < 0 || !from_frame(slot)) return OP1F_NOT_NOW;
+    u32 key_bytes = key ? length_most(key, (u32)OP1F_KEY_BYTES) : 0u;
+    if (!plain_member(key, key_bytes)) return OP1F_BAD_NAME;
+    int why = 0;
+    const Lend* d = kept_of(slot, which, 0, &why);
+    if (d == 0) return why;
+    Member m[MEMBERS_MOST];
+    int count = members_of(d->text, d->length, m);
+    for (int i = 0; i < count; ++i) {
+        if (name_order(key, key_bytes, d->text + m[i].name, m[i].name_bytes) != 0) continue;
+        u32 n = m[i].value_bytes;
+        if (out == 0 || room <= n) return OP1F_TOO_LARGE;
+        for (u32 b = 0; b < n; ++b) out[b] = d->text[m[i].value + b];
+        out[n] = 0;
+        return (int)n;
+    }
+    return OP1F_NO_FILE;
+}
+
+extern "C" int op1f_effects_hosted_set(const Op1fCard* card, unsigned which, const char* key, const char* text) {
+    int slot = slot_of(card);
+    if (slot < 0 || !from_frame(slot)) return OP1F_NOT_NOW;
+    u32 key_bytes = key ? length_most(key, (u32)OP1F_KEY_BYTES) : 0u;
+    if (!plain_member(key, key_bytes)) return OP1F_BAD_NAME;
+    u32 first = 0, end = 0;
+    if (text) {
+        u32 n = length_most(text, (u32)KEPT_MOST + 1u);
+        if (n > (u32)KEPT_MOST) return OP1F_TOO_LARGE;
+        first = past_space(text, 0, n);
+        end = json_end(text, first, n, 1u);
+        if (end == 0 || past_space(text, end, n) != n) return OP1F_BAD_VALUE;
+    }
+    int why = 0;
+    Lend* d = kept_of(slot, which, text != 0, &why);
+    if (d == 0) return text || why == OP1F_BAD_NAME ? why : 0;                      // else nothing to take away
+    Member m[MEMBERS_MOST];
+    int count = members_of(d->text, d->length, m);
+    if (count < 0) count = 0;                                                       // never: the texts are held to the form
+    char out[KEPT_MOST];
+    u32 at = 0, placed = text == 0;
+    put_bytes(out, &at, "{", 1u);
+    for (int i = 0; i < count; ++i) {
+        const char* name = d->text + m[i].name;
+        int order = name_order(key, key_bytes, name, m[i].name_bytes);
+        if (!placed && order < 0) {
+            if (!put_member(out, &at, key, key_bytes, text + first, end - first)) return OP1F_TOO_LARGE;
+            placed = 1;
+        }
+        if (order == 0) continue;
+        if (!put_member(out, &at, name, m[i].name_bytes, d->text + m[i].value, m[i].value_bytes)) return OP1F_TOO_LARGE;
+    }
+    if (!placed && !put_member(out, &at, key, key_bytes, text + first, end - first)) return OP1F_TOO_LARGE;
+    if (!put_bytes(out, &at, "}", 1u)) return OP1F_TOO_LARGE;
+    int same = at == d->length;
+    for (u32 i = 0; same && i < at; ++i) same = out[i] == d->text[i];
+    if (same) return 0;
+    for (u32 i = 0; i < at; ++i) d->text[i] = out[i];
+    d->length = (u8)at;
+    d->wrote = 1;
+    return 0;
+}
+
+extern "C" int op1f_rack_place(const Op1fCard* card, unsigned which, unsigned place, const char* kept) {
+    int slot = slot_of(card);
+    if (slot < 0) return OP1F_BAD_NAME;
+    if (!from_frame(slot)) return OP1F_NOT_NOW;
+    if (which >= (u32)RACK_PLACES || (place != (u32)OP1F_PLACE_NONE && place >= (u32)PLACES)) return OP1F_BAD_NAME;
+    u32 n = kept ? length_most(kept, (u32)KEPT_MOST + 1u) : 0u;
+    if (n > (u32)KEPT_MOST) return OP1F_TOO_LARGE;
+    Member m[MEMBERS_MOST];
+    if (members_of(kept, n, m) < 0) return OP1F_BAD_NAME;
+    u32 lent = place == (u32)OP1F_PLACE_NONE ? 0u : place + 1u;
+    Lend* d = lend_of((u32)slot, which);
+    u32 r = rack_current[slot][which];
+    if (d == 0 && lent == 0 && n == 0) {                                            // nothing lent, nothing kept
+        if (r != 0 && r <= rack_count) rack_lent[r - 1u] = 0;
+        return 0;
+    }
+    if (d == 0 && (d = lend_free()) == 0) return OP1F_TOO_LARGE;
+    int same = d->host == (u32)slot + 1u && d->length == n;
+    for (u32 i = 0; same && i < n; ++i) same = d->text[i] == kept[i];
+    d->host = (u16)(slot + 1);
+    d->which = (u8)which;
+    d->place = (u8)lent;
+    d->effect = 0;                                                                  // for the next ready at `which`
+    if (!same) {
+        for (u32 i = 0; i < n; ++i) d->text[i] = kept[i];
+        d->length = (u8)n;
+        d->told = 1;
+        d->wrote = 0;
+    }
+    if (r != 0 && r <= rack_count) rack_lent[r - 1u] = (u8)lent;
+    return 0;
+}
+
+extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, unsigned room) {
+    int slot = slot_of(card);
+    if (slot < 0) return OP1F_BAD_NAME;
+    if (!from_frame(slot)) return OP1F_NOT_NOW;
+    if (which >= (u32)RACK_PLACES) return OP1F_BAD_NAME;
+    u32 r = rack_current[slot][which];
+    if (r == 0 || r > rack_count || !effects[racks[r - 1u].effect].hosted) return OP1F_NOT_HERE;
+    Lend* d = lend_of((u32)slot, which);
+    if (d == 0 || !d->wrote || d->effect != racks[r - 1u].effect + 1u) return 0;
+    u32 n = d->length;
+    if (out == 0 || room <= n) return OP1F_TOO_LARGE;
+    for (u32 i = 0; i < n; ++i) out[i] = d->text[i];
+    out[n] = 0;
+    d->wrote = 0;
+    return (int)n;
+}
+
+extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) {
+    int slot = slot_of(card);
+    if (slot < 0) return OP1F_BAD_NAME;
+    if (!from_frame(slot)) return OP1F_NOT_NOW;
+    const Effect* l = layer_of(slot, ask);
+    if (l == 0 || which >= (u32)RACK_PLACES || words == 0) return OP1F_BAD_NAME;
+    u32 r = rack_current[slot][which], place = shown_place(RD32(CURRENT_MODE));
+    if (r == 0 || r > rack_count || racks[r - 1u].in.status != (u32)READY || place >= (u32)PLACES || riding(place) != l) {
+        if (page.host == (u32)slot + 1u && page.which == which) page.host = 0;     // its page ends
+        return OP1F_NOT_HERE;
+    }
+    if (page.host != (u32)slot + 1u || page.ask != ask || page.which != which || page.record != r || page.place != place) {
+        u32 mask;
+        MASK_OFF(mask);
+        page.host = (u32)slot + 1u;
+        page.record = r;
+        for (u32 i = 0; i < 4u; ++i) page.turns[i] = 0;
+        MASK_ON(mask);
+        page.ask = ask;
+        page.which = which;
+        page.place = place;
+        page.changed = 0;
+        for (u32 i = 0; i < 4u; ++i) page.words[i] = (u32)words[i];
+        page.asked = unit.frames;
+        return page.up ? (int)OP1F_HOSTED_PAGE_UP : 0;
+    }
+    page_move();
+    u32 changed = page.changed;
+    for (u32 i = 0; i < 4u; ++i) {
+        if (changed & (1u << i)) words[i] = (int)page.words[i];
+        else page.words[i] = (u32)words[i];
+    }
+    page.changed = 0;
+    page.asked = unit.frames;
+    return (int)(changed | (page.up ? (u32)OP1F_HOSTED_PAGE_UP : 0u));
+}
+
+extern "C" int op1f_effects_hosted(unsigned place, Op1fStanding* out) {
+    if (out == 0 || place >= (u32)PLACES || page.place != place || !page_live()) return 0;
+    u32 i = page.record - 1u;
+    const Rack* k = &racks[i];
+    const Effect* e = &effects[k->effect];
+    out->slot = e->slot;
+    out->ask = e->ask;
+    out->where = run_place(i);
+    out->how = (rack_on[i] ? 0u : (u32)OP1F_SHOWN_OFF) | (k->budget.off ? (u32)OP1F_STAND_OVER : 0u);
+    return 1;
+}
+
+extern "C" void op1f_effects_hosted_up(unsigned up) {
+    u32 mask;
+    MASK_OFF(mask);
+    page.up = up ? 1u : 0u;
+    for (u32 i = 0; i < 4u; ++i) page.turns[i] = 0;
+    MASK_ON(mask);
+}
+
+extern "C" int op1f_effects_hosted_turn(unsigned knob, int turn) {
+    u32 record = page.record;
+    if (!page.up || knob >= 4u || record == 0 || record > rack_count) return 0;
+    const Effect* e = &effects[racks[record - 1u].effect];
+    if (knob >= e->count || e->fixed[knob]) return 0;
+    u32 mask;
+    MASK_OFF(mask);
+    page.turns[knob] += turn;
+    MASK_ON(mask);
+    return 1;
+}

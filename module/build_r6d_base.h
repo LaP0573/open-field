@@ -37,4 +37,41 @@ extern "C" int op1f_param_heard(const Op1fCard* card, unsigned ask, unsigned pla
 // The mark of a base of level 10 (a constant 10): a pack that calls op1f_param_heard names it.
 extern "C" const unsigned op1f_level_10 OP1F_NAMED("op1f_level_10");
 
+// ---- R22 (base 45): hosted pages, for packs (as module/build_r6e_card.h words them, "Base 45: hosted pages") ----
+
+extern "C" int op1f_rack_place(const Op1fCard* card, unsigned which, unsigned place, const char* kept) OP1F_NAMED("op1f_rack_place");
+extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, unsigned room) OP1F_NAMED("op1f_rack_kept");
+extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
+extern "C" const unsigned op1f_hosted_1 OP1F_NAMED("op1f_hosted_1");
+
+// ---- R22 (base 45): hosted pages, from the effects unit for the cards unit and the values unit ----
+
+// The hosted page for `place`, the place on the screen: 1 and `out` filled while a host wants it there (its
+// op1f_rack_page at this frame or the one before, for that place, which still rides the host's layer, the instance
+// current and ready); 0 otherwise. `out->slot` and `out->ask` are the effect's card and ask; `out->where` the place its
+// pack is told (OP1F_PLACE_HOSTED + n for an effect that declares wagons, the lent place in the fallback, else
+// OP1F_PLACE_HOSTED + which); `out->how` OP1F_SHOWN_OFF while the host's last run of it was off, with OP1F_STAND_OVER
+// while it is switched off for its cost (an instance whose memory was refused is not ready: no page). The display
+// thread (the cards unit's choice of the page); it says no line and calls nothing of a pack's.
+extern "C" int op1f_effects_hosted(unsigned place, Op1fStanding* out) OP1F_NAMED("op1f_effects_hosted");
+
+// The hosted page came on the screen (1) or left it (0): the cards unit says it where it tells the effect's `shown`
+// (which it tells itself, with op1f_effects_hosted's `where`). While it is up, op1f_rack_page answers
+// OP1F_HOSTED_PAGE_UP and op1f_param_set reaches the page's words. The display thread.
+extern "C" void op1f_effects_hosted_up(unsigned up) OP1F_NAMED("op1f_effects_hosted_up");
+
+// A knob's turn that no pack took while the hosted page is up: knob `knob` (0 blue to 3 red), `turn` as an
+// Op1fInput's (1024 a step). Noted under a mask and moved at the next frame (op1f_effects_frame, or the host's
+// op1f_rack_page first) as the unit's knob of the effect the pack's stands on: inside that knob's row, a 128th of the
+// row a step; the word's bit then in the host's mask. Answers 1 when noted (the page up, the knob one of the effect's
+// values that does not stand fixed), 0 when not (drop it all the same: it is never the unit's while the page is up).
+// Any thread, the key thread's input among them; it says no line and calls nothing.
+extern "C" int op1f_effects_hosted_turn(unsigned knob, int turn) OP1F_NAMED("op1f_effects_hosted_turn");
+
+// For the values unit: op1f_value_get and op1f_value_set with `where` OP1F_KEEP_HOSTED (16), `which` the instance's
+// number, handed here whole (the card and the caller's thread held here, as the values unit holds them): the answers
+// are the two helpers', OP1F_BAD_NAME for no instance `which` of a declared effect of the card. The display thread.
+extern "C" int op1f_effects_hosted_get(const Op1fCard* card, unsigned which, const char* key, char* out, unsigned room) OP1F_NAMED("op1f_effects_hosted_get");
+extern "C" int op1f_effects_hosted_set(const Op1fCard* card, unsigned which, const char* key, const char* text) OP1F_NAMED("op1f_effects_hosted_set");
+
 #endif
