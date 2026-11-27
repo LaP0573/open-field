@@ -156,7 +156,7 @@ enum { OP1F_EFFECT_LAYER = 4, OP1F_ASK_LFO = 11, OP1F_LAYER_PAGE_UNIT = 0, OP1F_
 // R22 (base 45): the words of base 45's part "hosted pages" this unit uses.
 #ifndef OP1F_BUILD_R6E_CARD_H
 enum : unsigned { OP1F_PLACE_NONE = 0xffffffffu };
-enum { OP1F_HOSTED_KEPT_MOST = 48, OP1F_HOSTED_PAGE_UP = 256, OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1,
+enum { OP1F_HOSTED_KEPT_MOST = 44, OP1F_HOSTED_PAGE_UP = 256, OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1,
        OP1F_KEEP_HOSTED = 16 };
 #endif
 
@@ -1877,7 +1877,7 @@ static u32 rack_wipe(u32 i, u32 room) {
 // waits for the place's next ready; `told`, `changed` owed to the effect's pack; `wrote`, the pack wrote it since the
 // host's last op1f_rack_kept. The display thread's, but for `place` copied into rack_lent.
 enum { LENDS = RACKS, KEPT_MOST = OP1F_HOSTED_KEPT_MOST, MEMBERS_MOST = 32, KEEPS_BYTES = 324, DEPTH_MOST = 4 };
-struct Lend { u16 host; u8 which, place, effect, told, wrote, length; char text[KEPT_MOST]; };   // 56 bytes
+struct Lend { u16 host; u8 which, place, effect, told, wrote, length; char text[KEPT_MOST]; };   // 52 bytes
 static_assert(sizeof(Lend) == 136 && sizeof(Op1fKeeps) == KEEPS_BYTES, "a lend's 136 bytes, and level 7's table");
 static Lend lends[LENDS];
 static volatile u8 rack_lent[RACKS];                   // a record's lent place + 1, 0 for none (the audio thread reads it)
