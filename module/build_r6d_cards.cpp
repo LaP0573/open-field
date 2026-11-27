@@ -777,14 +777,14 @@ enum { LFO_BYTES = 28, STAND_LFO = 3, LFO_KINDS = 6 };
 enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2, BY_DRUM = 3 };
 
 // R21 (base 43): the drum engine's page. One ask of kind OP1F_ASK_DRUM_ENGINE (module/build_r6e_card.h), on a card of
-// level 8 or later: an engine the drum unit (module/build_r18_drum.cpp) adds to the drum's engine list, riding the drum
+// level 8 or later: an engine the drum unit (module/build_r21_drum.cpp) adds to the drum's engine list, riding the drum
 // sampler, whose page stands in for the engine page (T1) of the drum while the sound the owner sees there rides it. The
 // first card in the list's order (the packs' file names) holds it; any other's ask is left aside with line 51. Its page
 // is placed, kept, kept ready and closed as an engine's page is, by the engine's entry of the table of screens (entry
 // 2): that entry is the synth's for an engine and the drum's for this page, never both at once in one mode, and the
 // cards unit holds one entry at a time. The firmware's words it reads: the drum's slot the owner sees, and the drum's
 // screen of an engine type (a function), both OS 1.7.3's; whether the sound rides the engine, the drum unit answers.
-#ifndef OP1F_BUILD_R18_DRUM_H
+#ifndef OP1F_BUILD_R21_DRUM_H
 enum { OP1F_ASK_DRUM_ENGINE = 12 };
 #endif
 enum { DRUM_SAMPLER = 9, DRUM_MODE = 1 };
@@ -793,7 +793,7 @@ typedef u32 (*DrumScreenFn)(u32 type);                  // R21: 0x8fc2757c: the 
 #ifndef OP1F_HOST
 #define STOCK_DRUM_SCREEN ((DrumScreenFn)0x8fc2757cu)
 #endif
-// R21: the drum unit's two names (module/build_r18_drum.cpp), weak: away, no drum sound rides a pack's engine.
+// R21: the drum unit's two names (module/build_r21_drum.cpp), weak: away, no drum sound rides a pack's engine.
 #if defined(OP1F_HOST)
 static int (*const r18_none_drum_rides)(unsigned drum, unsigned slot, unsigned ask) = 0;
 #define op1f_drum_rides (*r18_none_drum_rides)
@@ -1488,7 +1488,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
 // looks; then, past a barrier, the word that says the check was made; the lines follow, each card's in the list's
 // order.
 static OP1F_APART void check() {
-    u32 count = op1f_cards.count;
+    u32 count = op1f_cards_2.count;
     u32 seen = count > (u32)MOST ? (u32)MOST : count;                               // the list holds 128 (R20): a count above that names slots that are not there
     u32 more = op1f_cards_2.more + (count - seen);
     u32 in_use = 0, a = 0, b = 0;
@@ -1559,7 +1559,7 @@ static u32 second_taken;
 static OP1F_APART void second_list() {
     op1f_cards_lists();
     if (r18_loader_2_record == 0 || second_taken != 0) return;
-    u32 count = op1f_cards.count;
+    u32 count = op1f_cards_2.count;
     u32 seen = count > (u32)MOST ? (u32)MOST : count;
     second_taken = 1;
     STOCK_LOG(3, LOG_FILE, 51, "cards: served from the loader's second list: %u card(s) in it, %u served, %u more than it holds", count, seen,

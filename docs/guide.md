@@ -127,7 +127,7 @@ A file may have any name that ends in `.pack`. If a file cannot run, the start s
 
 The loader in your firmware file decides how many pack files the unit reads. The page installs the second loader, N2. It reads up to 128 pack files and has a room of 16 MB for all of them. The first loader, N1, reads 32 and has 2 MB. N1 is still there for the way back: add `?loader=1.7.3-v1` behind the page's address. Every pack file runs under both, as it is. With 128 files the unit takes about 1.3 seconds longer to start.
 
-N2 needs base 40 or later. The page puts base 42 on with it, so a unit installed from the page has a base that fits.
+N2 needs base 40 or later. The page puts base 43 on with it, so a unit installed from the page has a base that fits.
 
 **If you installed open-field before 0.24**, do the install again to get the new room: build the firmware file on the page again and write it from the bootloader's menu, the same steps as [the first time](#the-install-once), with the same warnings. This write carries the same risk as the first one. Your pack files stay on the unit, and the new base goes on with the firmware file. When you connect, the page says so at the top, with an "install again" button that opens these steps.
 

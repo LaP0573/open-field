@@ -1,5 +1,6 @@
+/* Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's. */
 /* Step R21, base 43: the entry at one function of the firmware for a pack's drum engine (OS 1.7.3+0). The logic is in
- * the drum unit (module/build_r18_drum.cpp). The base's table puts a JUMP.a to the entry over the first eight bytes of
+ * the drum unit (module/build_r21_drum.cpp). The base's table puts a JUMP.a to the entry over the first eight bytes of
  * the function, with a trampoline the loader makes in the room named beside it: those eight bytes copied from the
  * running firmware (whole instructions, none relative to its own place), and a jump back behind them. A jump to the
  * room is the firmware's function as it always was; a call of the room is the same function returning to its caller.

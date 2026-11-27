@@ -42,14 +42,14 @@
 #include "build_r17_sample.h"                          // R17: the checks as plain code
 
 // R21 (base 43): a drum place too. op1f_sample_drop takes a drum place (OP1F_PLACE_DRUM + slot) when the ask is the
-// card's drum engine (kind 12, module/build_r18_drum.cpp) and that drum sound rides it: the drum sampler page's own post
+// card's drum engine (kind 12, module/build_r21_drum.cpp) and that drum sound rides it: the drum sampler page's own post
 // (0x8f00c4e0, the drum's twin of the synth's) and, in the unit's turn, DD, the head of the worker's drum drop job
 // (0x8f00ba38, request 10; the stub and its room are module/build_r17_sample.s), where the base's job makes the same
 // four calls as the drum job of the firmware (0x8f00bac0 on): the drum slot's holder (0x8f014848), the import, the mark
 // (0x8d4eb68a), the drum record's method 6. The unit keeps a drum sampler's sample over a restart itself (the mark),
 // so the restore is the synth's alone. op1f_sample_get answers a drum place's `dropped`, `ticket`, `done` and `answer`
 // as a synth place's, its loads counted by the drum unit.
-#ifndef OP1F_BUILD_R18_DRUM_H
+#ifndef OP1F_BUILD_R21_DRUM_H
 enum { OP1F_ASK_DRUM_ENGINE = 12 };
 #endif
 
@@ -404,15 +404,16 @@ extern "C" SAMPLE_APART int op1f_sample_drop(const Op1fCard* card, unsigned ask,
 }
 
 // R21 (base 43): the drum mark alone, for a pack that changed its drum sound's sample itself (op1f_sample_changed):
-// from the card's frame function, or its input function for an event on the key thread; a drum place that rides the
-// card's drum engine of that ask. The same ticket, post and DD as a drop; in the unit's turn the drum job's mark
-// (0x8d4eb68a) and the record's method 6, and no import: the unit then keeps the drum sampler's sample as after a drop.
+// from the card's input function for an event on the key thread only, as a drop (the post onto the worker's queue is
+// the key thread's alone: base 39's ruling); a drum place that rides the card's drum engine of that ask. The same
+// ticket, post and DD as a drop; in the unit's turn the drum job's mark (0x8d4eb68a) and the record's method 6, and no
+// import: the unit then keeps the drum sampler's sample as after a drop.
 extern "C" SAMPLE_APART int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) {
     int slot = slot_of(card);
     u32 why = 0;
     if (slot < 0) return OP1F_BAD_NAME;
-    u32 calling = op1f_cards_calling() == (u32)slot + 1u || op1f_cards_input_keyed(card) ? 1u : 0u;
-    if (!calling) why = OP1F_SAMPLE_NOT_INPUT;
+    u32 keyed = op1f_cards_input_keyed(card) ? 1u : 0u;                             // the review's mend: as the drop's `keyed`
+    if (!keyed) why = OP1F_SAMPLE_NOT_INPUT;
     else if (RD32(DISK_OPEN) != 0) why = OP1F_SAMPLE_DISK;
     else if (place < (u32)SLOTS || place >= 2u * (u32)SLOTS) why = OP1F_SAMPLE_NO_PLACE;
     else if (drum_ask(card, ask) == 0) why = OP1F_SAMPLE_NO_ASK;
@@ -530,7 +531,8 @@ extern "C" SAMPLE_APART void op1f_sample_drum_job(unsigned slot, unsigned clip) 
         return;
     }
     if (ticket.mark) {                                                              // the mark alone: the sample changed by the pack
-        u32 why = ride_of(slot, card, ask, 0, 1) == (u32)OP1F_SAMPLE_RIDES ? (u32)OP1F_SAMPLE_PASSED : (u32)OP1F_SAMPLE_NOT_RIDING;
+        u32 why = RD32(DISK_OPEN) != 0 ? (u32)OP1F_SAMPLE_DISK                      // the review's mend: the disk mode looked at again, as the drop's turn does
+                : ride_of(slot, card, ask, 0, 1) == (u32)OP1F_SAMPLE_RIDES ? (u32)OP1F_SAMPLE_PASSED : (u32)OP1F_SAMPLE_NOT_RIDING;
         if (why == (u32)OP1F_SAMPLE_PASSED) {
             STOCK_DRUM_MARK(slot);
             u32 record = (u32)DRUM_RECORDS + (u32)RECORD_BYTES * slot;
@@ -759,7 +761,7 @@ static void say_ticket() {
         MASK_ON(mask);
     }
     if (lost) {
-        op1f_log(2, LOG_FILE, 11, "sample: drop %u: lost from the unit's queue, not done", number);
+        op1f_log(2, LOG_FILE, 11, "sample: %s %u: lost from the unit's queue, not done", mark ? "mark" : "drop", number);
         return;
     }
     if (state != (u32)ENDED) return;
@@ -770,7 +772,7 @@ static void say_ticket() {
         op1f_log(3, LOG_FILE, 8, "sample: drop %u: %u frames rendered (stereo %u, room %u) after %u frame(s)", number, frames, stereo,
                  drum ? (u32)OP1F_SAMPLE_DRUM_POOL >> (stereo ? 1 : 0) : op1f_sample_room(stereo), after);
     else
-        op1f_log(2, LOG_FILE, 9, "sample: drop %u into %s %u refused in the unit's turn: %d, %s, after %u frame(s)", number, drum ? "drum" : "synth", slot + 1u,
+        op1f_log(2, LOG_FILE, 9, "sample: %s %u into %s %u refused in the unit's turn: %d, %s, after %u frame(s)", mark ? "mark" : "drop", number, drum ? "drum" : "synth", slot + 1u,
                  op1f_sample_answer(why), op1f_sample_why_words(why), after);
     if (why == (u32)OP1F_SAMPLE_PASSED && !drum && !mark && &op1f_sample_kept != 0) op1f_sample_kept(slot, frames, stereo);   // R21: the unit keeps a drum's itself
     MASK_OFF(mask);

@@ -1987,7 +1987,7 @@ extern "C" int op1f_sample_get(const Op1fCard* card, unsigned place, Op1fSample*
 // is not 0.
 extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
 
-// Base 40: a drum engine. Up to here every word is the earlier bases' (base 39's sample last); this part only adds
+// Base 43: a drum engine. Up to here every word is the earlier bases' (base 39's sample last); this part only adds
 // behind it, and a pack that does not ask for it is not touched by it.
 //
 // A pack may add an engine of its own to the drum's engine list (shift and T1 in the drum's mode), as level 9 lets a
@@ -2013,9 +2013,9 @@ extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
 // ask of any other card is left aside with a line, and that pack runs without it.
 //
 // The kind of ask a base 43 knows beside the earlier ones, for a card of level 8 or later. A base that does not know it
-// (39 or earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
+// (42 or earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
 //   OP1F_ASK_DRUM_ENGINE  a drum engine: what `what` points at is an Op1fDrumEngine
-#define OP1F_BUILD_R18_DRUM_H
+#define OP1F_BUILD_R21_DRUM_H
 enum { OP1F_ASK_DRUM_ENGINE = 12 };   // after OP1F_ASK_LFO (11); 9 stays proposed for files per tape
 
 // A drum engine: what its ask points at; its `bytes` 28 at base 43 (a later base may read more).
@@ -2029,15 +2029,17 @@ enum { OP1F_ASK_DRUM_ENGINE = 12 };   // after OP1F_ASK_LFO (11); 9 stays propos
 // The drop (base 39's op1f_sample_drop) takes a drum sound's place, OP1F_PLACE_DRUM + slot, with this ask's number,
 // while that drum sound rides the engine: the unit puts the lifted cut into the drum sampler's sample in its own turn,
 // as the drum sampler's page does, with the synth's checks and answers; `dropped`, `ticket`, `done` and `answer` of
-// op1f_sample_get are a drum place's too. The unit keeps the drum sampler's sample over a restart itself. The 24 keys'
-// points are not changed by a drop.
+// op1f_sample_get are a drum place's too. The unit keeps the drum sampler's sample over a restart itself. A drop does
+// what the drum sampler page's own drop does, no more.
 //
 // A pack that writes into its drum sound's sample itself (a cut pasted behind the kit's material, say) asks the unit
 // to keep it, as the unit keeps a dropped cut: op1f_sample_changed(card, ask, place), with the drum engine's ask and
-// the drum place, from the card's frame function or its input function (an event on the key thread). In the unit's
-// turn the base marks the drum sound changed (what the drum's own drop does after its import); nothing is imported.
+// the drum place, from the card's input function for an event on the key thread only, as a drop. A pack that wrote
+// the sample in its frame function asks at the next key event of its page. In the unit's turn the base marks the drum
+// sound changed (what the drum's own drop does after its import); nothing is imported.
 // It answers a ticket, 1 or more (watch op1f_sample_get's `done`; `answer` 0 when marked), or less than 0, with nothing
-// asked of the unit: OP1F_NOT_NOW (not from those functions; the disk mode open), OP1F_BAD_NAME (not a drum place, or
+// asked of the unit: OP1F_NOT_NOW (not in the card's input function for an event on the key thread; the disk mode
+// open), OP1F_BAD_NAME (not a drum place, or
 // not the card's drum engine ask), OP1F_NOT_HERE (the sound does not ride it now), OP1F_BUSY (a drop or mark under
 // way, or clipboard work waiting), OP1F_FAILED (the unit took nothing).
 extern "C" int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_changed");
@@ -2045,7 +2047,7 @@ struct Op1fDrumEngine { Op1fKindHead head; };   // 28 bytes at base 43
 static_assert(sizeof(Op1fDrumEngine) == 28, "a drum engine's table is the head, 28 bytes at base 43");
 
 // The mark of a base that adds a pack's drum engine to the drum's engine list (a constant 1). A pack with an ask of
-// kind OP1F_ASK_DRUM_ENGINE names it, so that a base before 40 leaves it out.
+// kind OP1F_ASK_DRUM_ENGINE names it, so that a base before 43 leaves it out.
 extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 
 #endif

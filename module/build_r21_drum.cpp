@@ -1,3 +1,4 @@
+// Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
 // Step R21, base 43: a pack's drum engine. A unit of its own, new at base 43.
 //
 // A pack adds an engine to the drum's own engine list (shift and T1 in the drum's mode) through one ask of its card
@@ -15,7 +16,7 @@
 //   a pick in the drum's engine list or by MIDI (D1, op1f_drum_pick_do, the key thread or MIDI's): the engine picked on
 //       a drum sound that plays the drum sampler begins the ride, and the firmware's pick is not made (the sound stays
 //       as it is); picked on one that plays another engine, nothing changes and a line says why; any other pick ends
-//       the ride and goes on to the firmware's pick. Base 40 on the unit: the list loads a kit of the drum sampler as
+//       the ride and goes on to the firmware's pick. Base 43 on the unit: the list loads a kit of the drum sampler as
 //       it closes, some 0.1 to 1 s after the pick (a preset_drum kit, read as a loaded sound). Such a load, or a pick
 //       of a kit, within GRACE_FRAMES of the pick keeps the ride, and the member is written into the kit loaded
 //   a frame (the display thread, op1f_drum_frame, from the cards unit): the lines; the base's member op1f_engine of a
@@ -52,7 +53,7 @@ typedef void (*JsonDestroyFn)(void* value);
 typedef void (*JsonTextFn)(void* value, const char* text);
 typedef void (*JsonNumberFn)(void* value, int number);
 
-// The room of the pick's entry (module/build_r18_drum.s): the firmware's pick as it always was.
+// The room of the pick's entry (module/build_r21_drum.s): the firmware's pick as it always was.
 extern "C" u8 op1f_drum_pick_room[] OP1F_NAMED("op1f_drum_pick_room");
 
 #define RD32(a) (*(volatile u32*)(a))
@@ -72,7 +73,7 @@ extern "C" u8 op1f_drum_pick_room[] OP1F_NAMED("op1f_drum_pick_room");
 #define ROOM_PICK ((PickFn)(void*)op1f_drum_pick_room)
 
 // The kind of ask, as the header of base 43 (module/build_r6e_card.h) names it; this unit reads base 29's header.
-#ifndef OP1F_BUILD_R18_DRUM_H
+#ifndef OP1F_BUILD_R21_DRUM_H
 enum { OP1F_ASK_DRUM_ENGINE = 12 };
 #endif
 
@@ -327,7 +328,8 @@ extern "C" void op1f_drum_changed(unsigned where, unsigned which, unsigned how) 
     u32 mask, bit = 1u << which;
     MASK_OFF(mask);
     if (how == (u32)OP1F_KEPT_LOADED) loads[which] = loads[which] + 1u;
-    if (how == (u32)OP1F_KEPT_LOADED && (rides & bit) != 0 && (int)(grace_until[which] - frames) > 0) {
+    if (how == (u32)OP1F_KEPT_LOADED && (rides & bit) != 0 && (int)(grace_until[which] - frames) > 0 &&
+        RD32(DRUM_TYPES + 4u * which) == (u32)DRUM_SAMPLER) {                      // the review's mend: a sound of the drum sampler only, as the pick
         member_due |= bit;                                                          // the kit the list loads as it closes: the ride stays, its member written
         kept |= bit;
         told &= ~bit;

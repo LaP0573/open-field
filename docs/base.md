@@ -445,6 +445,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |
 | `op1f_sample` | `sample:` | Base 39: each drop a pack asked for, its end with the frames put in, a refusal and why, and the count of the unit's own drops into its sampler ([your engine's sample](sample.md#the-lines-the-base-writes)) |
 | `op1f_sample_restore` | `sample:` | Base 39: after a start, each cut put back into a sound that plays a pack's engine, or why not |
+| `op1f_drum` | `drum:` | Base 43: the drum engine in the drum's engine list, which drum sound rides it, and when a ride ends ([a drum engine](drum-engine.md#the-lines-the-base-writes)) |
 | `op1f_tape_art` | `artwork` | A picture put together on the unit, and from what |
 | | `aud` | Every sixteenth second: the share of the processor the audio thread took, the longest block, and the blocks a second |
 | | `os heap:` | Every sixteenth second: how much of the firmware's own heap is free at its top, and the least it has been |

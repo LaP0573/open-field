@@ -213,7 +213,7 @@ extern "C" int op1f_lfos_row_is(const void* row) OP1F_NAMED("op1f_lfos_row_is") 
 #endif
 static const char KEY_LFO_LIST[] = "lfo_types";            // R11: the LFOs' list, whose rows the LFOs unit adds
 
-// R21 (base 43): the drum unit's two names at the catalog (module/build_r18_drum.cpp), weak: away, nothing of a drum
+// R21 (base 43): the drum unit's two names at the catalog (module/build_r21_drum.cpp), weak: away, nothing of a drum
 // engine is done. op1f_drum_catalog_read(document) adds the pack's row to `drum_types`; op1f_drum_row_is(row) answers
 // non-zero for that row.
 #if defined(OP1F_HOST)

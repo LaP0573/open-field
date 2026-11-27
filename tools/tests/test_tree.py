@@ -190,7 +190,7 @@ class TheRecipes(unittest.TestCase):
         header = text("module", "build_r6e_card.h")
         kinds = [int(n) for n in re.findall(r"OP1F_ASK_[A-Z_]+ = (\d+)", header)]
         self.assertIn("OP1F_ASK_DRUM_ENGINE = 12", header)
-        self.assertNotIn("OP1F_ASK_DRUM_PAGE", header)                  # the drum's page of 2e2b51d is the drum engine now
+        self.assertNotIn("OP1F_ASK_DRUM_PAGE", header)                  # kind 12 is the drum engine
         self.assertEqual(len(kinds), len(set(kinds)), "no two kinds of ask share a number")
         exports = load("packs", "base.json")["exports"]
         self.assertIn("op1f_drum_engine_1", exports)
@@ -207,11 +207,11 @@ class TheRecipes(unittest.TestCase):
         self.assertEqual(entries["0x8d4eb160"]["target"], "op1f_drum_pick_entry")
         self.assertEqual(entries["0x8d4eb160"]["room"], "op1f_drum_pick_room")
         self.assertEqual(entries["0x8d4eb160"]["copies"], 8)
-        self.assertIn("module/build_r18_drum.s", load("packs", "base.json")["sources"])
-        self.assertIn("module/build_r18_drum.cpp", load("packs", "base.json")["sources"])
+        self.assertIn("module/build_r21_drum.s", load("packs", "base.json")["sources"])
+        self.assertIn("module/build_r21_drum.cpp", load("packs", "base.json")["sources"])
 
     def test_the_drum_s_drop_job_is_a_place_with_the_synth_s_drop_job_s_sum(self):
-        """Base 40: DD, the head of the drum's drop job, begins with the same eight bytes as SD, the synth's."""
+        """Base 43: DD, the head of the drum's drop job, begins with the same eight bytes as SD, the synth's."""
         profile = load(PROFILE)
         sums = {p["address"]: p for p in profile["patches"]}
         self.assertEqual(sums["0x8f00ba38"]["sum"], sums["0x8f00b7b0"]["sum"])
@@ -251,7 +251,7 @@ int main() {
         self.assertEqual(out, ["0", "15", "4", "7", "15"])          # passed; too large; base 39; not riding; a synth pool's bound
 
     def test_the_base_offers_the_drum_mark_for_a_sample_a_pack_wrote(self):
-        """Base 40: op1f_sample_changed is offered, declared in the header and said on the drum engine's page."""
+        """Base 43: op1f_sample_changed is offered, declared in the header and said on the drum engine's page."""
         self.assertIn("op1f_sample_changed", load("packs", "base.json")["exports"])
         self.assertIn('int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place)', text("module", "build_r6e_card.h"))
         self.assertIn("op1f_sample_changed", text("docs", "drum-engine.md"))

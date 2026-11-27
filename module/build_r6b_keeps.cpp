@@ -314,7 +314,7 @@ static void (*const r11_none_lfos_changed)(unsigned where, unsigned which, unsig
 extern "C" void op1f_lfos_changed(unsigned where, unsigned which, unsigned how) OP1F_NAMED("op1f_lfos_changed") __attribute__((weak));
 #endif
 
-// R21 (base 43): the drum unit's (module/build_r18_drum.cpp), told what changed of the member op1f_engine at a drum
+// R21 (base 43): the drum unit's (module/build_r21_drum.cpp), told what changed of the member op1f_engine at a drum
 // slot, as the engines unit is at a synth slot. Weak: away, nothing is told.
 #if defined(OP1F_HOST)
 static void (*const r18_none_drum_changed)(unsigned where, unsigned which, unsigned how) = 0;
@@ -2348,7 +2348,7 @@ extern "C" int op1f_keeps_engine_set(unsigned slot, const char* text) {
     return value_set_at(index, BASE_ENGINE, text, SET_BASE);
 }
 
-// R21 (base 43): the same member at a drum slot, the drum engine a drum sound rides (module/build_r18_drum.cpp), from
+// R21 (base 43): the same member at a drum slot, the drum engine a drum sound rides (module/build_r21_drum.cpp), from
 // the display thread: as op1f_keeps_engine_get and op1f_keeps_engine_set, with the drum's holder.
 extern "C" int op1f_keeps_drum_engine_get(unsigned slot, char* out, unsigned room) OP1F_NAMED("op1f_keeps_drum_engine_get");
 extern "C" int op1f_keeps_drum_engine_set(unsigned slot, const char* text) OP1F_NAMED("op1f_keeps_drum_engine_set");

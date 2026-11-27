@@ -449,10 +449,10 @@ TABLE_BYTES_6[LFO] = 28
 ASK_KEYS_6[LFO] = ("kind", "name", "drum", "shown")
 ASK_ADDRESSES_6[LFO] = (("shown", 24),)
 ASK_KEYS_6[7] = ASK_KEYS_6[7] + ("layer",)
-# since base 43 (module/build_r6e_card.h, "Base 40: a drum engine"): a card of level 8 or later may add an engine to the
+# since base 43 (module/build_r6e_card.h, "Base 43: a drum engine"): a card of level 8 or later may add an engine to the
 # drum's engine list that rides the drum sampler ({"kind": "drum engine", "name": ..., "shown": a function's symbol or
 # null}; OP1F_ASK_DRUM_ENGINE, its table the head, 28 bytes, flags 0): picked, the pack's page stands on T1. No new level:
-# a card with it names the mark op1f_drum_engine_1 in a word behind its level's, so that a base before 40 leaves it out.
+# a card with it names the mark op1f_drum_engine_1 in a word behind its level's, so that a base before 43 leaves it out.
 # One a card (one pack of all holds it: the first by file name).
 DRUM_PAGE, DRUM_PAGE_LEVEL_LEAST = 12, 8                        # OP1F_ASK_DRUM_ENGINE, the level it needs
 DRUM_PAGE_MARK = "op1f_drum_engine_1"                           # the mark of a base that adds a pack's engine to the drum's list
@@ -2278,8 +2278,8 @@ def render_card(recipe, recipe_name):
             level_end = ".size %s_level, .-%s_level\n" % (label, label)
             text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_layer", "    .long %s\n" % LAYER_MARK, "OBJECT"), 1)
         if has_drum_page(asks):                             # since base 43: a word behind the level's names op1f_drum_engine_1
-            text = text.replace(" */\n.section", " * Base 40 (module/build_r6e_card.h, \"Base 40: a drum engine\"): the card asks for a drum engine, so a\n"
-                                " * word in front of it names the mark %s, and a base before 40 leaves the pack out. Nothing reads it.\n */\n.section"
+            text = text.replace(" */\n.section", " * Base 43 (module/build_r6e_card.h, \"Base 43: a drum engine\"): the card asks for a drum engine, so a\n"
+                                " * word in front of it names the mark %s, and a base before 43 leaves the pack out. Nothing reads it.\n */\n.section"
                                 % DRUM_PAGE_MARK, 1)
             level_end = ".size %s_level, .-%s_level\n" % (label, label)
             text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_drum_engine", "    .long %s\n" % DRUM_PAGE_MARK, "OBJECT"), 1)
@@ -2809,7 +2809,7 @@ def card_faults(data):
                     [t[3] for t in ask_tables_6(data, card["level"], True) if not t[4]]):
                 faults.append("it asks for a layer and the pack does not need %s, so a base before 35 would not leave it out" % LAYER_MARK)
             if (DRUM_PAGE_MARK, True) not in lists["imports"] and any(kind == DRUM_PAGE for kind, _s, _w in asks_in(data)):     # since base 43
-                faults.append("it asks for a drum engine and the pack does not need %s, so a base before 40 would not leave it out" % DRUM_PAGE_MARK)
+                faults.append("it asks for a drum engine and the pack does not need %s, so a base before 43 would not leave it out" % DRUM_PAGE_MARK)
             for number, (_kind, _size, what, ask, wrong) in enumerate(tables, 1):
                 if wrong:
                     faults.append("its ask %d is not in order: %s" % (number, wrong))
@@ -3102,7 +3102,7 @@ def build3(recipe, target_os, out_dir=None, objects=None, log=print, serve=None)
             if has_drum_page(asks) != has(label + "_drum_engine"):   # since base 43: the word that names op1f_drum_engine_1
                 raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % DRUM_PAGE_MARK)
             if has_drum_page(asks) and (DRUM_PAGE_MARK not in needed or (values[label + "_drum_engine"] - origin, KIND_WORD, needed.index(DRUM_PAGE_MARK), 0) not in places):
-                raise ValueError("The card asks for a drum engine and the pack does not need %s: a base before 40 would not leave it out" % DRUM_PAGE_MARK)
+                raise ValueError("The card asks for a drum engine and the pack does not need %s: a base before 43 would not leave it out" % DRUM_PAGE_MARK)
         if bytes(body[card_place:card_place + len(linked)]) != linked or level_place not in places:
             raise ValueError("The card in the sources is not the recipe's: write it again with `card`")
         if not card_place:

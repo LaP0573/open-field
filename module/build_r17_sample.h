@@ -135,7 +135,7 @@ static inline int op1f_sample_head_is_stock(const unsigned char* head) {
     return op1f_sample_crc8(head) == OP1F_SAMPLE_IMPORT_CRC ? 1 : 0;
 }
 
-// Base 40: the same bound against a pool of `pool` halfwords (a drum slot's, 1,764,000).
+// Base 43: the same bound against a pool of `pool` halfwords (a drum slot's, 1,764,000).
 static inline int op1f_sample_fits_pool(unsigned length, unsigned capacity, unsigned stereo, unsigned pool) {
     unsigned n = op1f_sample_frames(length, capacity);
     if (n > pool) return 0;

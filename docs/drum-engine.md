@@ -2,9 +2,9 @@
 
 At [level 9](level-9.md) a pack adds a synth engine that rides the unit's `dsynth`. From base 43 a pack can add an engine to the **drum's** engine list too (shift and T1 in the drum's mode, where the unit offers the drum sampler and `dbox`). A drum engine rides the unit's **drum sampler** and makes no sound of its own: under it the drum sampler plays on as always, with its kit, its sample, its keys' points, and the unit saves and loads the kit as it did. What is yours is the engine's name in the list and in the sound's file, and its page on T1, with the keys and knobs offered to it first. A pack that works on the kit (one that cuts the kit's sample into its keys, say) is such an engine.
 
-This is not a level. The level stays 10. Base 40 adds one kind of ask, `OP1F_ASK_DRUM_ENGINE` (12), on a card of level 8 or later, and a mark, `op1f_drum_engine_1` ([below](#the-mark)).
+This is not a level. The level stays 10. Base 43 adds one kind of ask, `OP1F_ASK_DRUM_ENGINE` (12), on a card of level 8 or later, and a mark, `op1f_drum_engine_1` ([below](#the-mark)).
 
-The words of the interface are in the header `module/build_r6e_card.h`, the section "Base 40: a drum engine". Where this page and the header disagree, the header is right.
+The words of the interface are in the header `module/build_r6e_card.h`, the section "Base 43: a drum engine". Where this page and the header disagree, the header is right.
 
 ## What the owner meets
 
@@ -39,9 +39,7 @@ The drum engine's page uses the same place in the base as an engine's page (the 
 
 ## The mark
 
-A pack with an ask of this kind names `op1f_drum_engine_1` (a constant 1), so that a base before 40 leaves it out. A base before 40 that loads a pack without naming the mark leaves the ask aside with its line for kinds it does not know.
-
-The base built at e005db8 knew kind 12 as "the drum's page" (a page on every drum sound that plays the drum sampler, mark `op1f_drum_page_1`). That form was never released; base 43 has the drum engine in its place, and a pack built for the page is left out (its mark is not offered).
+A pack with an ask of this kind names `op1f_drum_engine_1` (a constant 1), so that a base before 43 leaves it out. A base before 43 that loads a pack without naming the mark leaves the ask aside with its line for kinds it does not know.
 
 ## The lines the base writes
 
@@ -57,7 +55,7 @@ The base built at e005db8 knew kind 12 as "the drum's page" (a page on every dru
 | `cards: '<pack>' asks for a drum engine (its ask <n>) that is left aside: its table is not a head` | The ask points at nothing, or at fewer than 28 bytes |
 | `page: '<pack>' stands in for the drum engine's page of drum <n>, its document at 0x...` | Your page went up |
 
-The `drum:` lines come from `../src/main/op1f_drum.cpp` in the log; at most 32 of the last three kinds a start.
+The `drum:` lines come from `../src/main/op1f_drum.cpp` in the log. The four about picks and rides (picked on another engine, rides, plays the drum sampler's own page again, keeps over the kit) are said 32 times at most a start, together.
 
 ## A lifted cut dropped into the drum sound
 
@@ -65,8 +63,8 @@ Your engine may drop what the tape has lifted into the drum sound it rides, with
 
 ## A sample your pack wrote itself
 
-A pack that writes into the drum sound's sample itself (veffchop pastes a copied key's sound behind the kit's material) asks the unit to keep it with `op1f_sample_changed(card, ask, OP1F_PLACE_DRUM + slot)`, from its frame function or its input function. In the unit's turn the base marks that drum sound changed, as the drum's own drop does after its import, and the unit keeps the sample as it keeps a dropped cut. It answers a ticket (watch `done` with `op1f_sample_get`; `answer` 0 when marked) or a refusal: `OP1F_NOT_NOW`, `OP1F_BAD_NAME`, `OP1F_NOT_HERE`, `OP1F_BUSY`, `OP1F_FAILED`, as a drop's. The log says `sample: mark <t> into drum <n> for '<name>': queued` and `sample: mark <t>: drum <n> marked changed after <k> frame(s): the unit keeps its sample`.
+A pack that writes into the drum sound's sample itself (veffchop pastes a copied key's sound behind the kit's material) asks the unit to keep it with `op1f_sample_changed(card, ask, OP1F_PLACE_DRUM + slot)`, from its input function only, in an event on the key thread, as a drop. A pack that wrote the sample in its frame function asks at the next such event of its page; from anywhere else the call answers `OP1F_NOT_NOW` and asks nothing of the unit. In the unit's turn the base marks that drum sound changed, as the drum's own drop does after its import, and the unit keeps the sample as it keeps a dropped cut. It answers a ticket (watch `done` with `op1f_sample_get`; `answer` 0 when marked) or a refusal: `OP1F_NOT_NOW`, `OP1F_BAD_NAME`, `OP1F_NOT_HERE`, `OP1F_BUSY`, `OP1F_FAILED`, as a drop's. The log says `sample: mark <t> into drum <n> for '<name>': queued` and `sample: mark <t>: drum <n> marked changed after <k> frame(s): the unit keeps its sample`.
 
 ## What the base reads and changes of the firmware
 
-One place of the firmware is changed: the entry of the drum's engine pick, the function the drum's engine list and MIDI call with the id picked and the drum sound ([the change list](changes.md), `0x8d4eb160`). A pick of your engine on a sound that plays the drum sampler goes no further: the firmware makes no pick, and the sound stays as it was. Every other pick goes on to the firmware's function as before, after the base has ended the ride. The base adds your engine's row to the catalog's `drum_types` when it reads the catalog, as it adds a synth engine's to `synth_types` (the place it already had for level 9), and leaves it out of the catalog it writes back. The member `op1f_engine` of a drum sound is kept by the base's values unit, which already reads and writes the base's members in the drum's files. It reads the drum sound the owner sees and the engine type each drum sound plays, and, once, the drum's own function that answers the screen of an engine type ([the firmware's functions](firmware-interfaces.md)).
+Two places of the firmware are changed: the entry of the drum's engine pick, the function the drum's engine list and MIDI call with the id picked and the drum sound ([the change list](changes.md), `0x8d4eb160`), and the head of the drum's drop job ([above](#a-lifted-cut-dropped-into-the-drum-sound)). A pick of your engine on a sound that plays the drum sampler goes no further: the firmware makes no pick, and the sound stays as it was. Every other pick goes on to the firmware's function as before, after the base has ended the ride (a kit picked on that sound within about 2.5 s of your pick keeps it, as said above). The base adds your engine's row to the catalog's `drum_types` when it reads the catalog, as it adds a synth engine's to `synth_types` (the place it already had for level 9), and leaves it out of the catalog it writes back. The member `op1f_engine` of a drum sound is kept by the base's values unit, which already reads and writes the base's members in the drum's files. It reads the drum sound the owner sees and the engine type each drum sound plays, and, once, the drum's own function that answers the screen of an engine type ([the firmware's functions](firmware-interfaces.md)).
