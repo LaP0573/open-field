@@ -204,6 +204,31 @@
     border-top: 1px solid var(--line); font-size: 13px; }
   .also .r:last-child { border-bottom: 1px solid var(--line); }
   .also .r span { color: var(--mid); }
+  /* the room for packs: the loader's room as a bar, each pack where the loader would place it (room.mjs) */
+  .room { border: 1px solid var(--ink); background: var(--panel); padding: 12px 20px 14px; margin: 0 0 20px; display: grid; gap: 8px; }
+  .room h4 { margin: 0; font: 500 12px var(--mono); color: var(--mid); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px; }
+  .room .lab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px; margin-bottom: -4px; font: 11px var(--mono); color: var(--mid); }
+  .room .lab b { color: var(--ink); font-weight: 500; }
+  .room .lab b, .room .lab span span { white-space: nowrap; }
+  .room .lab .warn, .room .lab .warn b { color: var(--red); }
+  .room .meter { position: relative; height: 24px; border: 1px solid var(--ink); background: var(--white); overflow: hidden; }
+  .room .meter i { position: absolute; top: 0; bottom: 0; min-width: 1px; box-shadow: inset -1px 0 var(--white); background: var(--blue); color: var(--on-accent);
+    font: 10px/22px var(--mono); font-style: normal; padding: 0 4px; white-space: nowrap; overflow: hidden; cursor: default; }
+  .room .meter i.new { background: var(--ochre); }
+  .room .meter i.off { background: var(--red); }
+  .room .meter i.by { background: var(--grey); opacity: .6; }
+  .room .meter i.hi, .room .keys span.hi { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 1; }
+  .room .meter .end { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--red); z-index: 2; }
+  .room .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0 22px; font: 11px var(--mono); color: var(--mid); }
+  .room .keys span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding: 3px 2px; border-top: 1px solid var(--line); cursor: default; }
+  .room .keys .dot { margin-right: 0; }
+  .room .keys b { flex: 1; color: var(--ink); font-weight: 400; }
+  .room .keys .off, .room .keys .off b { color: var(--red); }
+  .room .nums { display: flex; flex-wrap: wrap; gap: 4px 26px; font: 12px var(--mono); }
+  .room .nums > span > span { color: var(--mid); }
+  .room .nums .warn > span { color: var(--red); }
+  .room .note { margin: 0; }
+  .room .note:empty { display: none; }
   .packnote { margin-top: 14px; }
   body[data-moment="asks"] #sec-packs, body[data-moment="back"] #sec-packs { opacity: .32; pointer-events: none; }
 
@@ -659,6 +684,7 @@
           <span class="aside" data-m="ours update loader packs"><span><span class="dot" style="--c:var(--blue)"></span>on your OP-1</span><span><span class="dot" style="--c:var(--ochre)"></span>update out</span><span><span class="dot" style="--c:var(--grey)"></span>not on it</span><span><span class="dot" style="--c:var(--red)"></span>coming off</span></span>
         </div>
         <div class="filters" id="filters"></div>
+        <div class="room hidden" id="roomBox" data-m="ours update loader packs"></div>
 
         <div class="base" id="baseRow">
           <svg class="pic" viewBox="0 0 120 96" aria-hidden="true"><path d="M6 82H114"/><path d="M22 82L58 24l36 58"/><path d="M58 24l-5-9M58 24l5-9"/><path class="fi" d="M58 42L47 82h22z"/><path d="M102 82V56"/><path class="fr" d="M102 56l11 4.5-11 4.5z"/><path d="M11 82l2-5M15 82l1-4M80 82l-1-4"/></svg>
@@ -1361,6 +1387,7 @@
   // and holds every file to the record it kept in the browser's storage (one record a firmware).
   import * as D from "./door.mjs";
   import * as P from "./packs-live.mjs";
+  import * as R from "./room.mjs";
   import { readListing, knownVersions, fileName, download, pictureOf, pictureLink, downloadPicture, checkPickedFile } from "./catalog.mjs";
 
   const $ = (id) => document.getElementById(id);
@@ -1373,6 +1400,13 @@
   // the pack files picked on this computer with the + tile, each checkPickedFile's answer with its bytes as `data`: they
   // belong to the computer, not to the unit, so they stay through a connect, a disconnect and a change that didn't go
   let picked = [];
+  // What each pack file takes of the loader's room, by its SHA-256 (room.mjs footOf): from the files the page holds, its
+  // own base.pack and the files picked on this computer, and from the listing's files that are on the unit or that a
+  // change would send, each downloaded once and held to the listing as for a change (a followed file: the bytes checked
+  // when the page opened). The page keeps what it read of a file, not the file.
+  const feet = new Map();
+  const feetAsked = new Set();             // the listed files asked for, by SHA-256: once each
+  let feetComing = Promise.resolve();      // one download after the other
 
   function store() { try { return window.localStorage; } catch (e) { return null; } }
   // The install steps, once open, stay until the owner closes them: nothing the unit does takes them away (it goes away
@@ -1486,6 +1520,7 @@
       try { listing = readListing(f.listingData, FW); known = knownVersions(f.listingData, FW); } catch (e) { listing = null; }
     }
     if (f && f.basePack) base = { sha256: f.basePack.sha256, size: f.basePack.bytes.length, version: f.basePack.version, release: f.basePack.release };
+    if (f && f.basePack) footFrom(f.basePack.sha256, f.basePack.bytes);
     for (const r of [...document.querySelectorAll(".releaseHere")]) r.textContent = base ? base.release : "?";
     if (base) $("railRelease").textContent = base.release;
     // the page's own records name the versions of the files it sent: an older one is then an update
@@ -1690,10 +1725,12 @@
       for (const c of listing.categories) add(c.key, c.label, c.entries.length);
       if (live) { const b = el("button", "sp" + (onlyMine ? " on" : ""), "only what's on my OP-1"); b.type = "button"; b.addEventListener("click", () => { onlyMine = !onlyMine; render(); }); fl.append(b); }
     }
+    const fig = live ? roomFigures() : null;
     renderBase(live);
     renderTiles(live);
     renderAlso(live);
-    renderBar(live);
+    renderBar(live, fig);
+    renderRoom(fig);
     if (live) renderHeader();
     if (!leaving && live && !["asks", "back", "install"].includes(document.body.dataset.moment)) setMoment(momentFor());
     logsLink();
@@ -1855,12 +1892,131 @@
     }
   }
 
-  function renderBar(live) {
+  function renderBar(live, fig) {
     const lines = live ? P.changeLines(rowsNow, resolved) : [];
     $("barLines").replaceChildren(...lines.map((l) => { const s = el("span"); s.append(el("i", "", l.sign), document.createTextNode(l.text)); return s; }));
     $("barCount").textContent = lines.length === 1 ? "1 change" : lines.length + " changes";
-    $("barProblem").textContent = live && resolved.problems.length ? resolved.problems.join(" ") : "";
+    // too big for the room: said, not refused, as the unit itself refuses it and changes nothing
+    const tooBig = fig && fig.after && fig.after.bytes > fig.room.bytes ? "Those packs together need " + (fig.after.unknown.length ? "at least " : "") + kb(fig.after.bytes) +
+      " of the " + kb(fig.room.bytes) + " room your OP-1 keeps for packs, so it would refuse the change. Untick one or two." : "";
+    $("barProblem").textContent = live ? [...resolved.problems, tooBig].filter(Boolean).join(" ") : "";
     $("send").disabled = !live || !lines.length || resolved.problems.length > 0 || running;
+  }
+
+  // ---------- the room for packs: what the pack files take of the loader's room, as room.mjs places them ----------
+
+  function footFrom(sha, bytes) { if (sha && !feet.has(sha)) feet.set(sha, R.footOf(bytes)); }
+  // A listed file whose room the page doesn't know yet, downloaded once (catalog.mjs's download, held to the listing),
+  // then the page drawn again. A file the listing doesn't have stays "room not known".
+  function fetchFeet(shas) {
+    if (!listing || leaving) return;
+    for (const sha of shas) {
+      if (!sha || feet.has(sha) || feetAsked.has(sha)) continue;
+      const entry = [...listing.offered.values()].find((e) => e.sha256 === sha);
+      if (!entry) continue;
+      feetAsked.add(sha);
+      feetComing = feetComing.then(() => download(entry)).then((got) => {
+        footFrom(got.sha256, got.bytes);
+        if (!entry.followed) say("downloaded " + got.name + " from " + got.from + " to count its room: its size and SHA-256 are the listing's");
+        render();
+      }, (e) => say("the room of " + entry.id + " isn't counted: " + (e && e.message ? e.message : e), "warn"));
+    }
+  }
+  // The room of the unit's loader, from its door's hello (hello 04's tail, or N1's numbers for a door that says none),
+  // and the pack files in it now and after the changes waiting: { room, now, after, plan, files }, or null when the
+  // page doesn't know where that loader's room begins.
+  function roomFigures() {
+    const room = R.roomOf(unit.hello, files && files.manifest);
+    if (room.first === null) return null;
+    for (const p of picked) footFrom(p.sha256, p.data);
+    const now = unit.files.filter((f) => f.isPack).map((f) => ({ file: f.name, sha256: f.sha256 }));
+    const plan = resolved && (resolved.plan.send.length || resolved.plan.remove.length) ? resolved.plan : null;
+    const after = plan ? R.afterChange(now, plan) : null;
+    fetchFeet([...now, ...(after || [])].map((e) => e.sha256));
+    return { room, plan, now: R.placeSet(R.withFacts(now, feet), room), after: after ? R.placeSet(R.withFacts(after, feet), room) : null,
+      files: { now: now.length, after: after ? after.length : null } };
+  }
+
+  // A pack's name shows inside its part of the bar only where it fits whole, again whenever the bar changes width.
+  function fitNames(meter) {
+    for (const s of meter.querySelectorAll("i[data-name]")) { s.textContent = s.dataset.name; if (s.scrollWidth > s.clientWidth) s.textContent = ""; }
+  }
+  const roomFit = "ResizeObserver" in window ? new ResizeObserver((all) => { for (const e of all) fitNames(e.target); }) : null;
+
+  // The room window: the bar of the room now and, with changes waiting, after them; each pack's room; the pack files,
+  // engines and effects against what the unit takes. Shown only while the page talks to a unit.
+  function renderRoom(fig) {
+    const box = $("roomBox");
+    if (roomFit) roomFit.disconnect();
+    box.replaceChildren();
+    box.classList.toggle("hidden", !fig);
+    if (!fig) return;
+    const { room, plan, now, after } = fig;
+    const set = after || now;
+    const low = (s) => String(s).toLowerCase();
+    const pc = (x) => ((x / room.bytes) * 100).toFixed(1) + "%";
+    const least = (s) => (s.unknown.length ? "at least " : "");
+    const removed = new Set(plan ? plan.remove.map(low) : []), replaced = new Set(plan ? plan.send.map((s) => low(s.name)) : []);
+    const mark = (pack, on) => { for (const e of box.querySelectorAll("[data-pack]")) if (e.dataset.pack === pack) e.classList.toggle("hi", on); };
+    const hover = (node, pack) => { node.dataset.pack = pack; node.addEventListener("mouseenter", () => mark(pack, true)); node.addEventListener("mouseleave", () => mark(pack, false)); };
+    const head = el("h4");
+    head.append(el("span", "", "room for packs"), el("span", "", "loader N" + room.generation + " · " + kb(room.bytes) + " · " + room.files + " pack files"));
+    box.append(head);
+    // one bar: its line above it, then each placed pack where the loader would place it, its width its room
+    function bar(label, s, later) {
+      const over = s.bytes > room.bytes, lab = el("div", "lab"), right = el("span", over ? "warn" : "");
+      const words = least(s) + kb(s.bytes) + " used" + (later ? " (" + (s.bytes >= now.bytes ? "+" : "−") + kb(Math.abs(s.bytes - now.bytes)) + ")" : "");
+      right.append(el("b", "", words), " ", el("span", "", "· " + (over ? "too big by " + kb(s.bytes - room.bytes) + ": your OP-1 would refuse it" : kb(room.bytes - s.bytes) + " free")));
+      lab.append(el("span", "", label), right);
+      const meter = el("div", "meter"), scale = Math.max(room.bytes, s.bytes), at = (x) => ((x / scale) * 100).toFixed(3) + "%";
+      meter.setAttribute("role", "img");
+      meter.setAttribute("aria-label", label + ": " + words + " of " + kb(room.bytes));
+      for (const q of s.placed) {
+        const state = q.standsBy ? "by" : later ? (q.sent ? "new" : "") : removed.has(low(q.file)) || replaced.has(low(q.file)) ? "off" : "";
+        const seg = el("i", state);
+        seg.style.left = at(q.start);
+        seg.style.width = at(q.foot);
+        seg.title = q.pack + " v" + q.version + " (" + q.file + "): " + kb(q.foot) + ", " + pc(q.foot) + " of the room" +
+          (state === "by" ? ". It stands by: a file of the same pack with a higher version is placed" : state === "off" ? ". Coming off" : state === "new" ? ". Going on" : "");
+        if (!q.standsBy) seg.dataset.name = q.pack;
+        hover(seg, q.pack);
+        meter.append(seg);
+      }
+      if (over) { const end = el("span", "end"); end.style.left = at(room.bytes); end.title = "the end of the room"; meter.append(end); }
+      box.append(lab, meter);
+    }
+    bar("now", now, false);
+    if (after) bar("after your changes", after, true);
+    // each pack's room, the largest first; then what comes off, what stands by, what the page can't count, and what is free
+    const keys = el("div", "keys");
+    const key = (colour, name, right, cls, pack) => {
+      const k = el("span", cls || "");
+      k.append(Object.assign(el("span", colour ? "dot" : "dot ring"), colour ? { style: "--c:" + colour } : {}), el("b", "", name), document.createTextNode(right));
+      if (pack) hover(k, pack);
+      keys.append(k);
+    };
+    for (const q of set.placed.filter((x) => !x.standsBy).sort((x, y) => y.foot - x.foot)) key(after && q.sent ? "var(--ochre)" : "var(--blue)", q.pack + " v" + q.version, kb(q.foot) + " · " + pc(q.foot), "", q.pack);
+    if (after) for (const q of now.placed) if (!q.standsBy && removed.has(low(q.file))) key("var(--red)", q.pack + " v" + q.version, "coming off · " + kb(q.foot), "off", q.pack);
+    for (const q of set.placed) if (q.standsBy) key("var(--grey)", q.pack + " v" + q.version, "stands by · " + kb(q.foot), "", q.pack);
+    for (const f of set.unknown) key("var(--soft)", f.replace(/\.pack$/i, ""), "room not known");
+    const free = room.bytes - set.bytes;
+    key(null, free >= 0 ? "free" : "over the room", kb(Math.abs(free)) + " · " + pc(Math.abs(free)), free >= 0 ? "" : "off");
+    // the pack files, engines and effects, against what the unit takes
+    const nums = el("div", "nums");
+    const num = (label, value, most, known, why) => {
+      const s = el("span", value > most ? "warn" : "");
+      s.append(el("span", "", label + " "), document.createTextNode((known ? "" : "at least ") + value + " of " + most));
+      if (value > most) s.title = why;
+      nums.append(s);
+    };
+    const count = after ? fig.files.after : fig.files.now;
+    num("pack files", count, room.files, true, "Your OP-1 takes " + room.files + " pack files at most.");
+    num("engines", set.engines, R.ENGINES_MOST, set.asksKnown, "The base takes " + R.ENGINES_MOST + " engines of all packs together and sets the others aside.");
+    num("effects", set.effects, R.EFFECTS_MOST, set.asksKnown, "The base takes " + R.EFFECTS_MOST + " effects of all packs together and sets the others aside.");
+    const note = el("p", "note");
+    if (set.unknown.length) note.textContent = (set.unknown.length === 1 ? "One file is" : set.unknown.length + " files are") + " not counted: the page reads only its own base.pack, the files of the list and the files you pick on this computer.";
+    box.append(keys, nums, note);
+    for (const m of box.querySelectorAll(".meter")) { fitNames(m); if (roomFit) roomFit.observe(m); }
   }
 
   function renderHeader() {

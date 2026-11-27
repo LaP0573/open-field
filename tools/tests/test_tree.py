@@ -652,7 +652,7 @@ class ThePagesOnAHost(unittest.TestCase):
 
     def test_every_module_the_page_imports_is_beside_it(self):
         files = self.page_files()
-        self.assertEqual(sorted(files), ["catalog.mjs", "door.mjs", "ferret.mjs", "index.html", "install.mjs", "ldr.mjs", "packs-live.mjs", "patch.mjs", "placement.mjs"])
+        self.assertEqual(sorted(files), ["catalog.mjs", "door.mjs", "ferret.mjs", "index.html", "install.mjs", "ldr.mjs", "packs-live.mjs", "patch.mjs", "placement.mjs", "room.mjs"])
 
     def test_the_page_names_no_absolute_path_and_loads_nothing_from_another_site(self):
         for name, content in self.page_files().items():
