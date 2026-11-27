@@ -1,0 +1,25 @@
+{
+  "id": "punch",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "effects",
+    "tape"
+  ],
+  "description": "punch: 14 punch-in effects (LP, HP, JET, CRUSH, GATE, DUB, VERB, STUTR ...) held on the white keys on the PERFORM face.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/punch.pack",
+  "follow": "main",
+  "version": 3,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [
+    {
+      "name": "punch",
+      "place": "punch"
+    }
+  ],
+  "picture": {
+    "path": "packs/punch/picture.png"
+  }
+}

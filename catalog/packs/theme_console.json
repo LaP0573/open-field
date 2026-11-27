@@ -1,0 +1,19 @@
+{
+  "id": "theme_console",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for themes: CONSOLE, an elbow header and pill lanes on the tape screen, a set list on the PERFORM face.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/theme_console.pack",
+  "follow": "main",
+  "version": 6,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/theme_console/picture.png"
+  }
+}
