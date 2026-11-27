@@ -2,6 +2,11 @@
 # USB MIDI and folder access need (builder/README.md, "On a host's pages"). It is published once the checks have
 # passed on main, or by hand. The host's pages are switched on once in the repository's settings, with this workflow
 # as their source.
+#
+# builder/ always holds the released base, builder/base.pack, even when the base's sources on main are ahead of it:
+# a change to the base is merged first and released later, by the maintainer's own pull request, which writes
+# builder/base.pack and what names it (tools/build_all.py --update --base-version N --release X.Y). Until then the page
+# keeps putting the last released base on every unit it installs.
 name: pages
 
 on:
@@ -22,7 +27,12 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # A green run of the checks on a push to main of this repository: not a fork's own branch named main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

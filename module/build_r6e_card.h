@@ -1962,7 +1962,8 @@ static_assert(sizeof(Op1fSample) == 36 && OP1F_PLACE_IN(Op1fSample, dropped) == 
 //   OP1F_NOT_NOW    not in this card's input function for an event on the key thread; the disk mode is open; the
 //                   sound's sample is being put back after a start
 //   OP1F_BAD_NAME   no ask of kind engine with that number; a place that is not a synth sound's (a drum sound's place,
-//                   OP1F_PLACE_DRUM + slot, on base 39)
+//                   OP1F_PLACE_DRUM + slot, on base 39). From base 43 a drum sound's place is taken when the ask is the
+//                   card's drum engine (OP1F_ASK_DRUM_ENGINE, below): the drum sampler's own drop, in the unit's turn
 //   OP1F_NOT_HERE   the sound does not play that engine now, or a sound loaded there is not told yet
 //   OP1F_BUSY       a drop is under way (any pack's), or the unit has clipboard work waiting
 //   OP1F_EMPTY      no cut of the tape is lifted (nothing, or a copied sound)
@@ -2027,5 +2028,68 @@ static_assert(sizeof(Op1fTapes) == 36 && OP1F_PLACE_IN(Op1fTapes, changed) == 32
 // The mark of a base that carries out an ask of kind OP1F_ASK_TAPES (a constant 1). A pack that must know whether its
 // files follow the tapes imports it as optional: 0 under a base that does not know the kind.
 extern "C" const unsigned op1f_tapes_1 OP1F_NAMED("op1f_tapes_1");
+
+// Base 43: a drum engine. Up to here every word is the earlier bases' (base 39's sample last); this part only adds
+// behind it, and a pack that does not ask for it is not touched by it.
+//
+// A pack may add an engine of its own to the drum's engine list (shift and T1 in the drum's mode), as level 9 lets a
+// pack add a synth engine that rides dsynth. A drum engine rides the unit's drum sampler and makes no sound of its own:
+// the drum sampler plays on under it (the kit, its sample, the keys' points, the saving and loading of the kit stay the
+// unit's), and the engine is the pack's page on T1 and a name in the list and in the sound's file. One ask of kind
+// OP1F_ASK_DRUM_ENGINE, on a card of level 8 or later. The owner meets it so:
+//   - the engine's name stands in the drum's engine list among the unit's own (dbox, the drum sampler), where the unit
+//     sorts it by its name, as a pack's synth engine stands in the synth's;
+//   - picked on a drum sound that plays the drum sampler, the sound goes on playing the drum sampler as it was, and T1
+//     shows the pack's page: the document op1f_page_stand_in gave for the ask, or the base's blank page with the ask's
+//     name until it gives one. Picked on a sound that plays another engine (dbox), nothing changes and the base says a
+//     line: pick the drum sampler there first;
+//   - every key and knob (the four knobs, shift, the keyboard's keys) goes to the pack's input function first, as for any
+//     page; what it does not take goes to the unit as it would on the drum sampler's own page;
+//   - another screen of the drum (T2 to T4, shift and T1, another mode) takes the page off as for any page that stands
+//     in, and T1 brings it back; the drum sampler (one of its kits), dbox, or a sound loaded that does not name the
+//     engine, picked on that drum sound, ends the ride and shows the unit's own page;
+//   - the sound's file keeps the engine's name in the base's member op1f_engine, as a synth sound's does; loaded again,
+//     the sound rides the engine again. Without the pack, or on a stock unit, the same file loads as the drum sampler
+//     with its kit and its keys' points.
+// Only one pack holds the drum engine: the first card in the list's order (the packs' file names) with such an ask. The
+// ask of any other card is left aside with a line, and that pack runs without it.
+//
+// The kind of ask a base 43 knows beside the earlier ones, for a card of level 8 or later. A base that does not know it
+// (42 or earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
+//   OP1F_ASK_DRUM_ENGINE  a drum engine: what `what` points at is an Op1fDrumEngine
+#define OP1F_BUILD_R21_DRUM_H
+enum { OP1F_ASK_DRUM_ENGINE = 12 };   // after OP1F_ASK_LFO (11); 9 stays proposed for files per tape
+
+// A drum engine: what its ask points at; its `bytes` 28 at base 43 (a later base may read more).
+//   head  level 5's head: `name` is the engine's name in the drum's engine list and in the sound's file, and what the
+//         base's blank page shows until the pack gives a document (1 to 15 characters of a-z, 0-9, space, - and _;
+//         never one of the unit's own: dbox, drum, drums, sampler, drum sampler, drum_sampler, synth); `flags` 0;
+//         `shown(where, how)` is told when the page comes on the screen and goes: `where` the drum sound's place
+//         (OP1F_PLACE_DRUM + slot, 8 to 15), `how` OP1F_SHOWN_UP, and 0 when the page leaves the screen. Another drum
+//         sound that rides the engine, picked while the page is up, is told with its own `where`
+// The ask names no address of the unit's and changes no place of the firmware. It needs op1f_drum_engine_1.
+// The drop (base 39's op1f_sample_drop) takes a drum sound's place, OP1F_PLACE_DRUM + slot, with this ask's number,
+// while that drum sound rides the engine: the unit puts the lifted cut into the drum sampler's sample in its own turn,
+// as the drum sampler's page does, with the synth's checks and answers; `dropped`, `ticket`, `done` and `answer` of
+// op1f_sample_get are a drum place's too. The unit keeps the drum sampler's sample over a restart itself. A drop does
+// what the drum sampler page's own drop does, no more.
+//
+// A pack that writes into its drum sound's sample itself (a cut pasted behind the kit's material, say) asks the unit
+// to keep it, as the unit keeps a dropped cut: op1f_sample_changed(card, ask, place), with the drum engine's ask and
+// the drum place, from the card's input function for an event on the key thread only, as a drop. A pack that wrote
+// the sample in its frame function asks at the next key event of its page. In the unit's turn the base marks the drum
+// sound changed (what the drum's own drop does after its import); nothing is imported.
+// It answers a ticket, 1 or more (watch op1f_sample_get's `done`; `answer` 0 when marked), or less than 0, with nothing
+// asked of the unit: OP1F_NOT_NOW (not in the card's input function for an event on the key thread; the disk mode
+// open), OP1F_BAD_NAME (not a drum place, or
+// not the card's drum engine ask), OP1F_NOT_HERE (the sound does not ride it now), OP1F_BUSY (a drop or mark under
+// way, or clipboard work waiting), OP1F_FAILED (the unit took nothing).
+extern "C" int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place) OP1F_NAMED("op1f_sample_changed");
+struct Op1fDrumEngine { Op1fKindHead head; };   // 28 bytes at base 43
+static_assert(sizeof(Op1fDrumEngine) == 28, "a drum engine's table is the head, 28 bytes at base 43");
+
+// The mark of a base that adds a pack's drum engine to the drum's engine list (a constant 1). A pack with an ask of
+// kind OP1F_ASK_DRUM_ENGINE names it, so that a base before 43 leaves it out.
+extern "C" const unsigned op1f_drum_engine_1 OP1F_NAMED("op1f_drum_engine_1");
 
 #endif

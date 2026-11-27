@@ -1,0 +1,61 @@
+# The guard of the release's own files: the check a pull request from a fork cannot change. A fork's pull request
+# runs its own copy of checks.yml and of the tools, so it could switch their refusal off for itself. This workflow runs
+# on pull_request_target: the workflow and the tool are main's own, checked out from main. The pull request is read as
+# data through the host's API (tools/build_all.py --guard), never checked out, and none of its code runs. It refuses
+# what the checks refuse from a fork: a change to builder/base.pack, builder/base-pack.json, catalog/packs/base.json,
+# packs/built.json's base.pack, or the base's version and release. A branch of this repository passes it.
+#
+# Its answer is the commit status open-field/guard on the event's head commit, which this workflow sets with its own
+# token: a fork's workflow has a read-only token and cannot set it, whatever its jobs are called. The maintainer
+# makes the status open-field/guard required in the repository's settings.
+name: guard
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: The release's own files, read from the pull request as data
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python -I tools/build_all.py --guard "$PULL_REQUEST" --head "$HEAD"
+
+      # The commit status takes the head's SHA and the guard's answer, and nothing of the pull request's own text.
+      - name: The status open-field/guard on the head commit
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          ANSWER: ${{ steps.guard.outcome }}
+        run: |
+          if [ "$ANSWER" = success ]; then
+            state=success; said="The release's own files are left as they are."
+          else
+            state=failure; said="The guard refused a change to the release's own files, or could not read them: see the run."
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD" -f state="$state" -f context=open-field/guard \
+            -f description="$said" -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

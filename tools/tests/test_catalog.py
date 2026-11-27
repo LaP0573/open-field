@@ -1412,7 +1412,7 @@ class ABundledEntry(unittest.TestCase):
             named = json.load(f)
         with open(os.path.join(ROOT, "packs", "built.json"), encoding="utf-8") as f:
             built = json.load(f)["files"]["base.pack"]
-        for said_of_it in ({"bytes": named["bytes"], "sha256": named["sha256"]}, built):
+        for said_of_it in ({"bytes": named["bytes"], "sha256": named["sha256"]}, {"bytes": built["bytes"], "sha256": built["sha256"]}):
             self.assertEqual(said_of_it, {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
         self.assertEqual((self.base["bytes"], self.base["sha256"], self.base["version"]), (len(data), hashlib.sha256(data).hexdigest(), named["version"]))
         self.assertEqual([entry["id"] for entry in self.listing["packs"] if entry["status"] == "bundled"], ["base"])

@@ -42,7 +42,15 @@ From the top of the repository:
 python -I tools/build_all.py
 ```
 
-It builds everything into `out/` and `build/`, and compares each result with the size and SHA-256 kept in `packs/built.json`, and the install page's own files with what it built: `builder/base.pack` with the `base.pack` it made, and the loader's file in `builder/` with the loader. It answers 0 when every file is the kept one, byte for byte. The compiler is pinned by the toolchain, so the same sources give the same bytes.
+It builds everything into `out/` and `build/`, and compares each result with the size and SHA-256 kept in `packs/built.json`, and the loader's file in `builder/` with the loader it built. It answers 0 when every file is the kept one, byte for byte. The compiler is pinned by the toolchain, so the same sources give the same bytes.
+
+The base is held in its own way, because its sources on `main` may be ahead of the base the install page serves. A change to the base is merged first and released later ([below](#a-change-to-the-base-and-its-release)). So `packs/built.json` keeps the released base: its size, its SHA-256, and `inputs`, one SHA-256 over every file its build read. Those files are the recipe, its sources and the headers they include, the pictures' instructions, the profile, the linker script and the tools that make the bytes. The build gives one of three answers for `base.pack`:
+
+- `the same`: the built file is the released base.
+- `ahead`: the built file differs, and so do the files it was built from. The sources have moved on since the release. One line says so, the build still answers 0, and the next release of the base makes those sources the page's.
+- `DIFFERS`: the built file differs, and the files it was built from are the ones the base was released with. The same sources gave other bytes, and that is a fault.
+
+The release's own files are always held to the released base: `builder/base.pack` byte for byte, `builder/base-pack.json`, which the install page holds that file to, and the base's entry in the listing, `catalog/packs/base.json`.
 
 `base.pack`, which every unit needs, is then in `out/packs/`, and the example packs in `out/examples/`. The folder `out/` must be new or empty: name another with `--out` for a second build.
 
@@ -105,15 +113,57 @@ python -I tools/place_sum.py --stock <your own os.ldr> 0x8c0dd488
 ```
 
 - **A pack's pictures**: a recipe names them. `python -I tools/pack_build.py pictures --recipe <recipe> --out <the pack's pictures source>` writes the directory the pack carries.
-- **A pack's card or the base's release**: `python -I tools/pack_build.py card --recipe <recipe> --out <the pack's card source>` writes a pack's card from its recipe, and `python -I tools/pack_build.py release --recipe packs/base.json --out module/build_r6d_base_release.s` the release the start screen shows behind the words open-field.
+- **A pack's card or the base's release**: `python -I tools/pack_build.py card --recipe <recipe> --out <the pack's card source>` writes a pack's card from its recipe, and `python -I tools/pack_build.py release --recipe packs/base.json --out module/build_r6d_base_release.s` the release the start screen shows behind the words open-field. The base's release changes only in the release of the base, which writes that source itself ([below](#a-change-to-the-base-and-its-release)).
 - **A function of the firmware that a source binds**: add its words to `profiles/op1f-1.7.3-interfaces.json` and write the page anew with `python -I tools/interfaces.py`.
-- **Anything in a pack, the base among them**: build again. `packs/built.json` then no longer matches, which is right: a changed pack is another file. Give it another version number in its recipe, and let the build write the new size and SHA-256:
+- **Anything in an example or a pack other than the base**: build again. `packs/built.json` then no longer matches, which is right: a changed pack is another file. Give it another version number in its recipe, and let the build write the new size and SHA-256:
 
 ```bash
 python -I tools/build_all.py --out out-new --update
 ```
 
-  `--update` renews the entries of the pack files and of the examples. For a new `base.pack` it also copies the file into `builder/` and writes `builder/base-pack.json` anew: once the change is merged, the install page puts that `base.pack` on every unit it installs, so the maintainer tries it on a unit first. A new `base.pack` also reaches a unit as a file copied into `user/pk`, with no install. `--update` does not renew the entries of the loader and of the builder's file by itself: see the next section.
+  `--update` renews the entries of the pack files and of the examples, the base's aside. It does not renew the entries of the loader and of the builder's file by itself: see "A change to the loader".
+- **Anything in the base**: change its sources, build again, and read `ahead` for `base.pack`. That is all a change to the base carries; the next section says why.
+
+## A change to the base, and its release
+
+A change to the base and its release are two steps, by different hands. Anyone can send the first. The second is the maintainer's.
+
+**The change** is a pull request that carries the base's sources and nothing else: `packs/base.json` and the files it names. It leaves the release's own files as they are: `builder/base.pack`, `builder/base-pack.json`, `catalog/packs/base.json`, the entry of `base.pack` in `packs/built.json`, and the base's version and release numbers, in `packs/base.json` and in the three sources that hold them (`module/build_r6d_door_base.s`, `module/build_r6d_base_release.s` and `module/build_r6d_base_pictures.s`). The build says `ahead` for `base.pack`, and the change can be merged as it is. A new `base.pack` reaches your own unit as a file copied into `user/pk`, with no install: try it there and say so in the change. After the merge, the install page keeps putting the released base on every unit it installs.
+
+**The checks the host runs** (`.github/workflows/checks.yml`) build in one of three ways:
+
+- On `main`: `python -I tools/build_all.py`. The base may be `ahead`.
+- On a pull request from a fork: the same build, and `--pull-request` with the commit the pull request merges into. It refuses any change to the release's own files, counted from the commit the two have in common. You can run it before you send, with the commit of `main` your branch starts from:
+
+```bash
+python -I tools/build_all.py --pull-request <a commit of main>
+```
+
+- On a pull request from a branch of this repository, which only the maintainer can make: `--pull-request` and `--release-allowed`. A change to the release's own files is let through, and then the release has to be whole: the built `base.pack` is the one `packs/built.json` keeps, the release's own files are that file's, and the `inputs` it keeps are those of the sources as they stand. When `builder/base.pack` is a new file, the base's version is above the one of the branch it merges into, and its release another.
+
+On a pull request the checks compare with the first parent of the merge commit the host makes for it, which is the commit the pull request merges into.
+
+A pull request from a fork runs its own copy of these checks and of the tools, so it could switch the refusal off for itself. The check it cannot change is the guard (`.github/workflows/guard.yml`). It runs on `pull_request_target`, with the workflow and the tool of `main`. It reads the pull request as data through the host's API, never checks it out and never runs its code, and refuses what the checks refuse from a fork:
+
+```bash
+python -I tools/build_all.py --guard <the pull request's number> --repository <owner/name>
+```
+
+It builds nothing and needs no compiler, only `gh` and a token in `GH_TOKEN`. A branch of this repository passes it. It also names the files of the pull request that are code the checks run (`.github/`, `hooks/`, `tools/`, `builder/*.mjs`), for whoever reads it, each written as JSON. It judges the head commit of the event that started it (`--head`), and stops when the pull request has moved on: the run of the new head judges that one. It refuses a pull request whose files the host's API does not list in full (the list stops at 3000 files).
+
+The guard answers with a commit status of its own, `open-field/guard`, on that head commit. The workflow sets it with its own token, and a fork's workflow, whose token can only read, cannot set it, whatever its jobs are called. So the required check is the status `open-field/guard`: the maintainer makes it required in the repository's settings. Without that, a red guard does not stop a merge.
+
+`ahead` lets a change of the base's bytes through, and it does so for a change nobody meant as well: a tool or a header that changes what is built says `ahead` too, until the release. The release's try on a unit is the check of those bytes.
+
+**The release** is the maintainer's own pull request, from a branch of this repository. One command makes it:
+
+```bash
+python -I tools/build_all.py --out out-release --update --base-version <N> --release <X.Y>
+```
+
+It writes the version N and the release X.Y (what the start screen shows behind the words open-field) into `packs/base.json` and the three sources that hold them, builds, and writes the released base: its entry in `packs/built.json` (size, SHA-256 and inputs), `builder/base.pack`, `builder/base-pack.json`, and the size, SHA-256, version, places and level of `catalog/packs/base.json`. N comes after the released base's version: a version keeps its bytes for good. When the build fails, it puts the numbers back as they were.
+
+The command writes the release's own files and nothing else. The pages that name the release or the base's version (README.md, docs/guide.md, docs/base.md, docs/packs.md, docs/first-pack.md) are changed by hand, in the same pull request. So is the history in the `about` of `packs/base.json` ("since base N ..."). The maintainer tries the new `base.pack` on a unit, then merges. From then on, the install page puts it on every unit it installs.
 
 ## A change to the loader
 

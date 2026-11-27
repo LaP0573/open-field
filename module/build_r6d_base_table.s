@@ -75,6 +75,8 @@ op1f_boot_table:
     .long 0x00080014, 0x8d4f7a34, op1f_layer_eh_stub, 0x4a08d6e5, op1f_layer_eh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's effect, and lets the firmware's function run (through a trampoline) otherwise. */
     .long 0x00080014, 0x8d4f7ad0, op1f_layer_lh_stub, 0x4a08d6e5, op1f_layer_lh_room    /* A jump to ours, which answers with the pack's row while the sound rides a pack's LFO, and lets the firmware's function run (through a trampoline) otherwise. */
     .long 0x00080014, 0x8f00b7b0, op1f_sample_sd_stub, 0xd0f0e34c, op1f_sample_sd_room    /* A jump to our stub. A drop a pack asked for (op1f_sample_drop) is done by ours, in the unit's turn; every other, the unit's own drop key's among them, goes on in the firmware's function through a trampoline. */
+    .long 0x00080014, 0x8d4eb160, op1f_drum_pick_entry, 0x8e2c6a48, op1f_drum_pick_room    /* A jump to ours, which puts a pack's drum engine on a drum sound that plays the drum sampler (the sound stays as it is) or takes it off, and lets the firmware's function run (through a trampoline) for every other pick. */
+    .long 0x00080014, 0x8f00ba38, op1f_sample_dd_stub, 0xd0f0e34c, op1f_sample_dd_room    /* A jump to our stub. A drop a pack asked for into a drum sound that rides its drum engine (op1f_sample_drop) is done by ours, in the unit's turn; every other, the drum page's own drop key's among them, goes on in the firmware's function through a trampoline. */
 .size op1f_boot_table, .-op1f_boot_table
 .global op1f_boot_table_end
 .type op1f_boot_table_end, STT_OBJECT

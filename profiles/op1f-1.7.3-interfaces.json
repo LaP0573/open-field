@@ -513,6 +513,12 @@
    "what": "The number of the screen of a synth engine's type. For a type that has no screen it writes a line into the log and gives back 86.",
    "thread": "Ours: the display thread."
   },
+  "0x8fc2757c": {
+   "name": "drum_screen",
+   "group": "screens",
+   "what": "The number of the screen of a drum engine's type, the one T1 shows in the drum's mode. For a type that has no screen it writes a line into the log and gives back 86.",
+   "thread": "Ours: the display thread."
+  },
   "0x8c0dd2cc": {
    "name": "draw_char",
    "group": "screens",
@@ -637,6 +643,24 @@
    "name": "sample_mark",
    "group": "sounds",
    "what": "Marks the sample of synth slot `slot` (0 to 7) to be kept over a restart, as the unit keeps its sampler's: in the file `user/audio/synth/synth_N.raw` of its disk, N the slot from 0, the sample from its 16th byte on. The unit puts that file back at the start only into a sound that plays its sampler; for a sound that plays a pack's engine the base reads it back itself. After it our code calls method 6 of the slot's record with the record: the records are 52 bytes a slot from `0x080235dc`, a record's first word is its table of functions, and method 6 is the table's +0x18.",
+   "thread": "Ours: the main task, in the unit's clipboard work."
+  },
+  "0x8f00c4e0": {
+   "name": "drum_post",
+   "group": "sounds",
+   "what": "The drum sampler page's own post of a drop for drum slot `slot` (0 to 7): when the unit's queue of clipboard work is empty it puts the drum's drop job there (request 10) and waits a tick at a time until the queue has taken it; with work waiting it posts nothing. The drop key on the drum sampler's page is its only caller.",
+   "thread": "Ours: the key thread, inside a card's input function, as the drum page's own key."
+  },
+  "0x8f014848": {
+   "name": "drum_holder",
+   "group": "sounds",
+   "what": "The holder of drum slot `slot` (0 to 7): its word in the table at `0x0802f0ac`. The holder's first word is the slot's object, as for a synth slot's (`synth_holder`).",
+   "thread": "Ours: the main task, in the unit's clipboard work."
+  },
+  "0x8d4eb68a": {
+   "name": "drum_mark",
+   "group": "sounds",
+   "what": "Marks drum slot `slot` (0 to 7) changed, as the drum's own drop does after its import, so that the unit keeps the drum sampler's new sample as it keeps its own.",
    "thread": "Ours: the main task, in the unit's clipboard work."
   },
   "0x8f007d68": {

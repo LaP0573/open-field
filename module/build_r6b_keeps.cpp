@@ -314,6 +314,15 @@ static void (*const r11_none_lfos_changed)(unsigned where, unsigned which, unsig
 extern "C" void op1f_lfos_changed(unsigned where, unsigned which, unsigned how) OP1F_NAMED("op1f_lfos_changed") __attribute__((weak));
 #endif
 
+// R21 (base 43): the drum unit's (module/build_r21_drum.cpp), told what changed of the member op1f_engine at a drum
+// slot, as the engines unit is at a synth slot. Weak: away, nothing is told.
+#if defined(OP1F_HOST)
+static void (*const r18_none_drum_changed)(unsigned where, unsigned which, unsigned how) = 0;
+#define op1f_drum_changed (*r18_none_drum_changed)
+#else
+extern "C" void op1f_drum_changed(unsigned where, unsigned which, unsigned how) OP1F_NAMED("op1f_drum_changed") __attribute__((weak));
+#endif
+
 // The return addresses into the five jobs that put a sound on a slot's record (each calls it with a call of four
 // bytes): three loads from a file, two changes of the engine.
 static const u32 CALLER_SYNTH_PRESET = 0x8d4ea95au, CALLER_DRUM = 0x8d4ebf9au, CALLER_SYNTH_SAMPLER = 0x8d4ec968u;
@@ -1190,7 +1199,7 @@ static void enrol() {
     own->owner = OWNER_BASE;
     Name* engine = &names[BASE_ENGINE];                                            // R6: the engine a synth sound rides
     copy_text(engine->name, ENGINE_KEY, NAME);
-    engine->files = OP1F_KEEP_SYNTH;
+    engine->files = OP1F_KEEP_SYNTH | OP1F_KEEP_DRUM;                              // R21 (base 43): and the drum engine a drum sound rides
     engine->owner = OWNER_BASE;
     Name* lfo = &names[BASE_LFO];                                                  // R11: the LFO layer of a synth or drum sound
     copy_text(lfo->name, LFO_KEY, NAME);
@@ -2062,6 +2071,7 @@ static void tell_cards(u32 index, u32 how) {
     u32 which = which_of_holder(index);
     if ((names[BASE_NAME].files & where) != 0 && EFFECTS_CHANGED) EFFECTS_CHANGED(where, which, how);
     if ((names[BASE_ENGINE].files & where) != 0 && &op1f_engines_changed != 0) op1f_engines_changed(where, which, how);   // R6
+    if (where == (u32)OP1F_KEEP_DRUM && (names[BASE_ENGINE].files & where) != 0 && &op1f_drum_changed != 0) op1f_drum_changed(where, which, how);   // R21 (base 43)
     if ((names[BASE_LFO].files & where) != 0 && &op1f_lfos_changed != 0) op1f_lfos_changed(where, which, how);   // R11
     for (u32 k = 0; k < keeps_count; ++k) {
         if ((keeps[k].files & where) == 0 || keeps[k].table->changed == 0) continue;
@@ -2338,6 +2348,24 @@ extern "C" int op1f_keeps_engine_set(unsigned slot, const char* text) {
     u32 index = 0;
     if (!base_holder((unsigned)OP1F_KEEP_SYNTH, slot, &index)) return OP1F_BAD_NAME;
     if (ready == 0) return OP1F_NOT_NOW;                                            // before the first frame, as the effects' member
+    return value_set_at(index, BASE_ENGINE, text, SET_BASE);
+}
+
+// R21 (base 43): the same member at a drum slot, the drum engine a drum sound rides (module/build_r21_drum.cpp), from
+// the display thread: as op1f_keeps_engine_get and op1f_keeps_engine_set, with the drum's holder.
+extern "C" int op1f_keeps_drum_engine_get(unsigned slot, char* out, unsigned room) OP1F_NAMED("op1f_keeps_drum_engine_get");
+extern "C" int op1f_keeps_drum_engine_set(unsigned slot, const char* text) OP1F_NAMED("op1f_keeps_drum_engine_set");
+extern "C" int op1f_keeps_drum_engine_get(unsigned slot, char* out, unsigned room) {
+    u32 index = 0;
+    if (!base_holder((unsigned)OP1F_KEEP_DRUM, slot, &index)) return OP1F_BAD_NAME;
+    if (!ready) return OP1F_NO_FILE;
+    return value_get_at(index, BASE_ENGINE, out, room);
+}
+
+extern "C" int op1f_keeps_drum_engine_set(unsigned slot, const char* text) {
+    u32 index = 0;
+    if (!base_holder((unsigned)OP1F_KEEP_DRUM, slot, &index)) return OP1F_BAD_NAME;
+    if (ready == 0) return OP1F_NOT_NOW;
     return value_set_at(index, BASE_ENGINE, text, SET_BASE);
 }
 

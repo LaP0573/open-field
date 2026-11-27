@@ -778,7 +778,39 @@ extern "C" void op1f_sample_frame() OP1F_NAMED("op1f_sample_frame") __attribute_
 enum { OP1F_ASK_LFO = 11, OP1F_LFO_DRUM = 1, OP1F_LFOS_MOST = 8 };
 #endif
 enum { LFO_BYTES = 28, STAND_LFO = 3, LFO_KINDS = 6 };
-enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2 };
+enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2, BY_DRUM = 3 };
+
+// R21 (base 43): the drum engine's page. One ask of kind OP1F_ASK_DRUM_ENGINE (module/build_r6e_card.h), on a card of
+// level 8 or later: an engine the drum unit (module/build_r21_drum.cpp) adds to the drum's engine list, riding the drum
+// sampler, whose page stands in for the engine page (T1) of the drum while the sound the owner sees there rides it. The
+// first card in the list's order (the packs' file names) holds it; any other's ask is left aside with line 51. Its page
+// is placed, kept, kept ready and closed as an engine's page is, by the engine's entry of the table of screens (entry
+// 2): that entry is the synth's for an engine and the drum's for this page, never both at once in one mode, and the
+// cards unit holds one entry at a time. The firmware's words it reads: the drum's slot the owner sees, and the drum's
+// screen of an engine type (a function), both OS 1.7.3's; whether the sound rides the engine, the drum unit answers.
+#ifndef OP1F_BUILD_R21_DRUM_H
+enum { OP1F_ASK_DRUM_ENGINE = 12 };
+#endif
+enum { DRUM_SAMPLER = 9, DRUM_MODE = 1 };
+static const u32 DRUM_GUI_SLOT = 0x11904708u;           // R21: the drum slot the owner sees
+typedef u32 (*DrumScreenFn)(u32 type);                  // R21: 0x8fc2757c: the drum's screen of an engine type (T1)
+#ifndef OP1F_HOST
+#define STOCK_DRUM_SCREEN ((DrumScreenFn)0x8fc2757cu)
+#endif
+// R21: the drum unit's two names (module/build_r21_drum.cpp), weak: away, no drum sound rides a pack's engine.
+#if defined(OP1F_HOST)
+static int (*const r18_none_drum_rides)(unsigned drum, unsigned slot, unsigned ask) = 0;
+#define op1f_drum_rides (*r18_none_drum_rides)
+static void (*const r18_none_drum_frame)() = 0;
+#define op1f_drum_frame (*r18_none_drum_frame)
+#else
+extern "C" int op1f_drum_rides(unsigned drum, unsigned slot, unsigned ask) OP1F_NAMED("op1f_drum_rides") __attribute__((weak));
+extern "C" void op1f_drum_frame() OP1F_NAMED("op1f_drum_frame") __attribute__((weak));
+#endif
+static struct {
+    u32 slot1, ask;                                     // the card's slot + 1 that holds the drum engine's page, 0 for none; its ask
+    u32 screen;                                         // the drum sampler's screen, asked once; 0 before
+} drumpage;
 
 // R11 (base 35): the LFO unit's (module/build_r11_lfos.cpp): whether an LFO layer's page stands in now, while the screen
 // the current controller asked for is the LFO page of a place that rides one (op1f_lfos_standing), and the same
@@ -1407,6 +1439,25 @@ static OP1F_APART void lfo_look(const Op1fCard* card, u32 ask) {
     STOCK_LOG(2, LOG_FILE, 49, "cards: '%s' asks for an LFO layer (its ask %u) that is left aside: %s", card->name, ask, why);
 }
 
+// R21 (base 43): an ask of kind OP1F_ASK_DRUM_ENGINE, from the line of the kinds this base knows: held by the first card
+// whose ask has a head's table, or left aside with line 51.
+static OP1F_APART void drum_look(const Op1fCard* card, u32 ask) {
+    int slot = slot_of(card);
+    if (slot < 0) return;
+    const Op1fAsk* a = &card->asks[ask];
+    if (a->what == 0 || a->bytes < (u32)sizeof(Op1fKindHead)) {
+        STOCK_LOG(2, LOG_FILE, 51, "cards: '%s' asks for a drum engine (its ask %u) that is left aside: its table is not a head", card->name, ask);
+        return;
+    }
+    if (drumpage.slot1 != 0) {
+        STOCK_LOG(2, LOG_FILE, 51, "cards: '%s' asks for a drum engine (its ask %u) that is left aside: '%s' holds it", card->name, ask,
+                  op1f_cards_2.slots[drumpage.slot1 - 1u].card->name);
+        return;
+    }
+    drumpage.slot1 = (u32)slot + 1u;
+    drumpage.ask = ask;
+}
+
 // R5: level 8 knows one kind more, for a card of level 8: an effect, whose lines the effects unit says.
 // R11 (base 35): and a layer of a sound's list of LFOs, for a card of level 8, held to its form here (lfo_look).
 static OP1F_APART void said_asks(const Op1fCard* card) {
@@ -1422,6 +1473,10 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (seven && kind == 9u) continue;                                          // R7: the files per tape (OP1F_ASK_TAPES), the tapes unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
+        if (kind == (u32)OP1F_ASK_DRUM_ENGINE && level_8(card)) {                  // R21 (base 43): the drum engine, the first card's
+            drum_look(card, i);
+            continue;
+        }
         if (kind == (u32)OP1F_ASK_LFO && level_8(card)) {                          // R11 (base 35): held to its form here
             lfo_look(card, i);
             continue;
@@ -1934,6 +1989,7 @@ static inline u32 pair_of(u32 mode) {
 // R11 (base 35): an LFO layer's its own too (entry 3).
 static inline u32 pair_for(u32 mode, u32 engine) {
     if (engine == (u32)BY_LFOS) return (u32)STAND_LFO;                              // R11 (base 35)
+    if (engine == (u32)BY_DRUM) return (u32)OP1F_STAND_ENGINE;                      // R21 (base 43): the drum's, in the drum's mode
     return engine ? (u32)OP1F_STAND_ENGINE : pair_of(mode);
 }
 
@@ -2473,6 +2529,8 @@ static const Op1fKindHead* head_of(u32 slot, u32 ask) {
         return (const Op1fKindHead*)asks[ask].what;                                 // R6
     if (ask < count && asks[ask].kind == (u32)OP1F_ASK_LFO && level_8(op1f_cards_2.slots[slot].card) && ((lfos.good[slot] >> ask) & 1u) != 0)
         return (const Op1fKindHead*)asks[ask].what;                                 // R11 (base 35): an LFO layer's, held to its form
+    if (drumpage.slot1 == slot + 1u && ask == drumpage.ask && ask < count)
+        return (const Op1fKindHead*)asks[ask].what;                                 // R21 (base 43): the drum engine's page, held
     if (ask >= count || asks[ask].kind != (u32)OP1F_ASK_SEQUENCER || asks[ask].what == 0 || asks[ask].bytes < (u32)sizeof(Op1fKindHead)) return 0;
     return (const Op1fKindHead*)asks[ask].what;
 }
@@ -2529,6 +2587,46 @@ static OP1F_APART void stand_off_top() {
 
 // ---------------------------------------------------------------- R5: an effect's page standing in
 
+// R21 (base 43): does the drum engine's page stand in, while the drum's controller asked for the drum sampler's screen
+// (`asked` 1), or whatever screen it asked (`asked` 0)? In the drum's mode, the sound the owner sees there riding the
+// pack's drum engine (on the drum sampler, as the drum unit answers), a card holding the page. `where` is the drum's
+// place (OP1F_PLACE_DRUM + slot), `how` OP1F_SHOWN_UP.
+static OP1F_APART int drum_answer(Op1fStanding* out, u32* screen, int asked) {
+    if (drumpage.slot1 == 0 || &op1f_drum_rides == 0 || RD32(CURRENT_MODE) != (u32)DRUM_MODE) return 0;
+    if (drumpage.screen == 0) {
+#ifdef OP1F_HOST
+        return 0;
+#else
+        drumpage.screen = STOCK_DRUM_SCREEN((u32)DRUM_SAMPLER);
+#endif
+    }
+    u32 g = RD32(DRUM_GUI_SLOT);
+    if (g >= 8u || !op1f_drum_rides(g, drumpage.slot1 - 1u, drumpage.ask)) return 0;
+    if (asked && op1f_screen_asked != drumpage.screen) return 0;
+    out->slot = drumpage.slot1 - 1u;
+    out->ask = drumpage.ask;
+    out->where = (u32)OP1F_PLACE_DRUM + g;
+    out->how = (u32)OP1F_SHOWN_UP;
+    *screen = drumpage.screen;
+    return head_of(out->slot, out->ask) != 0 ? 1 : 0;
+}
+
+static OP1F_APART int drum_standing(Op1fStanding* s) {
+    u32 screen = 0;
+    if (!drum_answer(s, &screen, 1)) return 0;
+    fx.asked_engine = BY_DRUM;
+    fx.asked = 1;
+    fx.asked_mode = (u32)DRUM_MODE;
+    fx.asked_screen = screen;
+    return 1;
+}
+
+static OP1F_APART int drum_ahead(u32 mode, Op1fStanding* out, u32* screen) {
+    if (!drum_answer(out, screen, 0)) return 0;
+    fx.ahead_engine = BY_DRUM;
+    return mode == (u32)DRUM_MODE ? 1 : 0;
+}
+
 // R11 (base 35): is the LFO unit's answer an ask of kind OP1F_ASK_LFO held to its form (a card of level 8 or later)?
 static inline int lfo_ask(u32 slot, u32 ask) {
     return slot < (u32)MOST && ask < (u32)ASKS_MOST && ((lfos.good[slot] >> ask) & 1u) != 0;
@@ -2538,7 +2636,7 @@ static inline int lfo_ask(u32 slot, u32 ask) {
 // stand_frame, as an effect's is, with entry 3 for it.
 static OP1F_APART int lfo_standing(Op1fStanding* s) {
     u32 mode = 0, screen = 0;
-    if (&op1f_lfos_standing == 0 || !op1f_lfos_standing(s, &mode, &screen) || !lfo_ask(s->slot, s->ask)) return 0;
+    if (&op1f_lfos_standing == 0 || !op1f_lfos_standing(s, &mode, &screen) || !lfo_ask(s->slot, s->ask)) return drum_standing(s);   // R21 (base 43)
     fx.asked_engine = BY_LFOS;
     fx.asked = 1;
     fx.asked_mode = mode;
@@ -2549,7 +2647,7 @@ static OP1F_APART int lfo_standing(Op1fStanding* s) {
 // R11 (base 35): else an LFO layer's page whatever screen is asked, as ahead_of asks the effects unit.
 static OP1F_APART int lfo_ahead(u32 mode, Op1fStanding* out, u32* screen) {
     u32 m = 0;
-    if (&op1f_lfos_ahead == 0 || !op1f_lfos_ahead(out, &m, screen) || !lfo_ask(out->slot, out->ask)) return 0;
+    if (&op1f_lfos_ahead == 0 || !op1f_lfos_ahead(out, &m, screen) || !lfo_ask(out->slot, out->ask)) return drum_ahead(mode, out, screen);   // R21 (base 43)
     fx.ahead_engine = BY_LFOS;
     return m == mode ? 1 : 0;
 }
@@ -2795,6 +2893,11 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
     if (fx.asked) fx.ready = 0;                                                     // R5: an entry kept ready is the stand-in's now
     if (stand.said_up >= (u32)STAND_SAID) return;
     ++stand.said_up;
+    if (fx.placed && fx.placed_engine == (u32)BY_DRUM) {                            // R21 (base 43): the drum engine's page, line 52
+        STOCK_LOG(3, LOG_FILE, 52, "page: '%s' stands in for the drum engine's page of drum %u, its document at 0x%08x", op1f_cards_2.slots[s->slot].card->name,
+                  (s->where & 7u) + 1u, (u32)document);
+        return;
+    }
     if (fx.placed && fx.placed_engine == (u32)BY_LFOS) {                            // R11 (base 35): an LFO layer's
         said_lfo(s->slot, s->where, document);
         return;
@@ -3552,6 +3655,7 @@ extern "C" void op1f_cards_frame() {
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     if (&op1f_sample_frame != 0) op1f_sample_frame();       // R17 (base 39): the sample unit's, behind the engines unit's
+    if (&op1f_drum_frame != 0) op1f_drum_frame();           // R21 (base 43): the drum unit's, behind the sample unit's
     said_passed();                                         // R4: the pictures a card of level 6 carries and a screen was not served
     Op1fStanding standing;
     int stands = op1f_seq_standing(&standing);              // R3: does a pack's page stand in for the sequencer's screen now
