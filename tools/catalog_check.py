@@ -181,7 +181,7 @@ def asks_options(data):
 
 
 def asks_tapes(data):
-    """Whether the file's card asks for files per tape (an ask of kind OP1F_ASK_TAPES, base 43), on a card of level 7 or later."""
+    """Whether the file's card asks for files per tape (an ask of kind OP1F_ASK_TAPES, base 44), on a card of level 7 or later."""
     card = pack_build.card_in(data)
     if card is None or card["level"] < 7:
         return False
@@ -195,7 +195,7 @@ def asks_tapes(data):
 BASE_SINCE = (
     ("places that give way", 31, gives_way),
     ("options", 32, asks_options),
-    ("files per tape", 43, asks_tapes),
+    ("files per tape", 44, asks_tapes),
 )
 
 

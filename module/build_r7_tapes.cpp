@@ -1,8 +1,8 @@
 // Made for OS 1.7.3.
-// Step R7, the base pack (base.pack 43, on top of base 42): files per tape. A unit of its own; no unit of base 42
+// Step R7, the base pack (base.pack 44, on top of base 43): files per tape. A unit of its own; no unit of base 43
 // changes but the cards unit, which calls this one's frame work and counts its kind of ask as known.
 //
-// A card of level 7 or later may carry one ask of kind OP1F_ASK_TAPES (module/build_r6e_card.h, "Base 43"): the number of
+// A card of level 7 or later may carry one ask of kind OP1F_ASK_TAPES (module/build_r6e_card.h, "Base 44"): the number of
 // one of its folders, whose files named tape<N>.<anything> (N the tape's number, 1 to 8) the base keeps with the unit's
 // tapes, and a function told when it did. This unit
 //
@@ -17,7 +17,7 @@
 //     clone just noted, a DELETE of it is noted: its files go, as a delete's did. This unit's first form had a second
 //     place at the firmware's tape delete; 65 places were one more than the door of bases 33 to 36 reads of a base
 //     (64), and it refused every pack sorting before base.pack, Faust's 8 tracks, beside such a base. So one place
-//     it stays (base 42's 64 and this one: 65; a unit on base 36 or older gets this base with the install page's
+//     it stays (base 43's 66 and this one: 67; a unit on base 36 or older gets this base with the install page's
 //     whole install, not through its door);
 //   carries what was noted at its frame work (op1f_tapes_frame, from the cards unit, on the display thread, behind the
 //     values' unit and before any frame function), never while the disk mode is open (the events wait for it to

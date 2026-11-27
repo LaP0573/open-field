@@ -1621,7 +1621,7 @@ static u32 entries_of(const Holder* h) {
     return n;
 }
 
-extern "C" void __attribute__((weak)) op1f_tapes_made() OP1F_NAMED("op1f_tapes_made");   // base 43: files per tape
+extern "C" void __attribute__((weak)) op1f_tapes_made() OP1F_NAMED("op1f_tapes_made");   // base 44: files per tape
 
 static void tape_take(Holder* c, u32 flag) {
     take_from(c, STOCK_TAPE_ROOT(), OP1F_KEEP_TAPE, 1);

@@ -720,7 +720,7 @@ extern "C" int __attribute__((weak)) op1f_options_down(unsigned key) OP1F_NAMED(
 #ifndef OP1F_BUILD_R6E_CARD_H
 enum { OP1F_ASK_OPTIONS = 10 };
 #endif
-// R7 (base 43): the files per tape (module/build_r7_tapes.cpp): the copies and deletes of tapes carried into the folders
+// R7 (base 44): the files per tape (module/build_r7_tapes.cpp): the copies and deletes of tapes carried into the folders
 // that ask for it, and their packs told, once a frame behind the values' unit and before the frame functions. Weak:
 // away, nothing of it is done.
 extern "C" void __attribute__((weak)) op1f_tapes_frame() OP1F_NAMED("op1f_tapes_frame");

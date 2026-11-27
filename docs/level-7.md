@@ -189,7 +189,7 @@ The flag needs no mark. Our effect train shows its page this way, which is why i
 | `page: '<pack>' shown again in mode <n>, as it stayed` | It's back |
 | `page: '<pack>' set aside while another page takes the screen in mode <n>` | Another page took the screen while yours waited |
 
-## Files per tape (base 43)
+## Files per tape (base 44)
 
 A value of level 7 is at most 2,048 bytes, and all the values of a tape at most 4 KiB. Some packs keep more for each tape: the notes of a tape's MIDI tracks, a tape's markers, a list of loops. Such a pack keeps them in **files of its own folder**, one file or several for each tape, named `tape<N>.<anything>`, `N` being the tape's number, 1 to 8. The unit knows nothing of these files: when it copies a tape, the copy would start with none; when it deletes one, a tape made later in its place would find the old ones. One ask has the base keep them with the tapes:
 
@@ -222,7 +222,7 @@ extern "C" void notes_tapes(unsigned how, unsigned from, unsigned to) { tapes_to
 
 **Which to use.** A few numbers for each tape: a value of level 7, kept inside the tape's own file, which the unit copies itself. More than that: files per tape.
 
-**Under base 42 and earlier**, which does not know the kind, the ask is left aside with the base's line for kinds it does not know, and the card is used: the pack runs, and its files do not follow the tapes. A pack that must know imports `op1f_tapes_1` as optional (a weak name in its source): it is 0 under such a base.
+**Under base 43 and earlier**, which does not know the kind, the ask is left aside with the base's line for kinds it does not know, and the card is used: the pack runs, and its files do not follow the tapes. A pack that must know imports `op1f_tapes_1` as optional (a weak name in its source): it is 0 under such a base.
 
 The lines:
 
@@ -235,7 +235,7 @@ The lines:
 
 The base finds the copy at the entry of the unit's own function, through one place of its table ([the change list](changes.md)), and a tape made anew from the tape load the values of this level already watch, with no place of its own. The copy of tracks 5 to 8 by `8 tracks` stands at another place, the tape list's call of the copy, and both work together.
 
-Why one place and not two: a base's door judges a new `base.pack` against every pack whose file sorts before it (`8 tracks.pack`), and the door of bases 33 to 36 reads at most 64 places of a base. A base it cannot read whole it holds to clash, and refuses the pack: "it clashes with the base, so the base would be left out at the start". Base 42 has 64 of its own, so a base with this one has 65: a unit on base 36 or older gets it with the install page's whole install, as it gets base 40 and later, and not through its door.
+Why one place and not two: a base's door judges a new `base.pack` against every pack whose file sorts before it (`8 tracks.pack`), and the door of bases 33 to 36 reads at most 64 places of a base. A base it cannot read whole it holds to clash, and refuses the pack: "it clashes with the base, so the base would be left out at the start". Base 43 has 66 of its own, so a base with this one has 67: a unit on base 36 or older gets it with the install page's whole install, as it gets base 40 and later, and not through its door.
 
 ## Limits, in one place
 
@@ -247,4 +247,4 @@ Why one place and not two: a base's door judges a new `base.pack` against every 
 | A value | 2,048 bytes of JSON text, nested up to four deep, whole numbers only |
 | The values of one slot or of the tape | 4 KiB |
 | Pages that stay | One at a time |
-| Asks of files per tape (base 43) | One a card, one folder each, files `tape1.*` to `tape8.*` |
+| Asks of files per tape (base 44) | One a card, one folder each, files `tape1.*` to `tape8.*` |

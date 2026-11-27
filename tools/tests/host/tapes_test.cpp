@@ -1,4 +1,4 @@
-// Host test of the base's files per tape (module/build_r7_tapes.cpp, base 43): the unit's tape copy and a tape made anew carried
+// Host test of the base's files per tape (module/build_r7_tapes.cpp, base 44): the unit's tape copy and a tape made anew carried
 // into the folder a card's ask of kind OP1F_ASK_TAPES names, and the ask's `changed` told.
 // The card header holds the sizes of four-byte addresses, so it is built for a 32-bit target: emscripten and node,
 //   em++ -std=c++11 -DOP1F_HOST -I module -I tools/tests/host tools/tests/host/tapes_test.cpp -o <out>.js && node <out>.js

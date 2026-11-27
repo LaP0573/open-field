@@ -1985,8 +1985,8 @@ extern "C" int op1f_sample_get(const Op1fCard* card, unsigned place, Op1fSample*
 // that also runs without it asks for op1f_sample_drop and op1f_sample_get weakly and calls them only when their address
 // is not 0.
 extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
-// Base 43 (hasis, on top of base 42): files per tape. Up to here every word is the earlier bases'; this part only adds
-// behind it, and a pack built for base 42 or earlier is not touched by it.
+// Base 44 (hasis, on top of base 43): files per tape. Up to here every word is the earlier bases'; this part only adds
+// behind it, and a pack built for base 43 or earlier is not touched by it.
 //
 // A pack that keeps something for each tape that does not fit level 7's 4 KiB a tape (a tape's notes, its markers)
 // keeps it in files of one of its folders named tape<N>.<anything>, N being the tape's number, 1 to 8 (the unit's
@@ -2002,8 +2002,8 @@ extern "C" const unsigned op1f_sample_1 OP1F_NAMED("op1f_sample_1");
 // before any frame function, and never while the disk mode is open: a tape made then waits for it to close. Then it
 // calls the ask's `changed`, before the frame functions of that frame.
 //
-// The kind of ask a base 43 knows beside the earlier bases', for a card of level 7 or later. A base that does not know
-// it (base 42 and earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
+// The kind of ask a base 44 knows beside the earlier bases', for a card of level 7 or later. A base that does not know
+// it (base 43 and earlier) leaves the ask aside, with its line for kinds it does not know, and uses the card.
 //   OP1F_ASK_TAPES  the files of one folder kept with the tapes: what `what` points at is an Op1fTapes
 enum { OP1F_ASK_TAPES = 9 };
 
@@ -2022,7 +2022,7 @@ struct Op1fTapes {
     Op1fKindHead head;                                // +0
     unsigned folder;                                  // +28
     void (*changed)(unsigned how, unsigned from, unsigned to);   // +32
-};   // 36 bytes in base 43
+};   // 36 bytes in base 44
 static_assert(sizeof(Op1fTapes) == 36 && OP1F_PLACE_IN(Op1fTapes, changed) == 32, "the table of files per tape is 36 bytes");
 
 // The mark of a base that carries out an ask of kind OP1F_ASK_TAPES (a constant 1). A pack that must know whether its

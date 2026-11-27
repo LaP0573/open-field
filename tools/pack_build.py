@@ -449,7 +449,7 @@ TABLE_BYTES_6[LFO] = 28
 ASK_KEYS_6[LFO] = ("kind", "name", "drum", "shown")
 ASK_ADDRESSES_6[LFO] = (("shown", 24),)
 ASK_KEYS_6[7] = ASK_KEYS_6[7] + ("layer",)
-# base 43 (hasis; module/build_r6e_card.h, "Base 43"): a card of level 7 or later may ask for one kind more, the files of
+# base 44 (hasis; module/build_r6e_card.h, "Base 44"): a card of level 7 or later may ask for one kind more, the files of
 # one of its folders kept with the tapes (its table 36 bytes: the head, the folder's number, the function told). A base
 # that does not know the kind leaves the ask aside and uses the card.
 TAPES = 9
@@ -1429,7 +1429,7 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card's memory asks come to %d bytes together, more than %d: the base gives %d bytes of its spare memory and "
                          "%d of the heap in all, and refuses the later" % (asked, MEMORY_ALL_MOST, MEMORY_SPARE, MEMORY_HEAP_MOST))
     places_together(out)                                    # since R6h: a firm one, then one that gives way
-    for what in (6, OPTIONS, TAPES):                               # since R8 (base 32): the options too; base 43: the tapes
+    for what in (6, OPTIONS, TAPES):                               # since R8 (base 32): the options too; base 44: the tapes
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
         if len(found) > 1:
             raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
@@ -1547,7 +1547,7 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
             held.append(option_of_card(said, place, o, [h[0] for h in held]))
         functions = {"changed": ask.get("changed"), "open": ask.get("open")}
         extra = {"options": held}
-    elif what == TAPES:                                     # base 43
+    elif what == TAPES:                                     # base 44
         if not whole(ask.get("folder"), 0, FOLDERS_MOST - 1):
             raise ValueError("%s: its folder is the number of one of the card's folders, from 0, not %r; the base leaves it aside" % (said, ask.get("folder")))
         if not a_symbol(ask.get("changed")):
@@ -2008,7 +2008,7 @@ def ask_words(what, name, flags, functions, extra=None):
         return "options '%s', %d option(s): %s" % (name, len(extra["options"]), "; ".join(
             option_words(n, k, f, cs, w) for n, k, _c, f, w, cs in extra["options"])) + "".join(
             ", " + key for key in ("changed", "open") if functions.get(key))
-    if what == TAPES:                                       # base 43
+    if what == TAPES:                                       # base 44
         return "tapes '%s', the files of folder %d" % (name, extra["folder"]) + (", changed" if functions.get("changed") else "")
     if what == 6:
         said = "keeps '%s', %d key(s): %s" % (name, len(extra["keys"]), "; ".join(
@@ -2092,7 +2092,7 @@ def ask_table_words(ask, address_of=None):
         left = OPTIONS_MOST - len(extra["options"])
         words += [bytes(left * OPTION_BYTES)] if left else []
         return words + ([address(functions["open"])] if functions.get("open") else [])     # since R8's design: `open` at +708, 712 bytes
-    if what == TAPES:                                       # base 43
+    if what == TAPES:                                       # base 44
         return [extra["folder"], address(functions["changed"])]
     if what == 8:                                           # since R6: an engine, its values as signed words, its list of sounds
         words = [extra["cycles"], extra["voice_bytes"], extra["voice_align"], address(functions["render"]), address(functions["reset"]), len(extra["params"])]
@@ -2484,7 +2484,7 @@ def ask_tables_6(data, level, layered=None):
                 wrong = "its count of options is not between 1 and %d" % OPTIONS_MOST
             elif any(not option_in_order(k, c, f, cs) for _n, k, c, f, _w, cs in held):
                 wrong = "an option that is not in order"
-        elif kind == TAPES:                                  # base 43
+        elif kind == TAPES:                                  # base 44
             extra = {"folder": words[0]}
             functions["changed"] = words[1]
         else:

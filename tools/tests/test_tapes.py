@@ -1,4 +1,4 @@
-"""The base's files per tape (module/build_r7_tapes.cpp, base 43) on the PC: tools/tests/host/tapes_test.cpp built with
+"""The base's files per tape (module/build_r7_tapes.cpp, base 44) on the PC: tools/tests/host/tapes_test.cpp built with
 emscripten for a 32-bit target and run with node. Skipped where either is missing."""
 import os
 import shutil
