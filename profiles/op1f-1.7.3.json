@@ -936,7 +936,7 @@
      "target": "op1f_tapes_clone",
      "room": "op1f_tapes_clone_room",
      "copies": 8,
-     "does": "A jump to ours (base 43), which lets the firmware copy the tape through a trampoline and then notes the copy; at its next frame the base copies the source's files of the folders asked for per tape to the copy's. A tape made anew is told by the values unit's tape load, with no place of its own."
+     "does": "A jump to ours, which lets the firmware copy the tape through a trampoline and then notes the copy; at its next frame the base copies the source's files of the folders asked for per tape to the copy's. A tape made anew is told by the values unit's tape load, with no place of its own."
     },
     {
      "address": "0x8c0d57a8",
