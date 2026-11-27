@@ -735,6 +735,12 @@
    "what": "The tape's saver: an object of the firmware's, made at the first call and the same at every call after. Hand it to `notify` to have the tape saved.",
    "thread": "Ours: the display thread."
   },
+  "0x8fc219a8": {
+   "name": "mounted_tape",
+   "group": "tape",
+   "what": "The number of the mounted tape, 0 to 7, or -1 when none is. Read after a tape's load has returned, it is the tape just loaded.",
+   "thread": "Ours: the display thread."
+  },
   "0x8fca1ed2": {
    "name": "notify",
    "group": "tape",

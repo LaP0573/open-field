@@ -450,6 +450,16 @@ TABLE_BYTES_6[LFO] = 28
 ASK_KEYS_6[LFO] = ("kind", "name", "drum", "shown")
 ASK_ADDRESSES_6[LFO] = (("shown", 24),)
 ASK_KEYS_6[7] = ASK_KEYS_6[7] + ("layer",)
+# base 44 (hasis; module/build_r6e_card.h, "Base 44"): a card of level 7 or later may ask for one kind more, the files of
+# one of its folders kept with the tapes (its table 36 bytes: the head, the folder's number, the function told). A base
+# that does not know the kind leaves the ask aside and uses the card.
+TAPES = 9
+for _level in (7, 8, 9, 10):
+    ASK_KINDS_OF_LEVEL[_level] = dict(ASK_KINDS_OF_LEVEL[_level], tapes=TAPES)
+KIND_WORDS_6[TAPES] = "tapes"
+TABLE_BYTES_6[TAPES] = 36
+ASK_KEYS_6[TAPES] = ("kind", "name", "folder", "changed")
+ASK_ADDRESSES_6[TAPES] = (("shown", 24), ("changed", 32))
 # since base 43 (module/build_r6e_card.h, "Base 43: a drum engine"): a card of level 8 or later may add an engine to the
 # drum's engine list that rides the drum sampler ({"kind": "drum engine", "name": ..., "shown": a function's symbol or
 # null}; OP1F_ASK_DRUM_ENGINE, its table the head, 28 bytes, flags 0): picked, the pack's page stands on T1. No new level:
@@ -1420,7 +1430,7 @@ def asks_of_card_6(asks, level):
         raise ValueError("The card's memory asks come to %d bytes together, more than %d: the base gives %d bytes of its spare memory and "
                          "%d of the heap in all, and refuses the later" % (asked, MEMORY_ALL_MOST, MEMORY_SPARE, MEMORY_HEAP_MOST))
     places_together(out)                                    # since R6h: a firm one, then one that gives way
-    for what in (6, OPTIONS):                               # since R8 (base 32): the options too
+    for what in (6, OPTIONS, TAPES):                               # since R8 (base 32): the options too; base 44: the tapes
         found = [number for number, ask in enumerate(out, 1) if ask[0] == what]
         if len(found) > 1:
             raise ValueError("Ask %d of the card is a second ask of %s: the base takes one such ask a card and leaves the later aside" % (found[1], KIND_WORDS_6[what]))
@@ -1468,8 +1478,8 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
     """Since R4: one ask of a stage, memory, places or keeps, held as a base of level 6 or 7 holds it. Since R5: an
     effect, held as a base of level 8 holds it (`earlier`: the card's asks before it), and the keeps of a card of level
     8, which may name the master."""
-    what = ASK_KINDS_OF_LEVEL[9][ask["kind"]]
-    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine", OPTIONS: "the options"}[what]
+    what = ASK_KINDS_OF_LEVEL[10][ask["kind"]]
+    words = {3: "a stage", 4: "a memory", 5: "the places", 6: "the keeps", 7: "an effect", 8: "an engine", OPTIONS: "the options", TAPES: "the tapes"}[what]
     name = ask.get("name")
     unknown = sorted(set(ask) - set(ASK_KEYS_6[what]))
     if unknown:
@@ -1538,6 +1548,13 @@ def ask_of_card_6(number, ask, level=7, earlier=()):
             held.append(option_of_card(said, place, o, [h[0] for h in held]))
         functions = {"changed": ask.get("changed"), "open": ask.get("open")}
         extra = {"options": held}
+    elif what == TAPES:                                     # base 44
+        if not whole(ask.get("folder"), 0, FOLDERS_MOST - 1):
+            raise ValueError("%s: its folder is the number of one of the card's folders, from 0, not %r; the base leaves it aside" % (said, ask.get("folder")))
+        if not a_symbol(ask.get("changed")):
+            raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
+        functions = {"changed": ask.get("changed")}
+        extra = {"folder": ask["folder"]}
     else:
         if not a_symbol(ask.get("changed")):
             raise ValueError("%s: its changed is the symbol of a function of the pack, or null: %r" % (said, ask.get("changed")))
@@ -1996,6 +2013,8 @@ def ask_words(what, name, flags, functions, extra=None):
         return "options '%s', %d option(s): %s" % (name, len(extra["options"]), "; ".join(
             option_words(n, k, f, cs, w) for n, k, _c, f, w, cs in extra["options"])) + "".join(
             ", " + key for key in ("changed", "open") if functions.get(key))
+    if what == TAPES:                                       # base 44
+        return "tapes '%s', the files of folder %d" % (name, extra["folder"]) + (", changed" if functions.get("changed") else "")
     if what == 6:
         said = "keeps '%s', %d key(s): %s" % (name, len(extra["keys"]), "; ".join(
             "%s in %s" % (key, " and ".join(KEEP_WORDS[bit] for bit in (1, 2, 4, 8) if bits & bit) or "no file") for key, bits in extra["keys"]))
@@ -2078,6 +2097,8 @@ def ask_table_words(ask, address_of=None):
         left = OPTIONS_MOST - len(extra["options"])
         words += [bytes(left * OPTION_BYTES)] if left else []
         return words + ([address(functions["open"])] if functions.get("open") else [])     # since R8's design: `open` at +708, 712 bytes
+    if what == TAPES:                                       # base 44
+        return [extra["folder"], address(functions["changed"])]
     if what == 8:                                           # since R6: an engine, its values as signed words, its list of sounds
         words = [extra["cycles"], extra["voice_bytes"], extra["voice_align"], address(functions["render"]), address(functions["reset"]), len(extra["params"])]
         for value_name, low, high, start in extra["params"]:
@@ -2471,6 +2492,9 @@ def ask_tables_6(data, level, layered=None):
                 wrong = "its count of options is not between 1 and %d" % OPTIONS_MOST
             elif any(not option_in_order(k, c, f, cs) for _n, k, c, f, _w, cs in held):
                 wrong = "an option that is not in order"
+        elif kind == TAPES:                                  # base 44
+            extra = {"folder": words[0]}
+            functions["changed"] = words[1]
         else:
             functions["changed"] = words[0]
             keys = []
@@ -2494,6 +2518,8 @@ def ask_tables_6(data, level, layered=None):
             wrong = "its cost is not between 1 and %d" % STAGE_CYCLES_MOST
         elif kind == 3 and not functions["process"]:
             wrong = "a stage with no process"
+        elif kind == TAPES and extra["folder"] >= FOLDERS_MOST:
+            wrong = "its folder is not one a card may list"
         elif kind == 4 and not 1 <= extra["bytes"] <= MEMORY_MOST:
             wrong = "its bytes are not between 1 and %d" % MEMORY_MOST
         elif kind == 4 and (not 4 <= extra["align"] <= MEMORY_ALIGN_MOST or extra["align"] & (extra["align"] - 1)):
@@ -2517,7 +2543,7 @@ def ask_tables_6(data, level, layered=None):
             continue
         if kind == 3 and ask[4]["memory"] and not (ask[4]["memory"] <= len(out) and out[ask[4]["memory"] - 1][0] == 4):
             out[number] = item[:4] + ("its memory names no memory ask of its card",)
-        elif kind in (6, OPTIONS) and any(other[0] == kind for other in out[:number]):     # since R8 (base 32): the options too
+        elif kind in (6, OPTIONS, TAPES) and any(other[0] == kind for other in out[:number]):     # since R8 (base 32): the options too
             out[number] = item[:4] + ("a second ask of %s, where the base takes one a card" % KIND_WORDS_6[kind],)
         elif kind == 5:                                      # since R6h (base 31): a firm one, then one that gives way
             before = [other for other in out[:number] if other[0] == 5]

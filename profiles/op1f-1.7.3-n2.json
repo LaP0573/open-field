@@ -424,6 +424,13 @@
    "name": "In the display thread's frame loop: the call that writes the frame buffer out of the cache before it is shown."
   },
   {
+   "address": "0x8d4fb908",
+   "length": 8,
+   "sum": "0xddcdf09e",
+   "group": "base",
+   "name": "The entry of the firmware's tape clone: the source's and the copy's tape index, a progress function, and a fourth word whose slot in the caller's frame it writes."
+  },
+  {
    "address": "0x8c0d57a8",
    "length": 8,
    "sum": "0xf5f3b463",
@@ -932,6 +939,14 @@
      "form": "call",
      "target": "op1f_gfx_frame_hook",
      "does": "A call to our frame hook, which does our own work of a frame and then makes the firmware's call."
+    },
+    {
+     "address": "0x8d4fb908",
+     "form": "jump",
+     "target": "op1f_tapes_clone",
+     "room": "op1f_tapes_clone_room",
+     "copies": 8,
+     "does": "A jump to ours, which lets the firmware copy the tape through a trampoline and then notes the copy; at its next frame the base copies the source's files of the folders asked for per tape to the copy's. A tape made anew is told by the values unit's tape load, with no place of its own."
     },
     {
      "address": "0x8c0d57a8",

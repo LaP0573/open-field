@@ -720,6 +720,10 @@ extern "C" int __attribute__((weak)) op1f_options_down(unsigned key) OP1F_NAMED(
 #ifndef OP1F_BUILD_R6E_CARD_H
 enum { OP1F_ASK_OPTIONS = 10 };
 #endif
+// R7 (base 44): the files per tape (module/build_r7_tapes.cpp): the copies and deletes of tapes carried into the folders
+// that ask for it, and their packs told, once a frame behind the values' unit and before the frame functions. Weak:
+// away, nothing of it is done.
+extern "C" void __attribute__((weak)) op1f_tapes_frame() OP1F_NAMED("op1f_tapes_frame");
 
 // R5: the effects unit's (base 28's effects unit): its frame work, once a frame on the display thread behind the
 // values' unit's and before the frame functions; and whether an effect's page stands in for a screen now. Weak: away,
@@ -1466,6 +1470,7 @@ static OP1F_APART void said_asks(const Op1fCard* card) {
         if (six && (kind == (u32)OP1F_ASK_STAGE || kind == (u32)OP1F_ASK_MEMORY || kind == (u32)OP1F_ASK_PLACES)) continue;   // R4
         if (seven && kind == (u32)OP1F_ASK_KEEPS) continue;                         // R4b
         if (six && kind == (u32)OP1F_ASK_OPTIONS) continue;                         // R8 (base 32): the options unit's
+        if (seven && kind == 9u) continue;                                          // R7: the files per tape (OP1F_ASK_TAPES), the tapes unit's
         if (kind == (u32)OP1F_ASK_EFFECT && level_8(card)) continue;               // R5
         if (kind == (u32)OP1F_ASK_ENGINE && level_9(card)) continue;               // R6
         if (kind == (u32)OP1F_ASK_DRUM_ENGINE && level_8(card)) {                  // R21 (base 43): the drum engine, the first card's
@@ -3646,6 +3651,7 @@ extern "C" void op1f_cards_frame() {
     op1f_stages_frame();
     op1f_keeps_frame();                                     // R4b: the values' unit's, before any frame function
     if (&op1f_options_frame != 0) op1f_options_frame();     // R8 (base 32): the options unit's, before any frame function
+    if (&op1f_tapes_frame != 0) op1f_tapes_frame();         // R7: the files per tape, before any frame function
     if (&op1f_effects_frame != 0) op1f_effects_frame();     // R5: the effects unit's, behind the values' unit's and the memory unit's
     if (&op1f_engines_frame != 0) op1f_engines_frame();     // R6: the engines unit's, behind the effects unit's
     if (&op1f_sample_frame != 0) op1f_sample_frame();       // R17 (base 39): the sample unit's, behind the engines unit's
