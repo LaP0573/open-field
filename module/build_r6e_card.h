@@ -2121,9 +2121,10 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 // call (the effect's op1f_param_set at the instance's place, or a knob turn no pack took, moved as the unit's knob of
 // the effect it stands on would move it), the others as they came in. The host applies them to its wagon and keeps them
 // as it keeps a turn. Answers a mask: bits 0 to 3 the words changed, with OP1F_HOSTED_PAGE_UP while the page is on the
-// screen; or less than 0: OP1F_NOT_HERE (no ready instance at `which`, or the place on the screen does not ride the
-// layer), OP1F_BAD_NAME (no such layer of the card, `which`, or `words` 0), OP1F_NOT_NOW (not from the pack's frame
-// function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
+// screen; or less than 0: OP1F_NOT_HERE (no ready instance at `which`, the place on the screen does not ride the
+// layer, or the effect does not declare wagons and the place op1f_rack_place lent the instance rides no layer of the
+// card: "Declared or not", below), OP1F_BAD_NAME (no such layer of the card, `which`, or `words` 0), OP1F_NOT_NOW (not
+// from the pack's frame function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
 // move the unit's effect under the layer): a turn moves the instance's word, a click or a press is dropped.
 enum { OP1F_HOSTED_PAGE_UP = 256 };
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
@@ -2152,12 +2153,14 @@ enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_
 //     loses its page on wagons, nothing worse. While the place a host lent the instance (op1f_rack_place) rides a layer
 //     of the host's own card (checked at each use: never the master under such a train, and a pick of another effect
 //     there ends it), the base answers the effect's pack as if that place rode the effect: `process` and `reset` get the
-//     place (not OP1F_PLACE_HOSTED + which); op1f_riding has its bit for as long as the wagon is lent; `shown` its
-//     `where`; op1f_param_get, op1f_param_heard and op1f_param_set at the place answer the instance whose page is up,
-//     else the first lent instance of that effect there (op1f_param_set answers OP1F_NOT_HERE while no hosted page is
-//     up; op1f_param_get without a page answers the values of its last run). op1f_value_get and op1f_value_set at that
-//     place stay the sound's own: two wagons of one sound with the same effect share them. op1f_rack_at(place) still
-//     answers the layer. Without op1f_rack_place, every run is as base 44 has it: OP1F_PLACE_HOSTED + which, no page.
+//     place (not OP1F_PLACE_HOSTED + which; when the ride begins or ends, `reset` is told the new place before the next
+//     `process` there, and `fresh` comes with that block); op1f_riding has its bit for as long as the wagon is lent;
+//     `shown` its `where`; op1f_param_get, op1f_param_heard and op1f_param_set at the place answer the instance whose
+//     page is up, else the first lent instance of that effect there (op1f_param_set answers OP1F_NOT_HERE while no
+//     hosted page is up; op1f_param_get without a page answers the values of its last run). op1f_value_get and
+//     op1f_value_set at that place stay the sound's own: two wagons of one sound with the same effect share them.
+//     op1f_rack_at(place) still answers the layer. Without op1f_rack_place, or while its lent place rides no layer of
+//     the host's card, every run is as base 44 has it: OP1F_PLACE_HOSTED + which, and no page.
 enum { OP1F_KEEP_HOSTED = 16 };
 
 // The mark of a base that carries out hosted pages (a constant 1): a host that calls the three helpers above names it,

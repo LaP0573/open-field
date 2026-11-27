@@ -1877,10 +1877,14 @@ static u32 rack_wipe(u32 i, u32 room) {
 // waits for the place's next ready; `told`, `changed` owed to the effect's pack; `wrote`, the pack wrote it since the
 // host's last op1f_rack_kept. The display thread's, but for `place` copied into rack_lent.
 enum { LENDS = RACKS, KEPT_MOST = OP1F_HOSTED_KEPT_MOST, MEMBERS_MOST = 32, KEEPS_BYTES = 324, DEPTH_MOST = 4 };
-struct Lend { u16 host; u8 which, place, effect, told, wrote, length; char text[KEPT_MOST]; };   // 52 bytes
-static_assert(sizeof(Lend) == 136 && sizeof(Op1fKeeps) == KEEPS_BYTES, "a lend's 136 bytes, and level 7's table");
+struct Lend { u16 host; u8 which, place, effect, told, wrote, length; char text[KEPT_MOST]; };   // 8 bytes and the text
+static_assert(sizeof(Lend) == ((8u + (u32)KEPT_MOST + alignof(Lend) - 1u) & ~(u32)(alignof(Lend) - 1u)) && sizeof(Op1fKeeps) == KEEPS_BYTES,
+              "a lend's 8 bytes and its text, rounded to its alignment, and level 7's table");
 static Lend lends[LENDS];
 static volatile u8 rack_lent[RACKS];                   // a record's lent place + 1, 0 for none (the audio thread reads it)
+enum { AT_RESETTING = 0xff };
+static volatile u8 rack_at[RACKS];                     // the place a record's last `reset` was told, its `process` told the same
+                                                       // (AT_RESETTING while a frame's `reset` runs: op1f_rack_run keeps out)
 static volatile u8 rack_on[RACKS];                     // the `on` of a record's last run
 static volatile int rack_values[RACKS][VALUES];        // the values of a record's last run, in the effect's numbers
 static volatile u32 rack_stamp[RACKS];                 // the cycle counter at that run
@@ -1924,16 +1928,25 @@ static u32 run_place(u32 i) {
     return lent_ok(lent, k->slot) ? lent - 1u : (u32)OP1F_PLACE_HOSTED + k->which;
 }
 
+// May record i's page be shown (the review): an effect that declares wagons always; in the fallback only while its
+// host lent it a place that rides the host's layer (the fallback's guard, as run_place has it). Any thread.
+static int page_may(u32 i) {
+    const Rack* k = &racks[i];
+    return effects[k->effect].hosted || lent_ok(rack_lent[i], k->slot);
+}
+
 // Is record i the one its host's place runs now?
 static int rack_live(u32 i) {
     return i < rack_count && rack_current[racks[i].slot][racks[i].which] == i + 1u;
 }
 
-// Does the page stand: asked at this frame or the one before, its record current and ready, and the place on the screen
-// its place, riding the host's layer.
+// Does the page stand: asked at this frame or the one before, its record current, ready and its page allowed
+// (page_may), and the place on the screen its place, riding the host's layer.
 static int page_live() {
     u32 host = page.host, record = page.record;
-    if (host == 0 || record == 0 || unit.frames - page.asked > 1u || !rack_live(record - 1u) || racks[record - 1u].in.status != (u32)READY) return 0;
+    if (host == 0 || record == 0 || unit.frames - page.asked > 1u || !rack_live(record - 1u) || racks[record - 1u].in.status != (u32)READY ||
+        !page_may(record - 1u))
+        return 0;
     const Effect* l = riding(page.place);
     return is_layer(l) && l->slot == host - 1u && l->ask == page.ask && shown_place(RD32(CURRENT_MODE)) == page.place;
 }
@@ -2058,6 +2071,26 @@ static EFFECTS_APART int instance_at(const Effect* e, u32 place, u32* found) {
     return 0;
 }
 
+// The fallback (the review): when the place a lent instance runs at turns (its lent place begins or ends to ride its
+// host's layer, run_place), the instance is made fresh again as op1f_rack_ready makes a new effect: its `reset` told
+// the new place before its next `process`, `fresh` at that block. The audio thread keeps out meanwhile (rack_at holds
+// AT_RESETTING: op1f_rack_run answers OP1F_NOT_HERE, the buffers untouched). The display thread, once a frame.
+static EFFECTS_APART void racks_moved() {
+    for (u32 i = 0; i < rack_count; ++i) {
+        Rack* k = &racks[i];
+        const Effect* e = &effects[k->effect];
+        if (e->hosted || k->in.status != (u32)READY || !rack_live(i)) continue;
+        u32 at = run_place(i);
+        if (at == rack_at[i]) continue;
+        rack_at[i] = (u8)AT_RESETTING;
+        BARRIER();
+        if (e->table->reset) call_reset(e, at, k->in.state);
+        k->fresh = 1;
+        BARRIER();
+        rack_at[i] = (u8)at;
+    }
+}
+
 // The places lent to instances of `e` that ride their hosts' layers now, a bit a place (the fallback).
 static EFFECTS_APART u32 lent_riding(const Effect* e) {
     u32 bits = 0;
@@ -2079,6 +2112,7 @@ static void frame_work() {
     if (n == 0) return;
     ++unit.frames;
     rack_look();                                                                    // R16 (hasis): which runs the packs' places still have
+    racks_moved();                                                                  // R22 (the review): a lent instance's place turned: `reset` there
     page_move();                                                                    // R22 (base 45): the hosted page's turns
     lends_tell();                                                                   // R22: the kept texts handed, told
     u32 mask;
@@ -2510,7 +2544,9 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
     if (k->budget.off) {                                                            // R16 (hasis): another go on a new pick
         if (rack_current[slot][which] == record) {
             if (unit.frames - asked <= (u32)RACK_PAUSE || unit.frames - tried <= (u32)RACK_PAUSE) return OP1F_NOT_HERE;
-            if (e->table->reset) call_reset(e, run_place(record - 1u), k->in.state);   // asked again after a pause: `reset` (R22: its place)
+            u32 at = run_place(record - 1u);
+            if (e->table->reset) call_reset(e, at, k->in.state);                    // asked again after a pause: `reset` (R22: its place)
+            rack_at[record - 1u] = (u8)at;                                          // R22 (the review): the place its runs are told
             k->fresh = 1;                                                           // returned while `off` keeps the audio thread out
             BARRIER();                                                              // (the review), then the go
             budget_rearm(&k->budget);
@@ -2520,7 +2556,9 @@ extern "C" int op1f_rack_ready(const Op1fCard* card, unsigned which, unsigned id
     }                                                                               // only once its `reset` has returned, below
     if (rack_current[slot][which] != record) {                                      // the place held another effect, or none
         rack_begun((u32)slot, which, record - 1u, e);                               // R22 (base 45)
-        if (e->table->reset) call_reset(e, run_place(record - 1u), k->in.state);    // R22: the instance's place, or the lent one
+        u32 at = run_place(record - 1u);
+        if (e->table->reset) call_reset(e, at, k->in.state);                        // R22: the instance's place, or the lent one
+        rack_at[record - 1u] = (u8)at;                                              // R22 (the review): the place its runs are told
         k->fresh = 1;
         BARRIER();
         rack_current[slot][which] = (u8)record;
@@ -2538,7 +2576,8 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
     u32 record = rack_current[slot][which];
     if (record == 0 || record > rack_count) return OP1F_NOT_HERE;
     Rack* k = &racks[record - 1u];
-    if (k->effect != r->id - (u32)ID_FIRST || k->in.status != (u32)READY || k->budget.off) return OP1F_NOT_HERE;
+    u32 at = rack_at[record - 1u];                                                  // R22 (the review): the place its last `reset` was told
+    if (k->effect != r->id - (u32)ID_FIRST || k->in.status != (u32)READY || k->budget.off || at == (u32)AT_RESETTING) return OP1F_NOT_HERE;
     Effect* e = &effects[k->effect];
     rack_on[record - 1u] = r->on ? 1u : 0u;                                         // R22 (base 45): for the hosted page
     if (r->on == 0 && (e->flags & (u32)OP1F_EFFECT_TAILS) == 0) return 0;           // switched off, and nothing to ring out
@@ -2552,7 +2591,7 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
     u32 fresh = r->fresh || k->fresh;
     k->fresh = 0;
     rack_ran(record - 1u, e, values);                                               // R22: the last run's values, as heard
-    run(e, run_place(record - 1u), r->left, r->right, values, r->on ? 1u : 0u, fresh, k->in.state, &k->budget);   // R22: its place
+    run(e, at, r->left, r->right, values, r->on ? 1u : 0u, fresh, k->in.state, &k->budget);   // R22: its place, as its `reset` had it
     return 0;
 }
 
@@ -2929,8 +2968,8 @@ extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which
     const Effect* l = layer_of(slot, ask);
     if (l == 0 || which >= (u32)RACK_PLACES || words == 0) return OP1F_BAD_NAME;
     u32 r = rack_current[slot][which], place = shown_place(RD32(CURRENT_MODE));
-    if (r == 0 || r > rack_count || racks[r - 1u].in.status != (u32)READY || place >= (u32)PLACES || riding(place) != l) {
-        if (page.host == (u32)slot + 1u && page.which == which) page.host = 0;     // its page ends
+    if (r == 0 || r > rack_count || racks[r - 1u].in.status != (u32)READY || place >= (u32)PLACES || riding(place) != l || !page_may(r - 1u)) {
+        if (page.host == (u32)slot + 1u && page.which == which) page.host = 0;     // its page ends (the review: no page in the fallback without a lend that rides)
         return OP1F_NOT_HERE;
     }
     if (page.host != (u32)slot + 1u || page.ask != ask || page.which != which || page.record != r || page.place != place) {

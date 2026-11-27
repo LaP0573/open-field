@@ -2864,6 +2864,7 @@ static OP1F_APART void stand_frame(u32 frame, u32 mode, int holds, const Op1fSta
         if (fits && s->slot == stand.slot && s->ask == stand.ask && mode == stand.mode) {
             stand.where = s->where;
             stand.how = s->how;
+            fx.placed_hosted = fx.asked ? fx.asked_hosted : 0u;                     // R22 (the review): the same card's page, hosted or its own now; stand_told says the turn
             if (fx.placed && stand.on == (u32)STAND_TOP && op1f_page_screen_mode == mode + 1u) effect_uncovered(mode);   // R5
             u32 named = 0;
             void* document = stand_document(stand.slot, stand.ask, &named);
