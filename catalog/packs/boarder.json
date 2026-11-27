@@ -1,0 +1,19 @@
+{
+  "id": "boarder",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "synths"
+  ],
+  "description": "boarder: an organ engine in the engine list. Tonewheels with drawbars, percussion and scanner, two combo-organ modes, twenty sounds.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/boarder.pack",
+  "follow": "main",
+  "version": 22,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/boarder/picture.png"
+  }
+}

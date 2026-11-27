@@ -1,0 +1,19 @@
+{
+  "id": "lilith",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "synths"
+  ],
+  "description": "lilith: a mono virtual-analog bass engine in the synth's engine list, a ladder filter, an animated face and ten sounds.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/lilith.pack",
+  "follow": "main",
+  "version": 16,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/lilith/picture.png"
+  }
+}
