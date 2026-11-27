@@ -1,0 +1,30 @@
+{
+  "id": "veffchop",
+  "author": "galfaroth",
+  "status": "listed",
+  "categories": [
+    "drums"
+  ],
+  "description": "A drum engine: chops the drum sampler's sample into the 24 keys by transients, lazy taps or equal parts; edit, copy and paste each key.",
+  "repository": "https://github.com/galfaroth/open-field-veff",
+  "commit": "c7da041fe838d110359623cbf6a16ced733f05f4",
+  "path": "veffchop.pack",
+  "sha256": "a5fbdd3452786385f2f8983a39a4b839591ad29797c89a53333475144fb83090",
+  "bytes": 45872,
+  "version": 10,
+  "firmware": "1.7.3",
+  "places": 0,
+  "needs": [],
+  "level": 10,
+  "folders": [
+    {
+      "name": "veffchop",
+      "place": "veffchop"
+    }
+  ],
+  "picture": {
+    "path": "thumbs/veffchop.png",
+    "sha256": "c2d51ee625f52233a932894c7992d963419dcb43620219548c5198a1b64fda32",
+    "bytes": 19956
+  }
+}
