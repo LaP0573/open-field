@@ -2101,7 +2101,7 @@ typedef const char* (*Op1fOptionWord)(unsigned choice);
 // (a longer text, or 64 places of all hosts hold a place or a text already), OP1F_NOT_NOW (not from the pack's frame
 // function). What the effect's pack is told of its place: "Declared or not", below.
 enum : unsigned { OP1F_PLACE_NONE = 0xffffffffu };
-enum { OP1F_HOSTED_KEPT_MOST = 128 };
+enum { OP1F_HOSTED_KEPT_MOST = 48 };
 extern "C" int op1f_rack_place(const Op1fCard* card, unsigned which, unsigned place, const char* kept) OP1F_NAMED("op1f_rack_place");
 
 // The kept text the effect's pack wrote for the instance at `which`, when it changed since the last call: written into
