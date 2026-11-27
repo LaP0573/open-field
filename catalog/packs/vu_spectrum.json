@@ -1,0 +1,19 @@
+{
+  "id": "vu_spectrum",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: SPECTRUM, an LED analyser with falling peaks.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_spectrum.pack",
+  "follow": "main",
+  "version": 6,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_spectrum/picture.png"
+  }
+}

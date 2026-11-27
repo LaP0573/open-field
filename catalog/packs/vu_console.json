@@ -1,0 +1,19 @@
+{
+  "id": "vu_console",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: CONSOLE, a retro sci-fi computer panel: elbow frame, colour blocks, pill bars, a radar sweep, scrolling hex, readouts.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_console.pack",
+  "follow": "main",
+  "version": 4,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_console/picture.png"
+  }
+}

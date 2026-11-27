@@ -1,0 +1,19 @@
+{
+  "id": "vu_bella",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: BELLA, MARY BELLE the cow on a 90s car stereo's LED panel, dancing on the tempo over a neon floor of the bands.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_bella.pack",
+  "follow": "main",
+  "version": 10,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_bella/picture.png"
+  }
+}

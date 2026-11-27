@@ -1,0 +1,19 @@
+{
+  "id": "vu_meter",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: VU, a pair of needle meters in line art with PEAK lamps.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_meter.pack",
+  "follow": "main",
+  "version": 4,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_meter/picture.png"
+  }
+}

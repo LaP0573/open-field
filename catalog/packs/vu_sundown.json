@@ -1,0 +1,19 @@
+{
+  "id": "vu_sundown",
+  "author": "hasis",
+  "status": "listed",
+  "categories": [
+    "looks"
+  ],
+  "description": "A look for vu: SUNDOWN, a synthwave sunset over mirrored mountains made of the bands, their water reflection below.",
+  "repository": "https://github.com/hasis/field-packs-releases",
+  "path": "packs/vu_sundown.pack",
+  "follow": "main",
+  "version": 1,
+  "firmware": "1.7.3",
+  "needs": [],
+  "folders": [],
+  "picture": {
+    "path": "packs/vu_sundown/picture.png"
+  }
+}
