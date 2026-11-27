@@ -7,12 +7,12 @@ The base is a pack like any other ([packs](packs.md)), built from `packs/base.js
 | | |
 | --- | --- |
 | Name | `base` |
-| Version | 42 |
-| Release | `0.24`: the start screen reads `1.7.3 - open-field 0.24` |
+| Version | 43 |
+| Release | `0.25`: the start screen reads `1.7.3 - open-field 0.25` |
 | Level | 10: it offers the marks `op1f_level_1` to `op1f_level_10` |
 | Interface number | 3 |
 | On the start screen | Not named: its release is shown |
-| Its changes of the firmware | Sixty-four: [the change list](changes.md), "The base, `base.pack`" |
+| Its changes of the firmware | Sixty-six: [the change list](changes.md), "The base, `base.pack`" |
 
 Since the base is a file, a new base is a new file copied into `user/pk`, with no install. The **loader**, our small piece inside the firmware file, only reads, places and joins the pack files. It hands the base what it needs and knows nothing of what the base offers.
 
@@ -79,6 +79,7 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 40 | Ready for the loader N2, which takes more pack files: the base reads that loader's numbers and offers it a second, longer list of cards ([below](#base-40-and-the-next-loader)). Under the first loader, N1, a unit runs as on base 39, but for one thing: a folder with too many pack files can still take a change that does not add files. Nothing for a pack to ask | none |
 | 41 | [More working memory](level-6.md#working-memory): the unit's spare memory first, then its heap as before; up to 32 MiB an ask and 64 asks in all | `op1f_memory_2`, for a pack that cannot do without these limits |
 | 42 | N2's longer list of cards: the base serves up to 128 of them ([below](#base-40-and-the-next-loader)). Under N1 a unit runs as on base 41. Nothing for a pack to ask | none |
+| 43 | [A drum engine](drum-engine.md): a pack's engine in the drum's engine list, riding the drum sampler; picked, its page stands on T1 with the keys and knobs offered to it first, and the drum sound's file keeps its name; one pack holds it | `op1f_drum_engine_1` |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 
@@ -444,6 +445,7 @@ The base's lines tell how a pack fares on a unit. Each line of a log begins with
 | `op1f_engines` | `engine:` | Level 9: the packs' engines in the unit's list, which sound plays which, their memory, their period, their sounds and the unit's count of user sounds |
 | `op1f_sample` | `sample:` | Base 39: each drop a pack asked for, its end with the frames put in, a refusal and why, and the count of the unit's own drops into its sampler ([your engine's sample](sample.md#the-lines-the-base-writes)) |
 | `op1f_sample_restore` | `sample:` | Base 39: after a start, each cut put back into a sound that plays a pack's engine, or why not |
+| `op1f_drum` | `drum:` | Base 43: the drum engine in the drum's engine list, which drum sound rides it, and when a ride ends ([a drum engine](drum-engine.md#the-lines-the-base-writes)) |
 | `op1f_tape_art` | `artwork` | A picture put together on the unit, and from what |
 | | `aud` | Every sixteenth second: the share of the processor the audio thread took, the longest block, and the blocks a second |
 | | `os heap:` | Every sixteenth second: how much of the firmware's own heap is free at its top, and the least it has been |
@@ -485,8 +487,8 @@ The base is a pack: a change to it is a new `base.pack`, built from `packs/base.
 
 1. **The sources** are the ones `packs/base.json` names: the cards, the pages, keys and knobs, folders and files, text and painting, sequencers, notes, stages, memory, the values kept, effects, engines, each in a unit of its own. The interface's text is the header the examples include.
 2. **A new level** is a new header beside the last one and a new mark, `op1f_level_11` say, which the base offers and a card of that level needs. From level 4 on, a level adds kinds of ask and helpers, and the card keeps its size. Every field, every kind and every name of the levels before stays where it is, with its meaning: a pack built for an earlier level runs on the new base as it is.
-3. **`packs/base.json`**: a new `version`. A new `release` when the start screen is to show it (one to eight characters of `0`-`9`, `A`-`Z`, `a`-`z`, `.`, `_` and `-`); `tools/pack_build.py release` then writes its source again from the recipe. A new `interface` number only when a name other packs use changes its meaning; then each of them is built again naming the new number.
-4. **Build**, and let the build write the new size and SHA-256 ([building](build.md), "If you change something").
-5. **A try on a unit**: copy the new `base.pack` over the old one, start, read the log.
+3. **`packs/base.json`**: its `version` and `release` stay as they are. They belong to the release of the base, the maintainer's step, which gives the base its next version once your change is merged ([building](build.md#a-change-to-the-base-and-its-release)). A new `interface` number only when a name other packs use changes its meaning; then each of them is built again naming the new number.
+4. **Build.** The build says `ahead` for `base.pack`: your sources are ahead of the released base, and that is right. Leave `builder/base.pack`, `builder/base-pack.json`, `catalog/packs/base.json` and the entry of `base.pack` in `packs/built.json` as they are: the checks on a pull request refuse a change to them.
+5. **A try on a unit**: copy the new `base.pack` from `out/packs/` over the old one, start, read the log.
 
 A change to the base that needs something new of the loader is rarer: it is a change to the loader, and an install ([building](build.md), "A change to the loader"). The base then needs the loader's next mark, and under an older loader it is left out with a line that names the mark.

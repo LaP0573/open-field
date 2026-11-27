@@ -186,6 +186,95 @@ class TheRecipes(unittest.TestCase):
             self.assertIn(mark, base["exports"])
         self.assertFalse(base["named"])                         # the start screen shows its release, not its name
 
+    def test_the_drum_engine_is_a_kind_of_its_own_and_the_base_offers_its_mark(self):
+        header = text("module", "build_r6e_card.h")
+        kinds = [int(n) for n in re.findall(r"OP1F_ASK_[A-Z_]+ = (\d+)", header)]
+        self.assertIn("OP1F_ASK_DRUM_ENGINE = 12", header)
+        self.assertNotIn("OP1F_ASK_DRUM_PAGE", header)                  # kind 12 is the drum engine
+        self.assertEqual(len(kinds), len(set(kinds)), "no two kinds of ask share a number")
+        exports = load("packs", "base.json")["exports"]
+        self.assertIn("op1f_drum_engine_1", exports)
+        self.assertNotIn("op1f_drum_page_1", exports)
+        self.assertIn("docs/drum-engine.md", pages())
+
+    def test_the_drum_s_pick_is_a_place_of_the_profile_with_the_synth_s_pick_s_sum(self):
+        """The drum's engine pick begins with the same eight bytes as the synth's: one sum, two places, each its own room."""
+        profile = load(PROFILE)
+        sums = {p["address"]: p for p in profile["patches"]}
+        self.assertEqual(sums["0x8d4eb160"]["sum"], sums["0x8d4eb3e8"]["sum"])
+        self.assertEqual(sums["0x8d4eb160"]["length"], 8)
+        entries = {e["address"]: e for t in profile["tables"] for e in t["entries"]}
+        self.assertEqual(entries["0x8d4eb160"]["target"], "op1f_drum_pick_entry")
+        self.assertEqual(entries["0x8d4eb160"]["room"], "op1f_drum_pick_room")
+        self.assertEqual(entries["0x8d4eb160"]["copies"], 8)
+        self.assertIn("module/build_r21_drum.s", load("packs", "base.json")["sources"])
+        self.assertIn("module/build_r21_drum.cpp", load("packs", "base.json")["sources"])
+
+    def test_the_drum_s_drop_job_is_a_place_with_the_synth_s_drop_job_s_sum(self):
+        """Base 43: DD, the head of the drum's drop job, begins with the same eight bytes as SD, the synth's."""
+        profile = load(PROFILE)
+        sums = {p["address"]: p for p in profile["patches"]}
+        self.assertEqual(sums["0x8f00ba38"]["sum"], sums["0x8f00b7b0"]["sum"])
+        entries = {e["address"]: e for t in profile["tables"] for e in t["entries"]}
+        self.assertEqual((entries["0x8f00ba38"]["target"], entries["0x8f00ba38"]["room"], entries["0x8f00ba38"]["copies"]),
+                         ("op1f_sample_dd_stub", "op1f_sample_dd_room", 8))
+
+    @unittest.skipUnless(shutil.which("c++"), "a C++ compiler on the computer")
+    def test_the_drop_s_checks_take_a_drum_place_that_rides_and_its_pool(self):
+        """module/build_r17_sample.h compiled on the computer: base 43 takes a drum place riding the drum engine, holds
+        it to the drum's pool, and still refuses a drum place where `drums` is 0 (base 39's answer)."""
+        source = r'''
+#include <cstdio>
+#include "build_r17_sample.h"
+int main() {
+    unsigned tracks[1] = {0};
+    Op1fSampleScene s = {};
+    s.turn = 0; s.keyed = 1; s.place = 9; s.engine = 1; s.ride = OP1F_SAMPLE_RIDES; s.queue_read = s.queue_write = 3;
+    s.tracks = tracks; s.tracks_end = tracks + 1; s.data = s.pool = 0x8d518598u + 0x35d540u; s.capacity = 882000; s.stereo = 1;
+    s.length = 800000; s.drums = 1;
+    int a = (int)op1f_sample_check(&s);
+    s.length = 882001; s.capacity = 900000; int b = (int)op1f_sample_check(&s);
+    s.length = 800000; s.capacity = 882000; s.drums = 0; int c = (int)op1f_sample_check(&s);
+    s.drums = 1; s.ride = OP1F_SAMPLE_RIDES_NOT; int d = (int)op1f_sample_check(&s);
+    s.ride = OP1F_SAMPLE_RIDES; s.place = 2; s.length = 300000; int e = (int)op1f_sample_check(&s);
+    std::printf("%d %d %d %d %d\n", a, b, c, d, e);
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "t.cpp")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(source)
+            exe = os.path.join(folder, "t")
+            subprocess.run(["c++", "-std=c++11", "-I", os.path.join(ROOT, "module"), "-o", exe, path], check=True)
+            out = subprocess.run([exe], check=True, capture_output=True, text=True).stdout.split()
+        self.assertEqual(out, ["0", "15", "4", "7", "15"])          # passed; too large; base 39; not riding; a synth pool's bound
+
+    def test_the_base_offers_the_drum_mark_for_a_sample_a_pack_wrote(self):
+        """Base 43: op1f_sample_changed is offered, declared in the header and said on the drum engine's page."""
+        self.assertIn("op1f_sample_changed", load("packs", "base.json")["exports"])
+        self.assertIn('int op1f_sample_changed(const Op1fCard* card, unsigned ask, unsigned place)', text("module", "build_r6e_card.h"))
+        self.assertIn("op1f_sample_changed", text("docs", "drum-engine.md"))
+        source = text("module", "build_r17_sample.cpp")
+        self.assertIn("ticket.mark = 1", source)
+        self.assertIn("STOCK_DRUM_MARK(slot)", source)
+
+    def test_a_drum_engine_s_ask_is_read_from_a_recipe_as_the_base_holds_it(self):
+        pb = tool("pack_build")
+        ask = pb.drum_page_of_card(1, {"kind": "drum engine", "name": "chop", "shown": "chop_shown"}, [])
+        self.assertEqual(ask, (12, "chop", 0, {"shown": "chop_shown"}, {}))
+        self.assertEqual(pb.ask_words(*ask[:4]), "drum engine 'chop', rides the drum sampler, shown")
+        self.assertTrue(pb.has_drum_page([ask]))
+        for name in ("dbox", "sampler", "drum sampler"):
+            with self.assertRaisesRegex(ValueError, "unit's own drum engines"):
+                pb.drum_page_of_card(1, {"kind": "drum engine", "name": name, "shown": None}, [])
+        with self.assertRaisesRegex(ValueError, "twice"):
+            pb.drum_page_of_card(2, {"kind": "drum engine", "name": "chop2", "shown": None}, [ask])
+        with self.assertRaisesRegex(ValueError, "which such an ask has not"):
+            pb.drum_page_of_card(1, {"kind": "drum engine", "name": "chop", "shown": None, "listed": True}, [])
+        self.assertEqual(pb.DRUM_PAGE_MARK, "op1f_drum_engine_1")
+        self.assertEqual(pb.KIND_WORDS_6[12], "drum engine")
+
     def test_every_picture_is_a_set_of_instructions_and_not_a_picture(self):
         """A pack carries how the unit is to put a picture together, never the picture."""
         for folder, _folders, names in os.walk(os.path.join(ROOT, "pictures")):
@@ -471,8 +560,8 @@ class TheInstaller(unittest.TestCase):
 
 class ThePageSBase(unittest.TestCase):
     """builder/base.pack: the base the install page puts on every unit it installs, and builder/base-pack.json, the
-    size and SHA-256 the page holds it to. The one finished pack file in the tree; the build holds it to
-    packs/built.json and to what it builds."""
+    size and SHA-256 the page holds it to. The one finished pack file in the tree, the released base: the build holds
+    it to packs/built.json's base.pack, and the base the build makes may be ahead of it."""
 
     @classmethod
     def setUpClass(cls):
@@ -484,8 +573,18 @@ class ThePageSBase(unittest.TestCase):
     def test_it_is_the_file_base_pack_json_names_and_packs_built_json_keeps(self):
         held = {"bytes": len(self.data), "sha256": hashlib.sha256(self.data).hexdigest()}
         self.assertEqual({key: self.named[key] for key in held}, held)
-        self.assertEqual(load("packs", "built.json")["files"]["base.pack"], held)
+        self.assertEqual({key: load("packs", "built.json")["files"]["base.pack"][key] for key in held}, held)
         self.assertEqual(self.named["file"], "base.pack")
+
+    def test_packs_built_json_keeps_the_inputs_of_the_released_base_and_of_nothing_else(self):
+        """Beside the released base's size and SHA-256, packs/built.json keeps `inputs`, the SHA-256 over the files its
+        build read (tools/build_all.py, base_inputs()). Every other file it keeps is a size and a SHA-256 alone, and the
+        file the page holds base.pack to says nothing of the inputs."""
+        kept = load("packs", "built.json")["files"]
+        self.assertEqual(sorted(kept["base.pack"]), ["bytes", "inputs", "sha256"])
+        self.assertRegex(kept["base.pack"]["inputs"], r"^[0-9a-f]{64}$")
+        self.assertEqual({name: sorted(entry) for name, entry in kept.items() if name != "base.pack" and sorted(entry) != ["bytes", "sha256"]}, {})
+        self.assertNotIn("inputs", self.named)
 
     def test_what_base_pack_json_says_is_what_the_file_says_of_itself(self):
         pack_build = tool("pack_build")
@@ -763,6 +862,17 @@ class TheBuild(unittest.TestCase):
         cls.folder = tempfile.mkdtemp(prefix="open-field-build-")
         cls.out = os.path.join(cls.folder, "out")
         cls.done = subprocess.run([sys.executable, "-I", os.path.join("tools", "build_all.py"), "--out", cls.out], cwd=ROOT, capture_output=True, text=True)
+        # The base's sources on main may be ahead of the released base, packs/built.json's: the built base.pack differs
+        # from it, and so do the files its build read. The same files giving other bytes is a fault, never "ahead".
+        cls.released = load("packs", "built.json")["files"]["base.pack"]
+        built = os.path.join(cls.out, "packs", "base.pack")
+        cls.built_base = None
+        if os.path.isfile(built):
+            with open(built, "rb") as f:
+                cls.built_base = f.read()
+        cls.ahead = (cls.built_base is not None
+                     and (len(cls.built_base), hashlib.sha256(cls.built_base).hexdigest()) != (cls.released["bytes"], cls.released["sha256"])
+                     and tool("build_all").base_inputs(PROFILE) != cls.released["inputs"])
 
     @classmethod
     def tearDownClass(cls):
@@ -779,12 +889,20 @@ class TheBuild(unittest.TestCase):
 
     def test_the_build_holds_the_page_s_base_pack_and_the_file_that_names_it(self):
         self.assertIn("the same  builder/base.pack, byte for byte, and builder/base-pack.json names it", self.done.stdout)
-        with open(os.path.join(self.out, "packs", "base.pack"), "rb") as f, open(os.path.join(ROOT, "builder", "base.pack"), "rb") as g:
-            self.assertEqual(f.read(), g.read())
+        with open(os.path.join(ROOT, "builder", "base.pack"), "rb") as f:
+            page = f.read()
+        self.assertEqual((len(page), hashlib.sha256(page).hexdigest()), (self.released["bytes"], self.released["sha256"]))      # always the released base
+        if self.ahead:
+            self.assertRegex(self.done.stdout, r"(?m)^ahead     base\.pack .*: the sources are ahead of it")
+            self.assertIn("but base.pack, whose sources are ahead of the released base", self.done.stdout)
+        else:
+            self.assertIsNotNone(self.built_base, "the build made no base.pack")
+            self.assertEqual((len(self.built_base), hashlib.sha256(self.built_base).hexdigest()), (len(page), hashlib.sha256(page).hexdigest()))
 
     def test_every_pack_and_example_is_built(self):
         for name in PACKS:
-            self.assertRegex(self.done.stdout, r"the same  %s\.pack " % re.escape(name))
+            word = "ahead" if name == "base" and self.ahead else "the same"
+            self.assertRegex(self.done.stdout, r"(?m)^%-9s %s\.pack " % (word, re.escape(name)))
         for name in EXAMPLES + ("trampolines",):
             self.assertRegex(self.done.stdout, r"the same  examples/%s\.pack " % name)
 
