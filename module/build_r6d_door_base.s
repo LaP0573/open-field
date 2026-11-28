@@ -8,7 +8,7 @@
 .global op1f_door_base_version
 .type op1f_door_base_version, STT_OBJECT
 op1f_door_base_version:
-    .long 44
+    .long 45
 .size op1f_door_base_version, .-op1f_door_base_version
 .global op1f_door_base_from
 .type op1f_door_base_from, STT_OBJECT

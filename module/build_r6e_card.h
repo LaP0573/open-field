@@ -2114,8 +2114,9 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 
 // The page of the effect at `which`, for the place on the screen while it rides the host's layer `ask` (an effect of
 // the card with OP1F_EFFECT_LAYER): T3's page becomes the effect's own page for that instance (its page that stands
-// in, or the base's blank page with its name), a third choice beside OP1F_LAYER_PAGE_UNIT and _OWN. Call it once a
-// frame while the host wants that page; a frame without the call, or op1f_layer_page, ends it. `words` is four ints, in
+// in, or the base's blank page with its name), a third choice beside OP1F_LAYER_PAGE_UNIT and _OWN. It comes up
+// whatever the layer's page choice is, UNIT or OWN. Call it once a frame while the host wants that page; a frame
+// without the call, or op1f_layer_page, ends it. `words` is four ints, in
 // and out, as OP1F_RACK_WORDS has them (the unit's knob words of the effect the pack's stands on): in, the instance's
 // four words as the host keeps them (as set, not moved by an LFO); out, the words the page changed since the last
 // call (the effect's op1f_param_set at the instance's place, or a knob turn no pack took, moved as the unit's knob of
@@ -2126,7 +2127,11 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 // card: "Declared or not", below), OP1F_BAD_NAME (no such layer of the card, `which`, or `words` 0), OP1F_NOT_NOW (not
 // from the pack's frame function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
 // move the unit's effect under the layer): a turn moves the instance's word, a click or a press is dropped.
-enum { OP1F_HOSTED_PAGE_UP = 256 };
+// OP1F_HOSTED_PAGE_READY comes with the mask while the page stands now at the place on the screen (its type's screen
+// asked there), up or lying under another page (the host's own, the base's top page or another pack's): a host that
+// draws its own page over the unit's closes that page then, and the page comes up (a base before this bit never sets
+// it).
+enum { OP1F_HOSTED_PAGE_UP = 256, OP1F_HOSTED_PAGE_READY = 512 };
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
 
 // For an effect's pack: the declaration of wagons. An effect knows wagons when its table is OP1F_EFFECT_HOSTED_BYTES
@@ -2151,7 +2156,7 @@ enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_
 //   - Not declared (every effect pack written before base 44): the fallback, only meant for packs written before base
 //     44. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then
 //     loses its page on wagons, nothing worse. While the place a host lent the instance (op1f_rack_place) rides a layer
-//     of the host's own card (checked at each use: never the master under such a train, and a pick of another effect
+//     of the host's own card (checked at each use, for a sound's place or the master's alike; a pick of another effect
 //     there ends it), the base answers the effect's pack as if that place rode the effect: `process` and `reset` get the
 //     place (not OP1F_PLACE_HOSTED + which; when the ride begins or ends, `reset` is told the new place before the next
 //     `process` there, and `fresh` comes with that block); op1f_riding has its bit for as long as the wagon is lent;
