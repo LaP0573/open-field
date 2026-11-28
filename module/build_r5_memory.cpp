@@ -4,10 +4,25 @@
 // start for the base's own use, by the same machinery and inside the same limits (op1f_memory_more, op1f_memory_block,
 // module/build_r5_base.h): the effects unit asks it for an effect's working memory at a place.
 //
+// Base 45 (step R23): the base's own blocks are given back and handed out again. Until base 44 the base could ask 16
+// blocks of its own a session and kept each to the end, so browsing pack effects in the unit's lists used them up and
+// every pack effect after the sixteenth played dry until a restart (open-field issue 80). Now:
+//   - op1f_memory_less gives a block of the base's own back: its record is FREE, its block and its room (the bytes the
+//     block holds) are kept, and op1f_memory_block answers 0 for it;
+//   - op1f_memory_more hands out first the FREE block with the least room that holds the ask on its alignment, cleared
+//     again over the frames as a new block is, under that record's handle; only when none holds it does it take a new
+//     block, inside the same limits as before (the heap's bytes counted once, when the block is first taken);
+//   - the base may hold MORE blocks of its own at once (OP1F_MEMORY_MORE, 104): what the units that ask can hold together
+//     (module/build_r5_base.h). With the table full and every FREE block too small, the FREE record with the least room
+//     takes a new block, and its old one is left behind, with a line (the spare memory's pointer only moves forward, and
+//     the base gives the heap nothing back);
+//   - a refusal's reason is kept for the unit that asked (op1f_memory_refusal), so that its line says the same.
+// A pack's asks are as before.
+//
 // Base 41 (step R19): the memory comes first from the unit's spare memory, then from the heap as before (below), and the
-// limits are wider: one ask at most BYTES_MOST (32 MiB), MOST asks of the packs (64), MORE of the base's own (16), at most
-// HEAP_MOST (16 MiB) of all asks together from the heap. Base 40 gave 16 MiB for one ask and for all asks together, and
-// 16 asks. The mark op1f_memory_2 says so to the packs.
+// limits are wider: one ask at most BYTES_MOST (32 MiB), MOST asks of the packs (64), MORE of the base's own (16; 104 from
+// base 45), at most HEAP_MOST (16 MiB) of all asks together from the heap. Base 40 gave 16 MiB for one ask and for all
+// asks together, and 16 asks. The mark op1f_memory_2 says so to the packs.
 //
 // Any pack may ask, through its card, for a block of working memory (OP1F_ASK_MEMORY, its table an Op1fMemory,
 // module/build_r5_card.h). The spare memory is two stretches, in their order (SPARE_FROM, SPARE_TO); each has a pointer
@@ -15,7 +30,7 @@
 // ask's alignment, leaves room for the ask's bytes rounded up to 4; the pointer then stands right behind them. When
 // neither stretch holds it, the memory comes from the C runtime's first heap of the firmware, which hands out blocks and
 // answers 0 when it has no room; it takes no lock, so the base asks it only from the display thread, with interrupts
-// masked around each call. A block is never given back while the unit runs.
+// masked around each call. A block of a pack's is never given back while the unit runs.
 //
 // The registration, once, at the base's first frame (op1f_memory_frame, from the cards unit, on the display thread,
 // before the stages unit's frame work): every card the base uses (op1f_cards_verdict) that says level 6 or later and
@@ -33,7 +48,7 @@
 // bytes counted with the packs' where they come from the heap, and has the same lines with the name it is handed
 // (`whose`) in the place of the ask's and the pack's. They are records of the same table behind the packs' asks, at
 // most MORE; a record of the base's own matches no card's slot, so that no stage waits for it. The handle is the
-// record's number + 1.
+// record's number + 1. R23: a record given back (op1f_memory_less) is handed out again before a new one is made.
 //
 // A block from the heap is asked for its bytes and its alignment more, and begins at the first multiple of the
 // alignment inside it. Each block is then cleared to 0 by the display thread, a quarter of a megabyte a frame, its bytes
@@ -91,7 +106,7 @@ typedef int (*HeapFreeFn)(int index);
 // R20 (base 42): the cards unit's list is op1f_cards_2 (module/build_r3_base.h), up to OP1F_SLOTS_MOST slots,
 // read past op1f_cards_lists (or a name of the cards unit's that calls it).
 
-enum { MOST = 64, MORE = 16, RECORDS = MOST + MORE, CARDS = OP1F_SLOTS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 36,
+enum { MOST = 64, MORE = OP1F_MEMORY_MORE, RECORDS = MOST + MORE, CARDS = OP1F_SLOTS_MOST, NAME = OP1F_KIND_NAME, TABLE_BYTES = 36,
        CARD_4_BYTES = OP1F_CARD_LEVEL_4_BYTES, HEAP = 0, ALIGN_LEAST = 4, CLEAR_A_FRAME = 256 * 1024, WHOSE = 48, STRETCHES = 2 };
 // Base 41's limits, named here where module/build_r6e_card.h ("Level 6: working memory") is not read; the header this
 // unit reads (module/build_r5_card.h) keeps base 40's, 16 MiB for one ask and for all asks together, and 16 asks.
@@ -99,13 +114,15 @@ enum { MOST = 64, MORE = 16, RECORDS = MOST + MORE, CARDS = OP1F_SLOTS_MOST, NAM
 //   HEAP_MOST    the most all asks together take from the heap (OP1F_MEMORY_HEAP_MOST)
 //   EARLY_MOST   what base 40 gave of all asks together: the early blocks, cleared first, come to at most this
 //   SPARE_BYTES  the spare memory, both stretches (OP1F_MEMORY_SPARE)
-//   MOST, MORE   how many asks the packs may make (OP1F_MEMORIES_MOST), and the base for its own (as base 40)
+//   MOST, MORE   how many asks the packs may make (OP1F_MEMORIES_MOST), and how many blocks the base may hold for its
+//                own at once (16 asks a session until base 44; R23: 104 held, OP1F_MEMORY_MORE)
 static const u32 BYTES_MOST = 32u << 20, HEAP_MOST = 16u << 20, EARLY_MOST = (u32)OP1F_MEMORY_MOST, SPARE_BYTES = 100401152u;
 static const u32 KEPT = (u32)OP1F_MEMORY_KEPT, ALIGN_MOST = (u32)OP1F_MEMORY_ALIGN_MOST;
 static const u32 BASES = 0xffffffffu;                  // the slot of a record of the base's own: no card's
 static_assert(sizeof(Op1fMemory) == TABLE_BYTES, "a memory's table is 36 bytes at level 6");
-static_assert(EARLY_MOST == (16u << 20) && BYTES_MOST >= EARLY_MOST && (u32)MOST >= (u32)OP1F_MEMORIES_MOST && (u32)MORE == 16u,
+static_assert(EARLY_MOST == (16u << 20) && BYTES_MOST >= EARLY_MOST && (u32)MOST >= (u32)OP1F_MEMORIES_MOST && (u32)MORE >= 16u,
               "base 41 gives every ask base 40 gave");
+static_assert((u32)MORE == 104u, "the count the refusal's line names");
 
 // The spare memory: the room our base hands out first for working memory, 95.75 MiB in OS 1.7.0 and in 1.7.3 alike
 // (base 41). Two stretches, in this order, written as 64 KiB block numbers (the port to 1.7.3 stops on a word that
@@ -123,21 +140,25 @@ static const char TOO_LARGE[] = "more than 32 MiB";
 static const char HEAP_PASSED[] = "no room for it in the spare memory, and the packs would take more than 16 MiB of the heap";
 static const char HEAP_KEPT[] = "no room for it in the spare memory, and less than 8 MiB of the heap would stay free";
 static const char HEAP_NONE[] = "no room for it in the spare memory, and the heap has no such room";
+// R23: the base's own asks' other two (op1f_memory_more answers OP1F_FAILED).
+static const char NOT_IN_ORDER_ASK[] = "its alignment or its size is not in order";
+static const char ALL_HELD[] = "the base holds 104 blocks of its own already";
 
 // Base 41: the mark of a base with these limits. A pack that counts on 32 MiB an ask or more than 16 asks names it, and
 // an older base's loader then leaves the pack out with the name in its line.
 extern "C" const unsigned op1f_memory_2 OP1F_NAMED("op1f_memory_2");
 const unsigned op1f_memory_2 = 1;
 
-enum { CLEARING = 0, GIVEN = 1, REFUSED = 2 };
+enum { CLEARING = 0, GIVEN = 1, REFUSED = 2, FREE = 3 };   // R23: FREE, a block of the base's own given back
 
 struct Memory {
     u32 slot, ask;                                     // the card's slot in op1f_cards_2, the ask's number in its list (BASES for the base's own)
-    u32 bytes;
+    u32 bytes;                                         // the ask's: what is cleared and handed over
     u32* block;                                        // on its alignment; 0 when refused
     u32 cleared;                                       // the words cleared so far
     u32 early;                                         // base 41: 1 for a block base 40 would have counted inside its 16 MiB
     volatile u32 state;
+    u32 room;                                          // R23: the bytes the block holds, from `block` (the first ask's, rounded up to 4)
     char name[NAME];
 };
 
@@ -385,21 +406,61 @@ static void enrol() {
     }
 }
 
+// R23: why op1f_memory_more refused its last ask (the display thread's).
+static const char* refusal = "";
+
+// R23: a FREE record of the base's own: with `bytes` 0 the one with the least room of all, else the one with the least
+// room that holds `bytes` on `align`. 0 for none.
+static Memory* free_record(u32 bytes, u32 align) {
+    Memory* best = 0;
+    u32 count = unit.count;
+    for (u32 i = 0; i < count && i < (u32)RECORDS; ++i) {
+        Memory* m = &memories[i];
+        if (m->slot != BASES || m->state != (u32)FREE) continue;
+        if (bytes != 0 && (m->room < bytes || ((u32)m->block & (align - 1u)) != 0)) continue;
+        if (best == 0 || m->room < best->room) best = m;
+    }
+    return best;
+}
+
+// R23: a record handed `bytes` to clear again over the frames and hand over, as a new block is. Its handle.
+static int clear_again(Memory* m, u32 bytes) {
+    m->bytes = bytes;
+    m->cleared = 0;
+    BARRIER();                                                                      // the record whole before the word that sets it clearing
+    m->state = CLEARING;
+    return (int)(m - memories) + 1;
+}
+
 // R5: a block for the base's own use. The display thread.
 extern "C" int op1f_memory_more(unsigned bytes, unsigned align, const char* whose) {
     if (whose == 0) whose = "the base";
     if (bytes == 0 || align < (u32)ALIGN_LEAST || align > ALIGN_MOST || (align & (align - 1u)) != 0) {
-        op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, "its alignment or its size is not in order");
+        refusal = NOT_IN_ORDER_ASK;
+        op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, refusal);
         return OP1F_FAILED;
     }
-    if (unit.bases == (u32)MORE) {
-        op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, "the base has asked sixteen blocks already");
+    if (bytes > BYTES_MOST) {                                                       // R23: before a block given back is looked at
+        refusal = TOO_LARGE;
+        op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, refusal);
+        return OP1F_TOO_LARGE;
+    }
+    Memory* back = free_record(bytes, align);                                       // R23: a block given back that holds it
+    if (back != 0) {
+        op1f_log(3, LOG_FILE, 9, "memory: %s is given %u bytes at 0x%08x again, a block of %u bytes given back", whose, bytes, (u32)back->block, back->room);
+        return clear_again(back, bytes);
+    }
+    Memory* over = unit.bases == (u32)MORE ? free_record(0, ALIGN_LEAST) : 0;       // R23: the table full, a FREE record too small
+    if (unit.bases == (u32)MORE && over == 0) {
+        refusal = ALL_HELD;
+        op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, refusal);
         return OP1F_FAILED;
     }
     const char* why = 0;
     u32 free_after = 0, spare = 0;
     u32* at = take_any(bytes, align, &why, &free_after, &spare);
     if (why) {
+        refusal = why;
         op1f_log(1, LOG_FILE, 6, "memory: %s is refused %u bytes: %s", whose, bytes, why);
         return why == TOO_LARGE || why == HEAP_PASSED ? OP1F_TOO_LARGE : OP1F_FAILED;
     }
@@ -407,6 +468,14 @@ extern "C" int op1f_memory_more(unsigned bytes, unsigned align, const char* whos
         op1f_log(3, LOG_FILE, 8, "memory: %s is given %u bytes at 0x%08x; %u KiB of the spare memory stay", whose, bytes, spare, spare_left());
     else
         op1f_log(3, LOG_FILE, 5, "memory: %s is given %u bytes at 0x%08x; %u KiB stay free", whose, bytes, (u32)at, free_after >> 10);
+    if (over != 0) {                                                                // R23: its old block left behind
+        op1f_log(2, LOG_FILE, 11, "memory: the base's %u bytes given back at 0x%08x are left behind: it holds %u blocks of its own", over->room, (u32)over->block,
+                 (u32)MORE);
+        over->block = at;
+        over->room = (bytes + 3u) & ~3u;
+        over->early = early(bytes);
+        return clear_again(over, bytes);
+    }
     u32 n = unit.count;
     Memory* m = &memories[n];
     m->slot = BASES;
@@ -415,12 +484,30 @@ extern "C" int op1f_memory_more(unsigned bytes, unsigned align, const char* whos
     m->cleared = 0;
     m->name[0] = 0;
     m->block = at;
+    m->room = (bytes + 3u) & ~3u;
     m->early = early(bytes);
     m->state = CLEARING;
     BARRIER();                                                                      // the record is whole before the word that counts it
     ++unit.bases;
     unit.count = n + 1u;
     return (int)(n + 1u);
+}
+
+// R23: a block of the base's own given back. The display thread.
+extern "C" int op1f_memory_less(int handle, const char* whose) {
+    if (whose == 0) whose = "the base";
+    u32 count = unit.count;
+    if (handle <= 0 || (u32)handle > count) return OP1F_FAILED;
+    Memory* m = &memories[handle - 1];
+    if (m->slot != BASES || (m->state != (u32)CLEARING && m->state != (u32)GIVEN)) return OP1F_FAILED;
+    m->state = FREE;
+    BARRIER();
+    op1f_log(3, LOG_FILE, 10, "memory: %s gives back %u bytes at 0x%08x", whose, m->room, (u32)m->block);
+    return 0;
+}
+
+extern "C" const char* op1f_memory_refusal() {
+    return refusal;
 }
 
 // ---------------------------------------------------------------- once a frame, on the display thread

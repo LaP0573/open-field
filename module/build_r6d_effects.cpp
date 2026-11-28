@@ -1,4 +1,22 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 45 (R23), the base pack: base 44's effects unit, edited in place. An effect's working memory is given back once
+// nothing plays it, so that trying pack effects in the unit's lists no longer uses up the base's blocks (open-field issue
+// 80: the unit's lists put each effect the cursor rests on onto the place, and until base 44 each such effect kept its
+// block for the instrument or the master to the end of the session, with 16 blocks for all):
+//   - at each frame, an instance (an effect's memory for the instrument, or for the master) that no place of its own rides
+//     stops being READY: from the next block on its place passes the sound dry, as it does for any effect it does not
+//     ride. Its block is given back to the memory unit (op1f_memory_less) once the audio thread's count of blocks
+//     (op1f_audio.count, which the base's audio handler raises after each block's work has returned) has moved on by
+//     LINGER since, about a second and a half: no block that could have read the state is still running then. Ridden
+//     again before that, the instance is READY again at once, its memory as it was. A block still being cleared is given
+//     back at once (no thread but the display thread has seen it); a refusal ends there, so a pick of the effect after
+//     it asks again;
+//   - a block handed over anew holds the effect back (`unreset`) until its `reset` has returned, whichever build plays;
+//   - a run inside a pack that is taken over for an effect its memory does not fit, or that needs none, gives its block
+//     back (it was left behind before); at 64 runs a spare run whose memory does not fit is taken too, and asks anew;
+//   - the line of a refusal says the memory unit's reason (op1f_memory_refusal).
+// What base 38's unit said follows and holds, but where it says a block is kept for the session.
+//
 // Base 38 (R16), the base pack: base 37's effects unit (base 35's with R13's list starts), edited in place, with hasis's open-field pull request 38 (made
 // on base 32's unit) and two mends of its review. The runs inside packs: op1f_rack_ready kept a record for every pack's
 // place and effect ever asked, 64 at most, and then answered "no room" (a link of a chain walked through the list used
@@ -374,9 +392,26 @@ enum { HEARD_TRIES = 4, WAIT_FRAMES = 128 };
 static u32 waiting;
 static u32 wait_type[PLACES], wait_from[PLACES], wait_frames[PLACES];
 
-enum { NONE = 0, CLEARING = 1, READY = 2, REFUSED = 3, WIPING = 4 };   // R16: WIPING, a run's kept memory cleared again for its new place
-struct Instance { int handle; void* volatile state; volatile u32 status; char whose[64]; };
+enum { NONE = 0, CLEARING = 1, READY = 2, REFUSED = 3, WIPING = 4, LEAVING = 5 };   // R16: WIPING, a run's kept memory cleared again for its new place
+// R23: LEAVING, an instance no place rides, whose block waits to be given back; `left_at` the audio thread's count of
+// blocks when it began to wait; `unreset` 1 while a block handed over anew waits for its effect's `reset`. `whose`, the
+// name on the memory unit's lines, holds 49 characters at most ("place 7 of '...'" with a name of 15 for a run): R23 took
+// eight of its 64 bytes for the two words, so that a run's record keeps its size.
+struct Instance { int handle; void* volatile state; volatile u32 status; char whose[56]; u32 left_at; volatile u32 unreset; };
+static_assert(sizeof(Instance) == 76, "an instance as big as base 44's");
 static Instance instances[EFFECTS][2];                 // an effect's working memory for the instrument, and for the master
+static_assert((u32)EFFECTS <= 32u, "a bit an effect in a word");
+// R23: every block the base may hold at once, what module/build_r5_base.h counts for OP1F_MEMORY_MORE: one an effect at
+// the instrument and at the master, one a run inside a pack, one an engine.
+static_assert(2u * (u32)EFFECTS + (u32)RACKS + (u32)OP1F_ENGINES_MOST <= (u32)OP1F_MEMORY_MORE, "the base's blocks held at once");
+
+// R23: the audio thread's count of blocks, the measuring unit's (module/build_r2_measure.cpp; module/m2_measure.s adds 1
+// to `count` once a block's work has returned). Weak: without it the effects' blocks are never given back.
+struct AudioCounters { u32 busy, count, peak; };
+extern "C" volatile AudioCounters op1f_audio OP1F_NAMED("op1f_audio") __attribute__((weak));
+// R23: the blocks an instance no place rides keeps its memory for, from its first frame unridden: about 1.5 s. A block
+// that read its state before has ended once the count moved by one; the rest is for a pick that comes straight back.
+static const u32 LINGER = 1024u;
 
 struct Wrap;
 static u32 wrapped_destroy(Wrap* self, u32 a, u32 b, u32 c);
@@ -669,7 +704,7 @@ static void* ready_state(u32 r, u32 index, const Wrap* w, u32 place, int* ok) {
     const Instance* in = &instances[r - 1u][index];
     if (in->status != (u32)READY) return 0;
     void* state = in->state;
-    if (e->table->reset != 0 && reset_seq[index] != w->seq) return 0;
+    if (e->table->reset != 0 && (reset_seq[index] != w->seq || in->unreset)) return 0;   // R23: unreset, a block handed over anew
     *ok = 1;
     return state;
 }
@@ -1637,10 +1672,20 @@ static void first_frame() {
     unit.countdown = PERIOD_FRAMES;
 }
 
-// An instance's working memory asked, or polled while it is cleared. Answers its status.
+// R23: an instance of the instrument's or the master's (not a run's, which op1f_rack_ready resets itself).
+static inline int of_a_place(const Instance* in) {
+    return in >= &instances[0][0] && in < &instances[0][0] + 2u * (u32)EFFECTS;
+}
+
+// An instance's working memory asked, or polled while it is cleared. Answers its status. R23: a block handed over anew
+// to an instance of a place is held back until its effect's `reset` has returned (`unreset`).
 static u32 make_ready(Instance* in, const Effect* e, const char* for_what) {
     if (in->status == (u32)READY || in->status == (u32)REFUSED) return in->status;
     if (in->status == (u32)WIPING) return CLEARING;                                 // R16: a run's kept memory, cleared again at the frames (rack_wipe)
+    if (in->status == (u32)LEAVING) {                                               // R23: ridden again before its block went back: as it was
+        in->status = READY;
+        return READY;
+    }
     if (e->state_bytes == 0) {
         in->state = 0;
         BARRIER();
@@ -1651,13 +1696,12 @@ static u32 make_ready(Instance* in, const Effect* e, const char* for_what) {
         u32 at = 0;
         for (const char* c = e->name; *c && at < 15u; ++c) in->whose[at++] = *c;
         for (const char* c = " for "; *c; ++c) in->whose[at++] = *c;
-        for (const char* c = for_what; *c && at < 63u; ++c) in->whose[at++] = *c;
+        for (const char* c = for_what; *c && at < 55u; ++c) in->whose[at++] = *c;
         in->whose[at] = 0;
         in->handle = op1f_memory_more(e->state_bytes, e->state_align, in->whose);
         if (in->handle <= 0) {
             in->status = REFUSED;
-            op1f_log(1, LOG_FILE, 9, "effect: '%s' has no room for %s: %s", e->name, for_what,
-                     in->handle == OP1F_TOO_LARGE ? "the packs would take more than 16 MiB" : "the heap has no such room, or less than 8 MiB would stay free");
+            op1f_log(1, LOG_FILE, 9, "effect: '%s' has no room for %s: %s", e->name, for_what, op1f_memory_refusal());   // R23: the memory unit's reason
             return REFUSED;
         }
         in->status = CLEARING;
@@ -1665,6 +1709,7 @@ static u32 make_ready(Instance* in, const Effect* e, const char* for_what) {
     void* block = op1f_memory_block(in->handle);
     if (block == 0) return CLEARING;
     in->state = block;
+    in->unreset = of_a_place(in) && e->table->reset != 0 ? 1u : 0u;                 // R23: held back until its `reset` has returned
     BARRIER();                                                                      // the state before the word that hands it over
     in->status = READY;
     op1f_log(3, LOG_FILE, 8, "effect: '%s' has %u bytes for %s at 0x%08x", e->name, e->state_bytes, for_what, (u32)block);
@@ -1812,22 +1857,25 @@ static u32 rack_spare(u32 effect) {
     return 0;
 }
 
+// R23: whether the memory a record keeps holds `e`'s: as big, on its alignment.
+static int rack_fits(const Rack* k, const Effect* e) {
+    return k->in.state != 0 && effects[k->effect].state_bytes >= e->state_bytes && ((u32)k->in.state & (e->state_align - 1u)) == 0;
+}
+
 // At 64 records: any spare record without memory, else a spare one whose memory fits `effect` (as big, on its
-// alignment: it is cleared again and kept, the review: no block left behind, since the heap gives nothing back), or 0,
-// "no room" as before base 38.
+// alignment: it is cleared again and kept, the review: no block left behind, since the heap gives nothing back), else
+// (R23) any spare one, whose block is given back and a new one asked; or 0, "no room" as before base 38.
 static u32 rack_spare_any(u32 effect) {
     for (u32 i = 0; i < rack_count; ++i) {
         u32 status = racks[i].in.status;
         if (rack_idle(i) && (status == (u32)NONE || status == (u32)REFUSED || effects[racks[i].effect].state_bytes == 0)) return i + 1u;
     }
     const Effect* e = &effects[effect];
-    if (e->state_bytes == 0) return 0;
-    for (u32 i = 0; i < rack_count; ++i) {
-        const Rack* k = &racks[i];
-        if (rack_idle(i) && k->in.status == (u32)READY && k->in.state != 0 && effects[k->effect].state_bytes >= e->state_bytes &&
-            ((u32)k->in.state & (e->state_align - 1u)) == 0)
-            return i + 1u;
-    }
+    if (e->state_bytes != 0)
+        for (u32 i = 0; i < rack_count; ++i)
+            if (rack_idle(i) && racks[i].in.status == (u32)READY && rack_fits(&racks[i], e)) return i + 1u;
+    for (u32 i = 0; i < rack_count; ++i)                                            // R23: any spare one: its block given back (rack_take)
+        if (rack_idle(i) && racks[i].in.status == (u32)READY) return i + 1u;
     return 0;
 }
 
@@ -1836,13 +1884,17 @@ static u32 rack_spare_any(u32 effect) {
 // op1f_rack_run OP1F_NOT_HERE, and no other place takes it); a record without memory asks its own as a new record does.
 // Its budget re-armed: no place runs it.
 static void rack_take(Rack* k, u32 slot, u32 which, u32 effect) {
-    if (k->in.status == (u32)READY && k->in.state != 0 && effects[effect].state_bytes != 0) {
+    if (k->in.status == (u32)READY && effects[effect].state_bytes != 0 && rack_fits(k, &effects[effect])) {
         k->wiped = 0;
         k->in.status = WIPING;
     } else {
+        int handle = k->in.handle;
+        u32 held = k->in.status == (u32)READY && k->in.state != 0 && handle > 0;
         k->in.status = NONE;
         k->in.state = 0;
         k->in.handle = 0;
+        BARRIER();
+        if (held) op1f_memory_less(handle, k->whose);                               // R23: given back (until base 44 it was left behind)
     }
     budget_rearm(&k->budget);
     k->slot = slot;
@@ -2102,6 +2154,50 @@ static EFFECTS_APART u32 lent_riding(const Effect* e) {
     return bits;
 }
 
+// R23: an instance's block given back to the memory unit; the instance asks anew at its next ride. Its status first: no
+// thread reads the block once it is not READY (the caller waited for the blocks that might have).
+static EFFECTS_APART void give_back(Instance* in) {
+    int handle = in->handle;
+    in->status = NONE;
+    in->state = 0;
+    in->handle = 0;
+    in->unreset = 0;
+    BARRIER();
+    op1f_memory_less(handle, in->whose);
+}
+
+// R23: the instances no place of their own rides (the instrument's: places 0 to 15; the master's: 16). Ridden: one
+// waiting to give its block back is READY again, its memory as it was. Not ridden: a READY one waits LINGER blocks of
+// the audio thread, then gives its block back; one being cleared gives it back now; a refusal ends, for another try at
+// the next ride. The display thread, after the rides are settled.
+static EFFECTS_APART void instances_leave() {
+    if (&op1f_audio == 0) return;                                                   // no count of blocks: kept as before
+    u32 rides[2] = {0, 0};                                                          // a bit an effect, the instrument's and the master's
+    for (u32 p = 0; p < (u32)PLACES; ++p) {
+        const Effect* e = riding(p);
+        if (e != 0) rides[p == (u32)MASTER ? 1u : 0u] |= 1u << e->number;
+    }
+    u32 now = op1f_audio.count;
+    u32 n = op1f_effects_registered;
+    for (u32 r = 0; r < n; ++r)
+        for (u32 index = 0; index < 2u; ++index) {
+            Instance* in = &instances[r][index];
+            u32 status = in->status;
+            if ((rides[index] >> r) & 1u) {
+                if (status == (u32)LEAVING) in->status = READY;
+                continue;
+            }
+            if (status == (u32)REFUSED) in->status = NONE;
+            else if (in->handle <= 0) continue;                                     // no block: never asked, or none needed
+            else if (status == (u32)CLEARING) give_back(in);                        // never handed to the audio thread
+            else if (status == (u32)READY) {
+                in->left_at = now;
+                BARRIER();
+                in->status = LEAVING;
+            } else if (status == (u32)LEAVING && now - in->left_at >= LINGER) give_back(in);
+        }
+}
+
 static void frame_work() {
     if (!unit.first_done) {
         unit.first_done = 1;
@@ -2197,16 +2293,20 @@ static void frame_work() {
     }
     for (u32 p = 0; p < (u32)PLACES; ++p)                                           // a member refused with OP1F_NOT_NOW, of a place that rides no more
         if (places[p].member_dirty && riding(p) == 0) write_member(p);
+    instances_leave();                                                              // R23
     for (u32 index = 0; index < 2u; ++index) {                                      // `reset` for a build that rides
         const Wrap* w = (const Wrap*)RD32(EFFECT_WORD + 4u * index);
         if (w != &wraps[index][0] && w != &wraps[index][1]) continue;
         u32 place = index ? (u32)MASTER : playing_place();
         u32 r = may_play(w, index, place);
-        if (r == 0 || reset_seq[index] == w->seq) continue;
+        if (r == 0) continue;
         const Effect* e = &effects[r - 1u];
-        const Instance* in = &instances[r - 1u][index];
+        Instance* in = &instances[r - 1u][index];
+        if (reset_seq[index] == w->seq && !in->unreset) continue;                   // R23: or a block handed over anew
         if (in->status != (u32)READY) continue;
         if (e->table->reset) call_reset(e, place, in->state);
+        BARRIER();                                                                  // R23: `reset` has returned before the word that lets the block play
+        in->unreset = 0;
         reset_seq[index] = w->seq;
     }
     u32 room = (u32)WIPE_A_FRAME >> 2;                                              // R16: words, for every run's memory together

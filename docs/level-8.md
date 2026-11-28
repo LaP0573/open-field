@@ -101,7 +101,7 @@ Your `process` gets the values in your own numbers, as the knobs, the LFOs and t
 | `playing` | Not 0 while the tape plays |
 | `state` | Your working memory for this place, or 0 when you asked none |
 
-The block lives for the call only. Never keep it, or the buffers' addresses.
+The block lives for the call only. Never keep it, or the buffers' addresses, or `state`: your memory is yours while the base hands it to you, in `process` and in `reset`. From base 45 it goes to another effect once nothing plays yours there.
 
 **The rules on the audio thread are level 6's, whole.** Nothing allocated, no file, no waiting, no line in the log, nothing of the firmware's. No division by a number that isn't a power of two, no 64-bit multiply, no floating point. **Hold every sum at full scale.** At most 1 KiB of stack (`OP1F_STAGE_STACK_MOST`), so a delay line lives in your working memory, never in a local. Of the base's helpers, `process` may call `op1f_memory`, `op1f_stage`, `op1f_mask`, `op1f_unmask` and `op1f_rack_run`. Count what you want to say and say it from your frame function.
 
@@ -143,10 +143,12 @@ static inline int add_held(int a, int b) {
 
 `state_bytes` is the memory one place needs, up to 8 MiB (`OP1F_EFFECT_STATE_MOST`). You don't ask it with a separate ask. The base takes it for you, from level 6's working memory and inside its limits (from base 41 the spare memory first, then up to 16 MiB of the unit's heap with 8 MiB kept free; before base 41, 16 MiB for every pack's asks together, 8 MiB kept free for the unit):
 
-- **One block for the sound that plays** (every synth and drum sound shares it, since only one plays at a time), and **one for the master**, each the first time your effect plays there.
+- **One block for the sound that plays** (every synth and drum sound shares it, since only one plays at a time), and **one for the master**, each the first time your effect plays there, and again after it was given back (below).
 - **One for each place another pack runs your effect at** (below), the first time it asks. Once no place runs it any more, the base may hand it on to the next place that asks for your effect, cleared to 0 again first.
 
-Each is cleared to 0 over the frames after it's taken, a quarter of a megabyte a frame, and the place passes the sound dry until it's handed over. It's never given back. **When it's refused**, the log says why, that place passes the sound dry, and your page says `no room`. `state` is 0 when you asked none.
+Each is cleared to 0 over the frames after it's taken, a quarter of a megabyte a frame, and the place passes the sound dry until it's handed over. **When it's refused**, the log says why, that place passes the sound dry, and your page says `no room`. `state` is 0 when you asked none.
+
+**From base 45 a block is given back** once nothing rides your effect there: the sound's block once no synth or drum sound rides it, the master's once the master rides another effect, and a run's when another effect takes the run over and the memory does not fit it (a run's memory that fits is handed on, cleared again, as before). The base waits about a second and a half first (1,024 blocks of the sound), so a pick that comes straight back finds your memory as it was. After that, the next ride takes a block anew: cleared to 0, and `reset` is called before its first block, as at the first ride. So the unit's lists can be browsed for as long as the owner likes: the effects the cursor passed over give their memory back. A refusal holds until nothing rides your effect there; the next ride asks again. Before base 45 a block was kept to the end of the session, and the base had 16 of them for every pack's effects and engines together.
 
 ## Starting anew: `fresh` and `reset`
 
@@ -305,7 +307,9 @@ Places are said as `synth 1` to `synth 8`, `drum 1` to `drum 8` and `the master`
 | `effect: <place> rides nothing now: ...` | It isn't there any more: another effect was picked, a sound without it was loaded, or the unit put another effect there |
 | `effect: <place> rides '<name>', whose pack is not here: ...` | A sound or the master saved with an effect whose pack is away: it plays dry |
 | `effect: '<name>' has <bytes> bytes for <place> at ...` | Your working memory for that place |
-| `effect: '<name>' has no room for <place>: ...` | Why not |
+| `effect: '<name>' has no room for <place>: ...` | Why not: the reason of the memory unit's line before it |
+| `memory: <name> for <place> is given <bytes> bytes at ...` | The block for that place, new; `... again, a block of <n> bytes given back` when it is one given back before (base 45) |
+| `memory: <name> for <place> gives back <bytes> bytes at ...` | Nothing rides your effect there any more (base 45) |
 | `effect: '<name>' this period: ...` | Through the base's quiet gate: calls, the most cycles, the average, and calls over what you declared |
 | `effect: '<name>' at <place> is switched off until ...: ...` | The call that went too far, or how many went over in one second, against what you declared. Until `an effect is picked there again` at a sound or the master, `it is picked there again` at another pack's place |
 | `effect: '<name>' value <n> '<value>' stands at <v>: the knob row of <effect> has no span` | A knob of the effect yours stands on doesn't move, so that value stays at its `start` |
