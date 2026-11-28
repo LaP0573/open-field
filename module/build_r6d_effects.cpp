@@ -156,7 +156,7 @@ enum { OP1F_EFFECT_LAYER = 4, OP1F_ASK_LFO = 11, OP1F_LAYER_PAGE_UNIT = 0, OP1F_
 // R22 (base 44): the words of base 44's part "hosted pages" this unit uses.
 #ifndef OP1F_BUILD_R6E_CARD_H
 enum : unsigned { OP1F_PLACE_NONE = 0xffffffffu };
-enum { OP1F_HOSTED_KEPT_MOST = 44, OP1F_HOSTED_PAGE_UP = 256, OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1,
+enum { OP1F_HOSTED_KEPT_MOST = 44, OP1F_HOSTED_PAGE_UP = 256, OP1F_HOSTED_PAGE_READY = 512, OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_WAGONS = 1,
        OP1F_KEEP_HOSTED = 16 };
 #endif
 
@@ -2967,6 +2967,13 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
     return (int)n;
 }
 
+// OP1F_HOSTED_PAGE_READY while the hosted page stands at `place` now, on top or under another page: stand()'s test with
+// the screen asked (page_over, the screen of the type the place holds asked there).
+static u32 page_ready(const Effect* l, u32 place) {
+    u32 type = place_type(place);
+    return type < (u32)STOCK_COUNT && stock_screens[type] != 0 && op1f_screen_asked == stock_screens[type] && page_over(l, place) ? (u32)OP1F_HOSTED_PAGE_READY : 0u;
+}
+
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) {
     int slot = slot_of(card);
     if (slot < 0) return OP1F_BAD_NAME;
@@ -2991,7 +2998,7 @@ extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which
         page.changed = 0;
         for (u32 i = 0; i < 4u; ++i) page.words[i] = (u32)words[i];
         page.asked = unit.frames;
-        return page.up ? (int)OP1F_HOSTED_PAGE_UP : 0;
+        return (int)((page.up ? (u32)OP1F_HOSTED_PAGE_UP : 0u) | page_ready(l, place));
     }
     page_move();
     u32 changed = page.changed;
@@ -3001,7 +3008,7 @@ extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which
     }
     page.changed = 0;
     page.asked = unit.frames;
-    return (int)(changed | (page.up ? (u32)OP1F_HOSTED_PAGE_UP : 0u));
+    return (int)(changed | (page.up ? (u32)OP1F_HOSTED_PAGE_UP : 0u) | page_ready(l, place));
 }
 
 extern "C" int op1f_effects_hosted(unsigned place, Op1fStanding* out) {

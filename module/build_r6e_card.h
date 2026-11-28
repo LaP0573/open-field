@@ -2127,7 +2127,10 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 // card: "Declared or not", below), OP1F_BAD_NAME (no such layer of the card, `which`, or `words` 0), OP1F_NOT_NOW (not
 // from the pack's frame function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
 // move the unit's effect under the layer): a turn moves the instance's word, a click or a press is dropped.
-enum { OP1F_HOSTED_PAGE_UP = 256 };
+// OP1F_HOSTED_PAGE_READY comes with the mask while the page stands now at the place on the screen (its type's screen
+// asked there), up or lying under another page of the host's: a host that draws its own page over the unit's closes
+// that page then, and the page comes up (a base before this bit never sets it).
+enum { OP1F_HOSTED_PAGE_UP = 256, OP1F_HOSTED_PAGE_READY = 512 };
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
 
 // For an effect's pack: the declaration of wagons. An effect knows wagons when its table is OP1F_EFFECT_HOSTED_BYTES
@@ -2152,7 +2155,7 @@ enum { OP1F_EFFECT_HOSTED_AT = 184, OP1F_EFFECT_HOSTED_BYTES = 188, OP1F_HOSTED_
 //   - Not declared (every effect pack written before base 44): the fallback, only meant for packs written before base
 //     44. Do not rely on it in new work: it will eventually be deprecated or removed, and a pack that relies on it then
 //     loses its page on wagons, nothing worse. While the place a host lent the instance (op1f_rack_place) rides a layer
-//     of the host's own card (checked at each use: never the master under such a train, and a pick of another effect
+//     of the host's own card (checked at each use, for a sound's place or the master's alike; a pick of another effect
 //     there ends it), the base answers the effect's pack as if that place rode the effect: `process` and `reset` get the
 //     place (not OP1F_PLACE_HOSTED + which; when the ride begins or ends, `reset` is told the new place before the next
 //     `process` there, and `fresh` comes with that block); op1f_riding has its bit for as long as the wagon is lent;
