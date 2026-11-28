@@ -45,7 +45,7 @@ A check that runs before every commit refuses a file that holds bytes of the fir
 **To write a feature of your own**
 
 1. [A first pack](docs/first-pack.md): build a small example, put it on your unit, read its lines in the log, change it.
-2. [The base](docs/base.md): what it offers a pack, level by level. A call every frame and pictures, a page with keys and knobs, folders and files and text, painting and pages that stack, a sequencer of your own, a place in the sound and working memory, values kept in tapes and sounds, an effect of your own, a synth engine of your own, the value as the sound plays it, a page that holds its picture, and rows of your own in the unit's lists of effects and LFOs. And what it does not offer yet.
+2. [The base](docs/base.md): what it offers a pack, level by level. A call every frame and pictures, a page with keys and knobs, folders and files and text, painting and pages that stack, a sequencer of your own, a place in the sound and working memory, values kept in tapes and sounds, an effect of your own, a synth engine of your own, the value as the sound plays it, a page that holds its picture, and rows of your own in the unit's lists of effects and LFOs, and an LFO's wave. And what it does not offer yet.
 3. [Packs](docs/packs.md): what a pack file is, and what the loader does with it at every start.
 4. [Methods](docs/methods.md): how to find, check and use a place in your own firmware, for a feature that has to stand in it.
 5. [The firmware's functions our code uses](docs/firmware-interfaces.md): what each takes and gives back.

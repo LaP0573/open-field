@@ -13,6 +13,10 @@
 //   a sound loaded onto a slot: its member is read once the slot's build has come (while `settling` holds it), so that
 //       a ride is never let go on the type word of the sound that was there before (base 29's review, F-1)
 //   the lines count synth sounds from 1, as every other unit and the checklists do (base 29's review, F-2)
+// Base 45 (R24): an LFO layer's wave (module/build_r11_lfos.cpp) may move a pack engine's values for one block.
+// op1f_engines_wave_in hands the wave a synth slot's values, op1f_engines_wave_out keeps what it added to each, and
+// the next block's render adds that, held to the engine's range: a move plays one block late, and level 10's heard
+// values are the moved ones. With no wave registered the render tests one word and does as base 44's.
 // What base 29's unit said follows and holds.
 //
 // Step R6, the base pack of level 9: synth engines (OS 1.7.0+0). A unit of its own, new at R6.
@@ -246,6 +250,27 @@ struct Heard {
     volatile int values[VALUES];
 };
 static Heard heard[SLOTS];
+
+// R24 (base 45): a wave's move of a synth slot's values (an LFO layer's wave, module/build_r11_lfos.cpp). The audio
+// thread's alone. `wave_in` holds the values the slot's last render worked out before any move, `wave_in_tick` the
+// synth's block it was in + 1 (0: none yet). `wave_handed` is what op1f_engines_wave_in handed the wave, `wave_count`
+// how many, `wave_handed_ride` the ride they are of. op1f_engines_wave_out keeps what the wave added to each value as
+// `wave_offset` (the difference as an unsigned word, 0 for a value left as handed; bit i of `wave_down` set when it
+// takes away), `wave_ride` the ride it moved, `wave_moved` the tick + 1 of the render the wave followed. The next
+// render adds the offsets when its tick is that one, while the slot rides that ride: a wave not called is dropped at
+// once. Keyed on renders, not on the call's tick, so the move holds whether the wave is called before or after the
+// block is counted (with fx train its wagon may run after the stage stub).
+static int wave_in[SLOTS][VALUES];
+static u32 wave_in_tick[SLOTS];
+static int wave_handed[SLOTS][VALUES];
+static u32 wave_count[SLOTS], wave_handed_ride[SLOTS];
+static u32 wave_offset[SLOTS][VALUES];
+static u32 wave_down[SLOTS], wave_ride[SLOTS], wave_moved[SLOTS];
+
+// The waves registered, 0 where the LFO unit or the effects unit's block count is not linked.
+static inline u32 waves() {
+    return &op1f_lfos_waves != 0 && &op1f_effects_wave_ticks != 0 ? op1f_lfos_waves : 0;
+}
 
 // ---- from the cards unit ----
 
@@ -497,6 +522,25 @@ static void silence(int* out, u32 words) {
     for (u32 k = 0; k < words; ++k) out[k] = 0;
 }
 
+// R24 (base 45), the audio thread, while waves are registered: the render's values as base 44 works them out, kept
+// unmoved for op1f_engines_wave_in, then the last block's move added, held to the engine's range.
+static void wave_render(const Engine* e, u32 slot, u32 ride, const u32* words, int* values) {
+    u32 tick = op1f_effects_wave_ticks[0];
+    u32 moved = wave_moved[slot] != 0 && wave_moved[slot] == tick && wave_ride[slot] == ride;
+    u32 down = wave_down[slot];
+    for (u32 i = 0; i < e->count; ++i) {
+        int v = value_of(e, i, words[i]);
+        wave_in[slot][i] = v;
+        u32 o = wave_offset[slot][i];
+        if (moved && o != 0 && v >= e->low[i] && v <= e->high[i]) {
+            if (down & (1u << i)) v = (u32)v - (u32)e->low[i] < 0u - o ? e->low[i] : (int)((u32)v + o);
+            else v = (u32)e->high[i] - (u32)v < o ? e->high[i] : (int)((u32)v + o);
+        }
+        values[i] = v;
+    }
+    wave_in_tick[slot] = tick + 1u;
+}
+
 // +0x8, the audio thread: (the object, the voice's out, the eight knob words of the block, the LFOs applied).
 static u32 voice_render(Voice* self, int* out, const u32* words) {
     u32 slot = self->slot & 7u;
@@ -513,10 +557,15 @@ static u32 voice_render(Voice* self, int* out, const u32* words) {
     u32 seq = h->seq + 1u;
     h->seq = seq;                                                                   // odd: being written
     h->ride = ride;
-    for (u32 i = 0; i < e->count; ++i) {
-        int v = value_of(e, i, words[i]);
-        values[i] = v;
-        h->values[i] = v;
+    if (waves() != 0) {                                                             // R24 (base 45): the last block's move
+        wave_render(e, slot, ride, words, values);
+        for (u32 i = 0; i < e->count; ++i) h->values[i] = values[i];
+    } else {
+        for (u32 i = 0; i < e->count; ++i) {
+            int v = value_of(e, i, words[i]);
+            values[i] = v;
+            h->values[i] = v;
+        }
     }
     h->stamp = cycles_now();
     h->live = 1;
@@ -549,6 +598,55 @@ static u32 voice_render(Voice* self, int* out, const u32* words) {
     e->table->render(&block);
     account(e, began, cycles_now() - began);
     return 0;
+}
+
+// R24 (base 45), the audio thread, from the LFO unit's op1f_lfos_wave_run: a synth slot's engine part of a wave's
+// block. Handed only when the slot rides a registered engine that is not switched off and has its memory: its count,
+// its ranges, and its values as this block's render worked them out, or, with no render yet this block, as the slot's
+// knob words give them. Else the count is 0. The unit's own engines and the envelope are never handed.
+extern "C" void op1f_engines_wave_in(unsigned slot, Op1fWaveBlock* b) {
+    if (slot >= (u32)SLOTS) {
+        b->engine_count = 0;
+        return;
+    }
+    u32 ride = rides[slot];
+    const Engine* e = engine_of_ride(ride);
+    if (e == 0 || e->budget.off || e->memory != (u32)READY) {
+        wave_count[slot] = 0;
+        b->engine_count = 0;
+        return;
+    }
+    u32 n = e->count > (u32)VALUES ? (u32)VALUES : e->count;
+    u32 rendered = wave_in_tick[slot] == b->blocks + 1u && heard[slot].ride == ride;
+    for (u32 i = 0; i < n; ++i) {
+        int v = rendered ? wave_in[slot][i] : value_of(e, i, RD32(slot_words(slot) + 4u * i));
+        wave_handed[slot][i] = v;
+        b->engine_values[i] = v;
+        b->engine_low[i] = e->low[i];
+        b->engine_high[i] = e->high[i];
+    }
+    wave_count[slot] = n;
+    wave_handed_ride[slot] = ride;
+    b->engine_count = n;
+}
+
+// R24 (base 45), the audio thread, after the wave: what it added to each value handed, for the next block's render.
+// A value left as handed adds 0.
+extern "C" void op1f_engines_wave_out(unsigned slot, const Op1fWaveBlock* b) {
+    if (slot >= (u32)SLOTS) return;
+    u32 n = wave_count[slot], down = 0;
+    for (u32 i = 0; i < (u32)VALUES; ++i) {
+        u32 o = 0;
+        if (i < n) {
+            int was = wave_handed[slot][i], now = b->engine_values[i];
+            o = (u32)now - (u32)was;
+            if (now < was) down |= 1u << i;
+        }
+        wave_offset[slot][i] = o;
+    }
+    wave_down[slot] = down;
+    wave_ride[slot] = n != 0 ? wave_handed_ride[slot] : 0u;
+    wave_moved[slot] = wave_in_tick[slot];                                          // the render this call followed
 }
 
 // +0xc and +0x14: a note begins or is let go on the voice (the note's thread, or the audio thread inside its block).

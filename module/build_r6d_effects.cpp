@@ -1,4 +1,14 @@
 // Made for OS 1.7.3 from this source's OS 1.7.0 form; every address the code uses is 1.7.3's; an address in a comment that the code does not use may still be 1.7.0's.
+// Base 45 (R24), the base pack: base 44's effects unit, edited in place, with an LFO layer's wave (module/build_r6e_card.h,
+// "Base 45"). The LFO unit holds the waves; this unit calls a place's wave once a block, before the place's effect plays
+// that block, at one of two points: the wrapping object's `process` (index 0, the effect on), else op1f_effects_after at
+// the instrument (the effect off, or an object made before the waves), which also counts the instrument's blocks
+// (op1f_effects_wave_ticks). Objects are wrapped once a wave is registered, with no effect of a pack too. The wave is
+// handed the effect's four values: a pack's effect in its own numbers and ranges, the unit's own effect (alone or under
+// an effect layer) as the knob words' upper halves and the knob rows' ranges, read at the first frame. A moved value
+// lasts the block: a pack's effect is called with it, the unit's own object with a copy of the eight words in which only
+// a moved knob's word is new. No stored word is written. With no wave registered every word, call and line is base 44's.
+//
 // Base 38 (R16), the base pack: base 37's effects unit (base 35's with R13's list starts), edited in place, with hasis's open-field pull request 38 (made
 // on base 32's unit) and two mends of its review. The runs inside packs: op1f_rack_ready kept a record for every pack's
 // place and effect ever asked, 64 at most, and then answered "no room" (a link of a chain walked through the list used
@@ -687,14 +697,172 @@ static EFFECTS_APART void layer_run(u32 r, u32 index, const Wrap* w, u32 place, 
     run(e, place, left, right, 0, on, fresh, state, &places[place].budget);
 }
 
+// ---------------------------------------------------------------- R24 (base 45): a wave's block, on the audio thread
+
+// A wave is called once an instrument's block, at the wrap's `process` (the effect on) or at op1f_effects_after (where
+// the wrap did not call it): `wave_done` holds the tick + 1 of the block whose wave was called, a host's. The ticks
+// count the blocks where the effect stage ends (op1f_effects_after); the engines unit reads the synth's. Should a wrap
+// run after the stage stub in its block (fx train's chain, a unit question), it reads the next tick: one call a block
+// all the same, but in a block where the effect is switched on the wave is called twice, at the stub and at the wrap.
+volatile unsigned op1f_effects_wave_ticks[2];
+static u32 wave_done[2];
+static u32 wave_words[8];                              // the unit's effect's eight words for one call, a moved knob's rewritten
+
+// The first four knob rows of the eleven types, read at the first frame a wave is registered (wave_frame): the display
+// thread writes them, then `wave_rows_ready`; the audio thread reads them only after it. A type is in order when each
+// of its four rows' lowest is below its highest. The audio thread sets `wave_rows_bad` and `wave_early` to 1 (a place
+// + 1), the display thread says each once; neither is cleared.
+static int wave_low[STOCK_COUNT][4], wave_high[STOCK_COUNT][4];
+static u8 wave_type_ok[STOCK_COUNT];
+static volatile u32 wave_rows_ready;
+static volatile u8 wave_rows_bad[STOCK_COUNT];
+static volatile u32 wave_early;                        // a place that rides a wave whose effect object is not wrapped
+static u32 wave_bad_said, wave_early_said;             // the display thread's
+
+// `wave_early` is set only after a second of the instrument's blocks in a row in which a place rides a wave, its effect
+// is on and no wrap stands at the effect word. While the unit changes a place's effect object (another effect put on,
+// a sound loaded), the test holds for a block or so with a wrap before and after: the unit showed it on 2026-11-27, and
+// the line was false. `wave_early_blocks` counts such blocks of a host, `wave_early_at` the place + 1 they are of; a
+// block with a wrap, with the effect off, of a place with no wave, or of another place starts the count anew. The
+// audio thread's alone. A second is 689 blocks of 64 frames, as the unit counted them.
+enum { WAVE_EARLY_BLOCKS = 689 };
+static u32 wave_early_blocks[2], wave_early_at[2];
+
+// The waves registered by the LFO unit, 0 when it is away (a weak name).
+static inline u32 waves() {
+    return &op1f_lfos_waves != 0 ? op1f_lfos_waves : 0u;
+}
+
+// A block with no values: the place, the clock, the tick.
+static void wave_fill(Op1fWaveBlock* b, u32 place, u32 on, u32 tick) {
+    b->bytes = OP1F_WAVE_BYTES;
+    b->place = place;
+    b->frames = FRAMES;
+    b->period = RD32(PERIOD);
+    b->playing = RD32(TRANSPORT) != 0 ? 1u : 0u;
+    b->fresh = 0;
+    b->blocks = tick;
+    b->on = on;
+    b->effect_count = 0;
+    b->engine_count = 0;
+    for (u32 i = 0; i < 4u; ++i) {
+        b->effect_values[i] = 0;
+        b->effect_low[i] = 0;
+        b->effect_high[i] = 0;
+    }
+    for (u32 i = 0; i < 8u; ++i) {
+        b->engine_values[i] = 0;
+        b->engine_low[i] = 0;
+        b->engine_high[i] = 0;
+    }
+}
+
+// The effect part of a pack's effect: its values from the knob words, its own ranges.
+static void wave_pack(Op1fWaveBlock* b, const Effect* e, const u32* words) {
+    b->effect_count = e->count;
+    for (u32 i = 0; i < e->count; ++i) {
+        b->effect_values[i] = value_of(e, i, words[i]);
+        b->effect_low[i] = e->low[i];
+        b->effect_high[i] = e->high[i];
+    }
+}
+
+// The effect part of the unit's own effect of `type`: the words' upper halves, held to the knob rows. None before the
+// rows are read, for a type the unit does not name, or one whose rows are not in order (marked for the frame's line).
+static void wave_unit(Op1fWaveBlock* b, u32 type, const u32* words) {
+    if (wave_rows_ready == 0 || type >= (u32)STOCK_COUNT) return;
+    BARRIER();                                                                      // the rows are read after the word
+    if (!wave_type_ok[type]) {
+        wave_rows_bad[type] = 1;
+        return;
+    }
+    b->effect_count = 4;
+    for (u32 i = 0; i < 4u; ++i) {
+        int low = wave_low[type][i], high = wave_high[type][i];
+        int v = low < 0 ? ((int)words[i] >> 16) : (int)(words[i] >> 16);
+        b->effect_values[i] = v < low ? low : v > high ? high : v;
+        b->effect_low[i] = low;
+        b->effect_high[i] = high;
+    }
+}
+
+// The copy of the eight words the unit's object is handed: a knob whose value the wave moved becomes the value shifted
+// left by sixteen; every other word is as it came, all 32 bits.
+static void wave_rewrite(const Op1fWaveBlock* b, const u32* words, const int* handed) {
+    for (u32 i = 0; i < 8u; ++i) wave_words[i] = words[i];
+    for (u32 i = 0; i < b->effect_count && i < 4u; ++i)
+        if (b->effect_values[i] != handed[i]) wave_words[i] = (u32)b->effect_values[i] << 16;
+}
+
+// At the wrap (index 0, the place's effect on): the place's wave, unless it was called this block. 1 when it was: a
+// pack's effect's values are then in `values` (r names it), else the unit's object's words in `wave_words`.
+static EFFECTS_APART u32 wave_wrap(const Wrap* self, u32 place, u32 r, const u32* words, int* values) {
+    u32 host = place < (u32)DRUM ? 0u : 1u;
+    u32 tick = op1f_effects_wave_ticks[host];
+    if (op1f_lfos_wave_ride[place] == 0 || wave_done[host] == tick + 1u) return 0;
+    const Effect* e = r != 0 && !is_layer(&effects[r - 1u]) ? &effects[r - 1u] : 0;
+    Op1fWaveBlock b;
+    wave_fill(&b, place, 1u, tick);
+    if (e != 0) wave_pack(&b, e, words);
+    else wave_unit(&b, self->type, words);
+    int handed[4];
+    for (u32 i = 0; i < 4u; ++i) handed[i] = b.effect_values[i];
+    if (op1f_lfos_wave_run(&b) == 0) return 0;
+    wave_done[host] = tick + 1u;
+    if (e != 0)
+        for (u32 i = 0; i < e->count; ++i) values[i] = b.effect_values[i];
+    else wave_rewrite(&b, words, handed);
+    return 1;
+}
+
+// After the effect (host 0 or 1): the place's wave where the wrap did not call it this block, then the block counted.
+// The effect off: the effect part from the words the block handed (the object `w`'s type, or the type word with no
+// wrap). The effect on all the same: it has played, no effect part; with no wrap for a second of blocks in a row the
+// frame says why (wave_frame). Answers 1 when a pack's effect's values are in `values`, for its tails.
+static EFFECTS_APART u32 wave_after(u32 host, u32 place, const Wrap* w, int* values) {
+    u32 tick = op1f_effects_wave_ticks[host];
+    u32 moved = 0;
+    if (op1f_lfos_wave_ride[place] != 0 && w == 0 && place_on(place)) {              // the count for `wave_early`
+        u32 n = wave_early_at[host] == place + 1u ? wave_early_blocks[host] : 0u;
+        if (n < (u32)WAVE_EARLY_BLOCKS) ++n;
+        if (n == (u32)WAVE_EARLY_BLOCKS && wave_early == 0) wave_early = place + 1u;
+        wave_early_blocks[host] = n;
+        wave_early_at[host] = place + 1u;
+    } else {
+        wave_early_blocks[host] = 0;
+    }
+    if (op1f_lfos_wave_ride[place] != 0 && wave_done[host] != tick + 1u) {
+        u32 on = place_on(place) ? 1u : 0u;
+        const Effect* e = 0;
+        Op1fWaveBlock b;
+        wave_fill(&b, place, on, tick);
+        if (on == 0) {
+            u32 words[4];
+            for (u32 i = 0; i < 4u; ++i) words[i] = RD32(STOCK_CTX + 4u * i);
+            u32 r = w != 0 ? may_play(w, 0, place) : 0u;
+            if (r != 0 && !is_layer(&effects[r - 1u])) e = &effects[r - 1u];
+            if (e != 0) wave_pack(&b, e, words);
+            else wave_unit(&b, w != 0 ? w->type : place_type(place), words);
+        }
+        if (op1f_lfos_wave_run(&b) != 0 && e != 0) {
+            for (u32 i = 0; i < e->count; ++i) values[i] = b.effect_values[i];
+            moved = 1;
+        }
+    }
+    op1f_effects_wave_ticks[host] = tick + 1u;
+    return moved;
+}
+
 static u32 wrapped_process(Wrap* self, int* left, int* right, const u32* words) {
     u32 index = self->index;
     u32 place = index ? (u32)MASTER : playing_place();
     u32 r = may_play(self, index, place);
+    int values[VALUES];
+    u32 moved = index == 0 && waves() != 0 ? wave_wrap(self, place, r, words, values) : 0u;   // R24: the place's wave, once a block
     if (r == 0 || (effects[r - 1u].flags & (u32)OP1F_EFFECT_LAYER) != 0) {         // R11: a layer: the unit's effect, then the layer
         void* inner = self->inner;
         ObjectFn fn = (ObjectFn)(*(const void* const* const*)inner)[2];
-        u32 answer = fn(inner, (u32)left, (u32)right, (u32)words);
+        u32 answer = fn(inner, (u32)left, (u32)right, (u32)(moved ? wave_words : words));   // R24: the copy, its moved knobs rewritten
         if (r != 0) layer_run(r, index, self, place, left, right, 1u);
         return answer;
     }
@@ -702,8 +870,8 @@ static u32 wrapped_process(Wrap* self, int* left, int* right, const u32* words) 
     void* state = ready_state(r, index, self, place, &ok);
     if (!ok) return 0;                                                              // the place passes the sound dry
     Effect* e = &effects[r - 1u];
-    int values[VALUES];
-    for (u32 i = 0; i < e->count; ++i) values[i] = value_of(e, i, words[i]);
+    if (!moved)                                                                     // R24: else the wave's values
+        for (u32 i = 0; i < e->count; ++i) values[i] = value_of(e, i, words[i]);
     heard_keep(place, e, values);                                                   // R6d
     u32 fresh = self->fresh;
     self->fresh = 0;
@@ -722,14 +890,18 @@ static u32 wrapped_delete(Wrap* self, u32 a, u32 b, u32 c) { return forward(self
 static u32 wrapped_init(Wrap* self, u32 a, u32 b, u32 c) { return forward(self, 3, a, b, c); }
 
 // After the effect at S1, S2 (OP1F_AT_INSTRUMENT, host 0 the synth, 1 the drum) and S4 (OP1F_AT_MASTER_OUT, host 2):
-// an effect that keeps its tails, at the place that plays, while that place's effect is switched off.
+// an effect that keeps its tails, at the place that plays, while that place's effect is switched off. R24: at S1 and
+// S2, first the place's wave where the wrap did not call it this block, and the instrument's block counted.
 extern "C" void op1f_effects_after(unsigned point, unsigned host, int* left, int* right) {
-    if (op1f_effects_registered == 0 || host > 2u) return;
+    if ((op1f_effects_registered == 0 && waves() == 0) || host > 2u) return;     // R24: or a wave
     if (host == 2u ? point != (u32)OP1F_AT_MASTER_OUT : point != (u32)OP1F_AT_INSTRUMENT) return;
     u32 index = host == 2u ? 1u : 0u;
     u32 place = host == 2u ? (u32)MASTER : host == 0u ? (RD32(SYNTH_BUILT) & 7u) : (u32)DRUM + (RD32(DRUM_BUILT) & 7u);
     const Wrap* w = (const Wrap*)RD32(EFFECT_WORD + 4u * index);
-    if (w != &wraps[index][0] && w != &wraps[index][1]) return;
+    int wrapped = w == &wraps[index][0] || w == &wraps[index][1];
+    int values[VALUES];
+    u32 moved = index == 0 && waves() != 0 ? wave_after(host, place, wrapped ? w : 0, values) : 0u;   // R24
+    if (!wrapped) return;
     u32 r = may_play(w, index, place);
     if (r == 0) return;
     Effect* e = &effects[r - 1u];
@@ -742,8 +914,8 @@ extern "C" void op1f_effects_after(unsigned point, unsigned host, int* left, int
     void* state = ready_state(r, index, w, place, &ok);
     if (!ok) return;
     u32 words = index ? (u32)MASTER_WORDS : (u32)STOCK_CTX;
-    int values[VALUES];
-    for (u32 i = 0; i < e->count; ++i) values[i] = value_of(e, i, RD32(words + 4u * i));
+    if (!moved)                                                                     // R24: else the wave's values
+        for (u32 i = 0; i < e->count; ++i) values[i] = value_of(e, i, RD32(words + 4u * i));
     heard_keep(place, e, values);                                                   // R6d
     u32 fresh = w->fresh;
     ((Wrap*)w)->fresh = 0;
@@ -755,7 +927,7 @@ extern "C" void op1f_effects_after(unsigned point, unsigned host, int* left, int
 extern "C" void* op1f_fx_make(unsigned type, unsigned index) OP1F_NAMED("op1f_fx_make");
 extern "C" void* op1f_fx_make(unsigned type, unsigned index) {
     void* object = STOCK_FACTORY(type, index);
-    if (object == 0 || index > 1u || op1f_effects_registered == 0) return object;
+    if (object == 0 || index > 1u || (op1f_effects_registered == 0 && waves() == 0)) return object;   // R24: or a wave
     u32 mask;
     MASK_OFF(mask);
     Wrap* w = &wraps[index][wrap_next[index] & 1u];                                 // the other one may still be in a block
@@ -2597,7 +2769,43 @@ extern "C" int op1f_rack_run(const Op1fCard* card, unsigned which, const Op1fRac
 
 // ---------------------------------------------------------------- R11: layers' helpers and the frame's end
 
+// R24: once a wave is registered, the knob rows read once, and the lines the audio thread marked, each said once. First
+// in the frame, so that frame_work's return with no effect of a pack does not pass it by.
+static void wave_frame() {
+    if (waves() == 0) return;
+    if (wave_rows_ready == 0) {
+        for (u32 t = 0; t < (u32)STOCK_COUNT; ++t) {
+            u32 ok = 1;
+            for (u32 i = 0; i < 4u; ++i) {                                          // as map_all reads them
+                u32 row = KNOB_ROWS + (u32)ROW_BYTES * t + (u32)KNOB_BYTES * i;
+                wave_low[t][i] = (int)(short)RD16(row);
+                wave_high[t][i] = (int)RD16(row + 2u);
+                if (wave_low[t][i] >= wave_high[t][i]) ok = 0;
+            }
+            wave_type_ok[t] = (u8)ok;
+        }
+        BARRIER();                                                                  // the rows whole before the word that says so
+        wave_rows_ready = 1;
+    }
+    for (u32 t = 0; t < (u32)STOCK_COUNT; ++t) {
+        if (wave_rows_bad[t] == 0 || (wave_bad_said & (1u << t)) != 0) continue;
+        wave_bad_said |= 1u << t;
+        const int* lo = wave_low[t];
+        const int* hi = wave_high[t];
+        op1f_log(2, LOG_FILE, 14, "effect: a wave is handed no knob of %s: its knob rows are not in order (%d..%d, %d..%d, %d..%d, %d..%d)", STOCK_NAMES[t],
+                 lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], lo[3], hi[3]);
+    }
+    u32 early = wave_early;
+    if (early != 0 && !wave_early_said) {
+        wave_early_said = 1;
+        char words[12];
+        op1f_log(2, LOG_FILE, 15, "effect: a wave rides %s, whose effect was made before the waves: its knobs are out of reach until it is made anew",
+                 place_words_for_log(early - 1u, words));
+    }
+}
+
 extern "C" void op1f_effects_frame() {
+    wave_frame();                                                                   // R24
     frame_work();
     if (&op1f_lfos_frame != 0) op1f_lfos_frame();                                   // R11: the LFO unit's, when it is linked
 }

@@ -73,5 +73,51 @@ extern "C" int op1f_effects_hosted_turn(unsigned knob, int turn) OP1F_NAMED("op1
 // are the two helpers', OP1F_BAD_NAME for no instance `which` of a declared effect of the card. The display thread.
 extern "C" int op1f_effects_hosted_get(const Op1fCard* card, unsigned which, const char* key, char* out, unsigned room) OP1F_NAMED("op1f_effects_hosted_get");
 extern "C" int op1f_effects_hosted_set(const Op1fCard* card, unsigned which, const char* key, const char* text) OP1F_NAMED("op1f_effects_hosted_set");
+// ---- R24, base 45: an LFO layer's wave (module/build_r6e_card.h, "Base 45") ----
+//
+// The LFO unit (module/build_r11_lfos.cpp) holds the waves; the effects unit fills a block at its two call points and
+// calls op1f_lfos_wave_run; the LFO unit asks the engines unit for a pack engine's part. Each name a unit may be linked
+// without is weak, as R11's are: its user reads the address as 0 and does as base 44 did. op1f_lfos_waves is in
+// module/build_r5_base.h, beside op1f_effects_registered.
+
+// Base 45's words, named here where the header for packs is not read (the units read base 29's header). The same
+// layout as that header's: the sizes are held below.
+#ifndef OP1F_BUILD_R6E_CARD_H
+enum { OP1F_LFO_WAVE_BYTES = 36, OP1F_WAVE_BYTES = 184, OP1F_WAVE_CYCLES_MOST = 8000 };
+struct Op1fWaveBlock;
+struct Op1fLfoWave {
+    Op1fKindHead head;
+    void (*wave)(Op1fWaveBlock* now);
+    unsigned cycles;
+};
+struct Op1fWaveBlock {
+    unsigned bytes, place, frames, period;
+    unsigned playing, fresh, blocks, on;
+    unsigned effect_count;
+    int effect_values[4], effect_low[4], effect_high[4];
+    unsigned engine_count;
+    int engine_values[8], engine_low[8], engine_high[8];
+};
+#endif
+static_assert(sizeof(Op1fLfoWave) == 36 && sizeof(Op1fWaveBlock) == 184, "an LFO layer with a wave is 36 bytes, its block 184, at base 45");
+
+// From the LFO unit. A place's byte: the layer's number + 1 while the place (0 to 15) rides a layer with a wave, else 0.
+// The key thread and the display thread write it, right after the place's ride; the audio thread reads it.
+extern "C" volatile unsigned char op1f_lfos_wave_ride[16] OP1F_NAMED("op1f_lfos_wave_ride") __attribute__((weak));
+
+// From the LFO unit, on the audio thread: the wave of the layer `b->place` rides called on the block, the effect's
+// part filled by the caller. Answers 1 when it was called (the values written held to their ranges), 0 when not (the
+// place rides no wave, or the wave is switched off): the block is then as handed.
+extern "C" int op1f_lfos_wave_run(Op1fWaveBlock* b) OP1F_NAMED("op1f_lfos_wave_run") __attribute__((weak));
+
+// From the effects unit: the instrument's blocks since the start, [0] the synth's, [1] the drum's. The audio thread
+// counts them, once a block, where the instrument's effect stage ends.
+extern "C" volatile unsigned op1f_effects_wave_ticks[2] OP1F_NAMED("op1f_effects_wave_ticks") __attribute__((weak));
+
+// From the engines unit, on the audio thread, for a synth slot (0 to 7). wave_in fills the block's engine part (its
+// count 0 when the slot plays no pack engine it can hand); wave_out takes what the wave wrote, for the next block's
+// render. The LFO unit calls them only when their address is not 0.
+extern "C" void op1f_engines_wave_in(unsigned slot, Op1fWaveBlock* b) OP1F_NAMED("op1f_engines_wave_in") __attribute__((weak));
+extern "C" void op1f_engines_wave_out(unsigned slot, const Op1fWaveBlock* b) OP1F_NAMED("op1f_engines_wave_out") __attribute__((weak));
 
 #endif

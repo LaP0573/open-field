@@ -9,6 +9,11 @@
 // stages each place runs is the unit's own (`counts`), as base 24's word was. With no effect registered every word, every
 // call and every line is base 24's.
 //
+// Base 45 (R24): a wave of an LFO layer (module/build_r6e_card.h, "Base 45") is called by the effects unit, at the
+// synth's and the drum's places too when no effect of a pack is registered: once a wave is registered
+// (op1f_lfos_waves, weak), places 0 and 1 call op1f_effects_after as an effect would have them, and their words say one
+// more. With no wave registered every word, every call and every line is base 44's.
+//
 // What base 24's unit said of itself follows and holds:
 //
 // Step R4, the base pack (base.pack 24): the sound stages, level 6's first kind of ask (OS 1.7.0+0). A unit of its own,
@@ -204,7 +209,8 @@ extern "C" void op1f_stages_run(u32 place) {
     u32 point = place < 2u ? (u32)OP1F_AT_INSTRUMENT : place == 2u ? (u32)OP1F_AT_MASTER_IN : (u32)OP1F_AT_MASTER_OUT;
     int* left = place < 2u ? BUFFER(INSTRUMENT_LEFT) : BUFFER(MASTER_LEFT);
     int* right = place < 2u ? BUFFER(INSTRUMENT_RIGHT) : BUFFER(MASTER_RIGHT);
-    if (place != 2u && op1f_effects_registered != 0) op1f_effects_after(point, host, left, right);   // R5: an effect's tails, before the stages
+    if (place != 2u && (op1f_effects_registered != 0 || (place < 2u && &op1f_lfos_waves != 0 && op1f_lfos_waves != 0)))   // R24: or a wave's
+        op1f_effects_after(point, host, left, right);                               // R5: an effect's tails, before the stages
     u32 period = RD32(PERIOD);
     u32 playing = RD32(TRANSPORT) != 0 ? 1u : 0u;
     for (u32 i = 0; i < count; ++i) {
@@ -397,9 +403,12 @@ static void enrol() {
     }
     unit.count = n;
     u32 effects = op1f_effects_registered != 0 ? 1u : 0u;                           // R5: the effects' call after their effect
+    u32 waves = &op1f_lfos_waves != 0 && op1f_lfos_waves != 0 ? 1u : 0u;            // R24: a wave's call, at the synth and the drum
     for (u32 p = 0; p < (u32)PLACES; ++p) counts[p] = at[p];
     BARRIER();                                                                      // the tables are whole before the words that say so
-    for (u32 p = 0; p < (u32)PLACES; ++p) op1f_stages_at[p] = at[p] + (p != 2u ? effects : 0u);
+    // A place's word: its stages, and one more where the effects unit is called after the effect: at 0, 1 and 3 once an
+    // effect of a pack is registered, at 0 and 1 once a wave is (R24). Else base 44's.
+    for (u32 p = 0; p < (u32)PLACES; ++p) op1f_stages_at[p] = at[p] + ((p != 2u && effects) || (p < 2u && waves) ? 1u : 0u);
 }
 
 // ---------------------------------------------------------------- once a frame, on the display thread

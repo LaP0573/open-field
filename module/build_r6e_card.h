@@ -1794,9 +1794,9 @@ enum { OP1F_EFFECT_LAYER = 4 };
 // eight words, its switch), the unit's own LFO playing under it as always and changing without ending the ride, the
 // three ways it ends, the file (the unit's own LFO saved as left, and the base's member op1f_lfo, beside op1f_effect
 // and op1f_engine, naming the layer), and the page on T4 (the unit's own LFO's page until op1f_layer_page chooses the
-// pack's). An LFO layer has no function on the audio thread: the unit's LFO acts in many places of a voice, and a pack
-// that moves the sound itself does it through level 6's stages. The row never reaches the firmware: no pick, no
-// file, no catalog the unit writes ever holds its name (the unit resets a whole sound whose LFO it does not know).
+// pack's). An LFO layer has no function on the audio thread, but its wave (base 45): the unit's LFO acts in many
+// places of a voice, and a pack that moves the sound itself does it through level 6's stages. The row never reaches
+// the firmware: no pick, no file, no catalog the unit writes ever holds its name (the unit resets a whole sound whose LFO it does not know).
 // The places: a synth sound's slot, 0 to 7; with OP1F_LFO_DRUM also a drum sound's, OP1F_PLACE_DRUM + slot (8 to 15),
 // from base 37 on. Never the master: the master has no LFO.
 //
@@ -1820,7 +1820,7 @@ enum { OP1F_LFOS_MOST = 8 };
 //   head  level 5's head: `name` is what the list of LFO kinds shows (1 to 15 characters of a-z, 0-9, ' ', '-' and '_':
 //         none of the unit's LFO kinds, "tremolo", "value", "random", "element", "midi", "velocity", nor a name an
 //         earlier pack registered for an LFO; the lists of effects and of LFOs are separate, so an effect's name may be
-//         an LFO's, though the pack tool refuses one name for an effect and an LFO layer of the same card); `bytes` 28 at base 35 (a later base may read more); `flags` OP1F_LFO_...;
+//         an LFO's, though the pack tool refuses one name for an effect and an LFO layer of the same card); `bytes` 28 at base 35 (base 45: 36 with a wave); `flags` OP1F_LFO_...;
 //         `shown(where, how)` is told when the layer's own page comes on the screen and goes, as an effect's: `where`
 //         the place, `how` OP1F_SHOWN_UP, with OP1F_SHOWN_OFF while the unit's LFO under it is switched off, and 0 when
 //         the page leaves the screen. Not told while the unit's own LFO page shows
@@ -2166,5 +2166,95 @@ enum { OP1F_KEEP_HOSTED = 16 };
 // The mark of a base that carries out hosted pages (a constant 1): a host that calls the three helpers above names it,
 // so that a base before 44 leaves it out. An effect that declares wagons needs no mark.
 extern "C" const unsigned op1f_hosted_1 OP1F_NAMED("op1f_hosted_1");
+
+// Base 45: an LFO layer's wave (step R24, 2026-11-27). Up to here every word is the earlier bases' (base 44's hosted
+// pages last); this part only adds behind it, and an LFO layer without a wave is base 35's. No new level or kind of ask:
+// level stays 10.
+//
+// A wave. An LFO layer's table (OP1F_ASK_LFO) may be an Op1fLfoWave: the head with `bytes` OP1F_LFO_WAVE_BYTES, then a
+// function `wave` and its cost `cycles`. The base reads the part it knows: a table of 36 bytes or more whose `wave` is
+// not 0 carries a wave; any other table of 28 or more is a plain layer, as before (a `wave` of 0: `cycles` is not read). The base calls `wave` on the audio thread, once a block, for every place that
+// rides the layer and whose sound the instrument's block plays now: a synth sound's slot (0 to 7), a drum sound's
+// (8 to 15) with OP1F_LFO_DRUM, never the master. It comes before the place's effect plays that block. It may move the
+// four knob values of the place's effect and the eight values of a pack's engine the place plays, for that block
+// only. The knob stays where it is: the base writes no stored word, and the saved sound is as the owner left it.
+//
+// The call. Once a block where the place plays, whether its effect is switched on or not (`on` says which). Not while
+// the place does not ride the layer, nor while another place's sound plays, nor while the wave is switched off for its
+// cost. The block lives for the call only: read it and write its values inside the call, keep no pointer to it.
+//
+// What it is handed.
+//   - The effect's part. For a pack's effect the place rides: `effect_values` are the pack's own values, in its own
+//     numbers, and `effect_low`, `effect_high` its ranges. For the unit's own effect (alone, or under a pack's effect
+//     layer): each value is the upper half of the knob's word, and the range is that knob's row. `effect_count` 0 when
+//     the base cannot reach the knobs in this block (the effect played already, or its rows are not in order). The
+//     effect on and its object made before the waves, a second of the sound's blocks in a row: the log says so once.
+//   - The engine's part. For a pack's engine on a synth slot: its values in its numbers, its ranges, `engine_count`
+//     its count. 0 for the unit's own engines, for the envelope and for a drum sound.
+//   - A value beyond its count is not read. The base holds every written value to its range.
+//
+// The move. A value written lasts one block: the next call is handed the value as set again. An effect's move plays
+// in the same block. An engine's plays at the next block (the voices of that block rendered before the call): about
+// 1.45 ms late, and dropped when the wave was not called in the block after. Only a value written other than as handed
+// counts as a move; a knob left as handed keeps its word to the last bit.
+//
+// `fresh` is 1 at the first call after a ride began (a pick, a load, op1f_layer_start, a start), and when the call
+// before at that place was not in the instrument's block just before (another sound played, or the place was silent).
+//
+// The cost. `cycles` is the most one call takes, 1 to OP1F_WAVE_CYCLES_MOST. A call that takes more than
+// OP1F_STAGE_CYCLES_OFF switches the wave off at once; OP1F_STAGE_OVER_CALLS calls in one second over twice `cycles`
+// and over `cycles` and OP1F_STAGE_CYCLES_SPARE switch it off too. Off, it is never called and moves nothing, until
+// its row is picked again in a list of LFOs (any place) or the next start.
+//
+// The mark op1f_wave_1. A base 35 to 44 reads a 36-byte LFO table as a plain layer and never calls the wave: the row,
+// the ride and the page are there, the moves are not. A card with a wave names the mark, so that such a base leaves
+// the pack out.
+//   OP1F_LFO_WAVE_BYTES     an LFO table with a wave, its head's `bytes`
+//   OP1F_WAVE_BYTES         the block as base 45 hands it (a later base may hand more: read `bytes`)
+//   OP1F_WAVE_CYCLES_MOST   the most a wave may declare
+enum { OP1F_LFO_WAVE_BYTES = 36, OP1F_WAVE_BYTES = 184, OP1F_WAVE_CYCLES_MOST = 8000 };
+
+struct Op1fWaveBlock;
+
+// An LFO layer with a wave: what its ask points at.
+//   head    as Op1fLfo's, `bytes` OP1F_LFO_WAVE_BYTES
+//   wave    the function, in the pack, on an even address
+//   cycles  its cost, 1 to OP1F_WAVE_CYCLES_MOST
+struct Op1fLfoWave {
+    Op1fKindHead head;
+    void (*wave)(Op1fWaveBlock* now);
+    unsigned cycles;
+};
+
+// What a wave is handed.
+//   bytes         what the base wrote: 184 at base 45
+//   place         0 to 7 a synth sound's slot, 8 to 15 a drum sound's (OP1F_PLACE_DRUM + slot)
+//   frames        the block's frames, 64
+//   period        a 96th of a beat, in samples times 2^18, as an effect's block has it
+//   playing       1 while the tape plays
+//   fresh         see above
+//   blocks        the instrument's blocks since the start (the synth and the drum count their own)
+//   on            1 when the place's effect is switched on
+//   effect_count  0 to 4: the effect's values handed
+//   effect_values in and out; effect_low, effect_high their ranges
+//   engine_count  0 to 8: the engine's values handed
+//   engine_values in and out; engine_low, engine_high their ranges
+struct Op1fWaveBlock {
+    unsigned bytes, place, frames, period;
+    unsigned playing, fresh, blocks, on;
+    unsigned effect_count;
+    int effect_values[4], effect_low[4], effect_high[4];
+    unsigned engine_count;
+    int engine_values[8], engine_low[8], engine_high[8];
+};
+static_assert(sizeof(Op1fLfoWave) == OP1F_LFO_WAVE_BYTES && OP1F_PLACE_IN(Op1fLfoWave, wave) == 28 && OP1F_PLACE_IN(Op1fLfoWave, cycles) == 32,
+              "an LFO layer with a wave is 36 bytes at base 45");
+static_assert(sizeof(Op1fWaveBlock) == OP1F_WAVE_BYTES && OP1F_PLACE_IN(Op1fWaveBlock, on) == 28 && OP1F_PLACE_IN(Op1fWaveBlock, effect_values) == 36 &&
+              OP1F_PLACE_IN(Op1fWaveBlock, engine_count) == 84 && OP1F_PLACE_IN(Op1fWaveBlock, engine_high) == 152,
+              "what a wave is handed is 184 bytes at base 45");
+
+// The mark of a base that calls an LFO layer's wave (a constant 1). A card with a wave names it (the pack tool writes
+// the word), so that a base before 45 leaves the pack out.
+extern "C" const unsigned op1f_wave_1 OP1F_NAMED("op1f_wave_1");
 
 #endif

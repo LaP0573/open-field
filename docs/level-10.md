@@ -2,7 +2,7 @@
 
 Levels 8 and 9 give your effect or engine values the owner turns with the knobs, and `op1f_param_get` tells your page where each knob stands. But an LFO aimed at a value moves it block by block while the knob stays put, and so does any pack's offset on the unit's knob words (our own `lfo` adds four LFOs that way). The sound plays the moved value. A page that draws `op1f_param_get` shows a number that sits still while the owner hears it swing.
 
-Level 10 adds one helper, `op1f_param_heard`. It answers the value the sound last used, in your own numbers, with every LFO's move in it. Draw that, and the owner sees the LFO on your page the way some of the unit's own pages show it.
+Level 10 adds one helper, `op1f_param_heard`. It answers the value the sound last used, in your own numbers, with every LFO's move in it, and from base 45 the moves of an LFO layer's wave ([layers](layers.md#an-lfo-layers-wave-base-45)). Draw that, and the owner sees the LFO on your page the way some of the unit's own pages show it.
 
 The words of the interface are in the header `module/build_r6e_card.h`. Where this page and the header disagree, the header is right.
 

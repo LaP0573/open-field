@@ -284,6 +284,7 @@ The build works the lists out from the compiled code. Call an optional name only
 A needed name can also stand for an ability and not for a function to call: a **mark**. It is never called or read.
 
 - The base offers `op1f_level_1` to `op1f_level_10`: "this base serves cards of that level". A pack's card makes its level's mark a name the pack needs ([the base](base.md), "The levels, and their marks").
+- The base offers the marks of its parts after level 10 too: `op1f_hold_1`, `op1f_layer_1`, `op1f_parts_1`, `op1f_sample_1`, `op1f_memory_2`, `op1f_drum_engine_1` (base 43), `op1f_hosted_1` (base 44) and `op1f_wave_1` (base 45), each for a pack that uses that part ([the base](base.md), "After level 10"). A card that uses a part names its mark, and a base before it leaves the pack out.
 - The loader answers itself for `op1f_loader_1`: "this loader hands the cards over". The base needs it. A pack that needs something only a later loader does names that loader's mark, and under an older loader it is left out with a line that says which mark was missing.
 - N2 answers for `op1f_loader_2` as well, with the address of six words of its own: their size in bytes (24), the loader's generation (2), the room's first address, the room's bytes, the most pack files it looks at (128) and the slots of the second list of cards (128). Read the size first and only the words it covers: a later loader adds words behind and never changes the meaning of one. Under N1 the name gives 0, so a pack that names it as optional can tell the two loaders apart.
 
