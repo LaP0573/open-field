@@ -23,10 +23,10 @@
 // (the firmware's pick of that type's row, the words, the switch at the first frame after that pick has returned, the
 // master's at its return too), and a pick of the row the place
 // rides already, the type unchanged, picks nothing again. The page: the unit's own while the layer's choice is
-// OP1F_LAYER_PAGE_UNIT (stand() answers 0), the layer's for the screen of the type the place holds with
-// OP1F_LAYER_PAGE_OWN. The helpers op1f_layer_start, op1f_layer_end and op1f_layer_page serve kind 7 here and hand an
-// ask of kind OP1F_ASK_LFO to the LFO unit (weak names); the mark op1f_layer_1; at each frame's end, the LFO unit's
-// frame (weak). What base 30's unit said follows and holds.
+// OP1F_LAYER_PAGE_UNIT (stand() answers 0, but while its host's hosted page stands there: page_over), the layer's
+// for the screen of the type the place holds with OP1F_LAYER_PAGE_OWN. The helpers op1f_layer_start, op1f_layer_end
+// and op1f_layer_page serve kind 7 here and hand an ask of kind OP1F_ASK_LFO to the LFO unit (weak names); the mark
+// op1f_layer_1; at each frame's end, the LFO unit's frame (weak). What base 30's unit said follows and holds.
 //
 // Step R6d, base 30, the release's base: the effects unit's sibling. A sibling of base 29's effects unit (base
 // 29), which stays as it was: everything of it is here as it was, its stubs are still module/build_r5_effects.s, and
@@ -1956,6 +1956,12 @@ static int page_holds(u32 i) {
     return page.up && page.record == i + 1u && page_live();
 }
 
+// Does the hosted page stand for `place`, which rides the layer `l`: its host asked for it on that layer and place, and
+// it is live (page_live)? Then the place stands in (stand()) whatever the layer's page choice, UNIT or OWN.
+static int page_over(const Effect* l, u32 place) {
+    return page.host == l->slot + 1u && page.ask == l->ask && page.place == place && page_live();
+}
+
 // The turns noted moved onto the page's words, as the unit's knob would move them: a 128th of the knob's row a step,
 // held to the row (the display thread).
 static EFFECTS_APART void page_move() {
@@ -2232,8 +2238,8 @@ static int stand(Op1fStanding* out, unsigned* mode, unsigned* screen, int asked)
     if (e == 0) return 0;
     u32 shown = e->screen;
     if (is_layer(e)) {                                                              // R11: the unit's page, or the layer's for the type the place holds
-        u32 type = place_type(place);
-        if (e->page != (u32)OP1F_LAYER_PAGE_OWN || type >= (u32)STOCK_COUNT || stock_screens[type] == 0) return 0;
+        u32 type = place_type(place);                                               // (or its host's hosted page there, whatever the choice: page_over)
+        if ((e->page != (u32)OP1F_LAYER_PAGE_OWN && !page_over(e, place)) || type >= (u32)STOCK_COUNT || stock_screens[type] == 0) return 0;
         shown = stock_screens[type];
     } else if (place_type(place) != e->type) {
         return 0;

@@ -2114,8 +2114,9 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 
 // The page of the effect at `which`, for the place on the screen while it rides the host's layer `ask` (an effect of
 // the card with OP1F_EFFECT_LAYER): T3's page becomes the effect's own page for that instance (its page that stands
-// in, or the base's blank page with its name), a third choice beside OP1F_LAYER_PAGE_UNIT and _OWN. Call it once a
-// frame while the host wants that page; a frame without the call, or op1f_layer_page, ends it. `words` is four ints, in
+// in, or the base's blank page with its name), a third choice beside OP1F_LAYER_PAGE_UNIT and _OWN. It comes up
+// whatever the layer's page choice is, UNIT or OWN. Call it once a frame while the host wants that page; a frame
+// without the call, or op1f_layer_page, ends it. `words` is four ints, in
 // and out, as OP1F_RACK_WORDS has them (the unit's knob words of the effect the pack's stands on): in, the instance's
 // four words as the host keeps them (as set, not moved by an LFO); out, the words the page changed since the last
 // call (the effect's op1f_param_set at the instance's place, or a knob turn no pack took, moved as the unit's knob of
