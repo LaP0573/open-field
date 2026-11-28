@@ -63,6 +63,11 @@ extern "C" void op1f_effects_catalog_read(void* document) OP1F_NAMED("op1f_effec
 // How many effects are registered: 0 before the catalog's read and when none is. One word, from any thread.
 extern "C" volatile unsigned op1f_effects_registered OP1F_NAMED("op1f_effects_registered");
 
+// R24 (base 45): how many LFO layers with a wave are registered, the LFO unit's (module/build_r11_lfos.cpp): 0 before
+// the catalog's read and when none is. Written once, at the catalog's first read, before the objects are made. One
+// word, from any thread. Weak: a unit linked without the LFO unit reads its address as 0.
+extern "C" volatile unsigned op1f_lfos_waves OP1F_NAMED("op1f_lfos_waves") __attribute__((weak));
+
 // 1 when an element of `fx_types` is a row the effects unit added (its `type` the name of a registered effect), else
 // 0: the catalog's write leaves such rows out of the copy it writes. Under the database's lock: it calls only the
 // JSON functions' readers.

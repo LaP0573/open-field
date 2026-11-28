@@ -469,6 +469,14 @@ KIND_WORDS_6[DRUM_PAGE] = "drum engine"
 TABLE_BYTES_6[DRUM_PAGE] = 28
 ASK_KEYS_6[DRUM_PAGE] = ("kind", "name", "shown")
 ASK_ADDRESSES_6[DRUM_PAGE] = (("shown", 24),)
+# since R24 (base 45, module/build_r6e_card.h, "Base 45: an LFO layer's wave"): an LFO layer may carry a wave
+# ({"kind": "lfo", ..., "wave": a function's symbol, "cycles": its cost a call}; both or neither), a function the base
+# calls once a block before the place's effect. Its table is then 36 bytes: the head, the wave, its cost. A card with
+# a wave names the mark op1f_wave_1 in a word behind op1f_layer_1's, as a base 35 to 44 would take the table as a
+# plain layer.
+WAVE_MARK, LFO_WAVE_BYTES, WAVE_CYCLES_MOST = "op1f_wave_1", 36, 8000      # the mark, OP1F_LFO_WAVE_BYTES, OP1F_WAVE_CYCLES_MOST
+ASK_KEYS_6[LFO] = ASK_KEYS_6[LFO] + ("wave", "cycles")
+ASK_ADDRESSES_6[LFO] = ASK_ADDRESSES_6[LFO] + (("wave", 28),)   # only in a table of 36 bytes
 STOCK_ENGINES = ("cluster", "digital", "drwave", "dr.wave", "fm", "phase", "pulse", "dna", "string", "dsynth", "voltage", "dimension", "amp",
                  "vocoder", "sampler", "fazer")                 # the names no engine of a pack's may take, as the base refuses them
 SOUND = struct.Struct("<24sII")                                  # a sound of an engine's list: its name, its text, its bytes
@@ -1785,7 +1793,16 @@ def lfo_of_card(number, ask, earlier):
         raise ValueError("%s: its drum is true or false, not %r (a flag this base does not know is left aside)" % (said, ask["drum"]))
     if not a_symbol(ask.get("shown")):
         raise ValueError("%s: its shown is the symbol of a function of the pack, or null: %r" % (said, ask["shown"]))
-    return LFO, name, LFO_DRUM if ask.get("drum", False) else 0, {"shown": ask.get("shown")}, {}
+    wave, extra = ask.get("wave"), {}                       # since R24 (base 45): a wave and its cost, both or neither
+    if not a_symbol(wave):
+        raise ValueError("%s: its wave is the symbol of a function of the pack, or null: %r" % (said, wave))
+    if wave is None and "cycles" in ask:
+        raise ValueError("%s: it has a cost and no wave; a cost comes with a wave, or neither is there" % said)
+    if wave is not None:
+        if not whole(ask.get("cycles"), 1, WAVE_CYCLES_MOST):
+            raise ValueError("%s: its wave's cost is not between 1 and %d cycles a call, %r; %s" % (said, WAVE_CYCLES_MOST, ask.get("cycles"), aside))
+        extra = {"cycles": ask["cycles"]}
+    return LFO, name, LFO_DRUM if ask.get("drum", False) else 0, {"shown": ask.get("shown"), "wave": wave}, extra
 
 
 def drum_page_of_card(number, ask, earlier):
@@ -1816,6 +1833,12 @@ def has_layer(asks):
     """Since R11 (base 35): whether a card's asks (as card_asks or ask_tables answer them) hold an effect layer or an LFO
     layer, for which the card names the mark op1f_layer_1."""
     return any(ask is not None and (ask[0] == LFO or (ask[0] == 7 and ask[2] & EFFECT_LAYER)) for ask in asks)
+
+
+def has_wave(asks):
+    """Since R24 (base 45): whether a card's asks (as card_asks or ask_tables answer them) hold an LFO layer with a wave
+    (a recipe writes its table in 36 bytes), for which the card names the mark op1f_wave_1."""
+    return any(ask is not None and ask[0] == LFO and "cycles" in ask[4] for ask in asks)
 
 
 def sound_fault(text, name):
@@ -1990,7 +2013,8 @@ def ask_words(what, name, flags, functions, extra=None):
     if what == DRUM_PAGE:                                   # since base 43: "drum engine 'chop', rides the drum sampler, shown"
         return "drum engine '%s', rides the drum sampler" % name + (", shown" if functions.get("shown") else "")
     if what == LFO:                                         # since R11 (base 35): "lfo layer 'ufo', the synth's and the drum's, shown"
-        return "lfo layer '%s', the synth's%s" % (name, " and the drum's" if flags & LFO_DRUM else "") + (", shown" if functions.get("shown") else "")
+        return ("lfo layer '%s', the synth's%s" % (name, " and the drum's" if flags & LFO_DRUM else "") + (", shown" if functions.get("shown") else "")
+                + (", a wave of %d cycles" % extra["cycles"] if extra and "cycles" in extra else ""))     # since R24 (base 45)
     if what == 7 and flags & EFFECT_LAYER:                  # since R11 (base 35): "effect 'train', a layer, 2000 cycles a call, mono, reset"
         said = "effect '%s', a layer, %s" % (name, "%d cycles a call" % extra["cycles"] if functions.get("process") else "no process")
         said += "".join(", " + word for bit, word in ((EFFECT_MONO, "mono"), (EFFECT_TAILS, "tails")) if flags & bit)
@@ -2087,8 +2111,10 @@ def ask_table_words(ask, address_of=None):
         if symbol is None:
             return "0" if address_of is None else 0
         return symbol if address_of is None else address_of(symbol)
-    if what in (LFO, DRUM_PAGE):                           # since R11 (base 35), base 43: a table that is its head alone
+    if what == DRUM_PAGE:                                   # since base 43: a table that is its head alone
         return []
+    if what == LFO:                                         # since R11 (base 35): an LFO layer's table is its head alone
+        return [address(functions["wave"]), extra["cycles"]] if "cycles" in extra else []     # since R24 (base 45): or its wave and cost behind
     if what == 3:
         return [extra["point"], extra["cycles"], extra["memory"], address(functions["process"])]
     if what == 4:
@@ -2182,6 +2208,8 @@ def table_bytes_of(ask):
         return EFFECT_HOSTED_BYTES
     if ask[0] == 7 and ask[4].get("wagon"):
         return EFFECT_WAGON_BYTES
+    if has_wave([ask]):                                     # since R24 (base 45): an LFO layer with a wave, 36
+        return LFO_WAVE_BYTES
     return TABLE_BYTES_6[ask[0]] if ask[0] > 2 else ASK_TABLE_BYTES[ask[0]]
 
 
@@ -2326,6 +2354,12 @@ def render_card(recipe, recipe_name):
                                 % DRUM_PAGE_MARK, 1)
             level_end = ".size %s_level, .-%s_level\n" % (label, label)
             text = text.replace(level_end, level_end + DATA_OBJECT.format(label + "_drum_engine", "    .long %s\n" % DRUM_PAGE_MARK, "OBJECT"), 1)
+        if has_wave(asks):                                  # since R24 (base 45): a word behind op1f_layer_1's names op1f_wave_1
+            text = text.replace(" */\n.section", " * Base 45 (module/build_r6e_card.h, \"Base 45: an LFO layer's wave\"): an LFO layer carries a wave, so a\n"
+                                " * word behind op1f_layer_1's names the mark %s, and a base before 45 leaves the pack out. Nothing reads it.\n */\n.section"
+                                % WAVE_MARK, 1)
+            layer_end = ".size %s_layer, .-%s_layer\n" % (label, label)
+            text = text.replace(layer_end, layer_end + DATA_OBJECT.format(label + "_wave", "    .long %s\n" % WAVE_MARK, "OBJECT"), 1)
         text += asks_source(label, asks) if asks else ""
     return text
 
@@ -2423,7 +2457,7 @@ def ask_table_5(fields, body, kind, size, what):
     return (kind, size, what, (kind, text, flags, functions), wrong)
 
 
-def ask_tables_6(data, level, layered=None):
+def ask_tables_6(data, level, layered=None, waved=None):
     """Since R4: each ask of a card of level 6 or 7 read from its table as linked, as ask_tables answers it; a stage,
     memory, places and keeps as (kind, name, flags, {function's word: its address}, {what else the table holds}), the
     list of names of places read from the pack. What is not in order is said as a base of that level would leave it
@@ -2441,6 +2475,10 @@ def ask_tables_6(data, level, layered=None):
         known.add(LFO)
     if (DRUM_PAGE_MARK, True) in fields["lists"]["imports"] and level >= DRUM_PAGE_LEVEL_LEAST:     # since base 43
         known.add(DRUM_PAGE)
+    # since R24: a pack that needs op1f_wave_1 runs only on base 45 or later, which reads a wave in an LFO table of 36
+    # bytes or more whose wave word is not 0
+    if waved is None:                                        # `waved` True: read as base 45 would, whatever the pack needs
+        waved = (WAVE_MARK, True) in fields["lists"]["imports"]
     out = []
     for kind, size, what in asks_in(data):
         if kind not in known:
@@ -2450,7 +2488,7 @@ def ask_tables_6(data, level, layered=None):
             out.append(ask_table_5(fields, body, kind, size, what))
             continue
         if kind == LFO:                                      # since R11 (base 35): an LFO layer, read as the cards unit reads it
-            out.append(lfo_table(fields, body, size, what, out))
+            out.append(lfo_table(fields, body, size, what, out, waved))
             continue
         if kind == DRUM_PAGE:                                # since base 43: a drum engine, read as the base reads it
             out.append(drum_page_table(fields, body, size, what, out))
@@ -2611,18 +2649,28 @@ def drum_page_table(fields, body, size, what, earlier):
     return (DRUM_PAGE, size, what, ask, wrong)
 
 
-def lfo_table(fields, body, size, what, earlier):
+def lfo_table(fields, body, size, what, earlier, waved=False):
     """Since R11 (base 35): one table of an LFO layer read from a pack file as linked, held as the cards unit holds it
     (lfo_verdict) and said in the words of its line 49. Answers (11, size, what, the ask as lfo_of_card answers it, its
-    shown linked, or None, what is not in order or None)."""
+    shown linked, or None, what is not in order or None). Since R24 (base 45), `waved`: read as base 45 reads it, for a
+    pack that needs op1f_wave_1: a table of 36 bytes or more whose word at +28 is not 0 carries a wave and its cost (the
+    ask then {"shown", "wave"}, {"cycles"}); any other table of 28 or more is a plain layer, its head alone, as on base
+    44. Without `waved` every table is read as before, its head alone."""
     first, span = linked_at(fields, 0), fields["body_bytes"] + fields["bss_bytes"]
-    table = TABLE_BYTES_6[LFO]
+    table = LFO_WAVE_BYTES if waved and size >= LFO_WAVE_BYTES else TABLE_BYTES_6[LFO]
     if not what or size < table or size > ASK_BYTES_MOST or what % 4 or not (first <= what and what + table <= first + span):
         return (LFO, size, what, None, "its table is not in order")
     raw = bytes(body[what - first:what - first + table]).ljust(table, b"\0")
     head_bytes, name_raw, flags, shown = KIND_HEAD.unpack_from(raw, 0)
     name = effect_name(name_raw)
     ask = (LFO, name if name is not None else name_raw.split(b"\0")[0].decode("latin-1"), flags, {"shown": shown}, {})
+    wave = cycles = None
+    if table == LFO_WAVE_BYTES:                              # since R24 (base 45): the wave at +28, its cost at +32
+        wave, cycles = struct.unpack_from("<2I", raw, TABLE_BYTES_6[LFO])
+        if wave:
+            ask = ask[:3] + ({"shown": shown, "wave": wave}, {"cycles": cycles})
+        else:                                                # a wave word of 0: a plain layer, its cost not read
+            wave = cycles = None
     wrong = None
     if head_bytes != size:
         wrong = "its table is not in order"
@@ -2636,6 +2684,10 @@ def lfo_table(fields, body, size, what, earlier):
         wrong = "it has a flag this base does not know"
     elif shown and (not first <= shown < first + span or shown & 1):
         wrong = "its shown does not lie in its pack on an even address"
+    elif wave is not None and (not first <= wave < first + span or wave & 1):
+        wrong = "its wave does not lie in its pack on an even address"
+    elif cycles is not None and not 1 <= cycles <= WAVE_CYCLES_MOST:
+        wrong = "its wave's cost is not between 1 and %d cycles a call" % WAVE_CYCLES_MOST
     return (LFO, size, what, ask, wrong)
 
 
@@ -2865,6 +2917,15 @@ def card_faults(data):
                 faults.append("it asks for a layer and the pack does not need %s, so a base before 35 would not leave it out" % LAYER_MARK)
             if (DRUM_PAGE_MARK, True) not in lists["imports"] and any(kind == DRUM_PAGE for kind, _s, _w in asks_in(data)):     # since base 43
                 faults.append("it asks for a drum engine and the pack does not need %s, so a base before 43 would not leave it out" % DRUM_PAGE_MARK)
+            # since R24 (base 45): a table base 45 would take with a wave, in a pack that does not need op1f_wave_1; and
+            # an LFO table base 45 would leave aside (one of 36 bytes or more whose wave word is not 0, read with its wave)
+            if (WAVE_MARK, True) not in lists["imports"] and card["level"] >= LFO_LEVEL_LEAST:
+                as_45 = ask_tables_6(data, card["level"], True, True)
+                if has_wave([t[3] for t in as_45 if not t[4]]):
+                    faults.append("it asks for a wave and the pack does not need %s, so a base before 45 would not leave it out" % WAVE_MARK)
+                for number, (t, t45) in enumerate(zip(tables, as_45), 1):
+                    if t45[0] == LFO and t45[4] and not t[4]:
+                        faults.append("its ask %d is not in order for base 45, which would leave it aside: %s" % (number, t45[4]))
             for number, (_kind, _size, what, ask, wrong) in enumerate(tables, 1):
                 if wrong:
                     faults.append("its ask %d is not in order: %s" % (number, wrong))
@@ -3158,6 +3219,10 @@ def build3(recipe, target_os, out_dir=None, objects=None, log=print, serve=None)
                 raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % DRUM_PAGE_MARK)
             if has_drum_page(asks) and (DRUM_PAGE_MARK not in needed or (values[label + "_drum_engine"] - origin, KIND_WORD, needed.index(DRUM_PAGE_MARK), 0) not in places):
                 raise ValueError("The card asks for a drum engine and the pack does not need %s: a base before 43 would not leave it out" % DRUM_PAGE_MARK)
+            if has_wave(asks) != has(label + "_wave"):      # since R24 (base 45): the word that names op1f_wave_1
+                raise ValueError("The card's word for the mark %s in the sources is not the recipe's: write it again with `card`" % WAVE_MARK)
+            if has_wave(asks) and (WAVE_MARK not in needed or (values[label + "_wave"] - origin, KIND_WORD, needed.index(WAVE_MARK), 0) not in places):
+                raise ValueError("The card asks for a wave and the pack does not need %s: a base before 45 would not leave it out" % WAVE_MARK)
         if bytes(body[card_place:card_place + len(linked)]) != linked or level_place not in places:
             raise ValueError("The card in the sources is not the recipe's: write it again with `card`")
         if not card_place:

@@ -30,7 +30,19 @@
 //       whose pack chose its own page (OP1F_LAYER_PAGE_OWN), on the LFO screen of the kind the place holds now
 //   the helpers' part for kind 11 (op1f_lfos_layer_start, _end, _page, called by the effects unit's op1f_layer_start,
 //       op1f_layer_end and op1f_layer_page), from the pack's frame function
-// Nothing of it runs on the audio thread: an LFO layer has no function there.
+// Nothing of it ran on the audio thread up to base 44: an LFO layer had no function there. Step R24 (base 45) adds one,
+// below.
+//
+// R24 (base 45): an LFO layer's wave (module/build_r6e_card.h, "Base 45"). A layer's table of 36 bytes or more may
+// carry a function `wave` (not 0) and its cost behind the head. At the catalog's first read enrol keeps both and counts
+// the layers with a wave in op1f_lfos_waves, before layer_count. Every write of a place's ride writes the place's byte
+// op1f_lfos_wave_ride right behind it (the layer's number + 1 when that layer has a wave, else 0), and a ride that
+// begins counts in ride_begins. On the audio thread the effects unit fills a block and calls op1f_lfos_wave_run once a
+// block for a played place whose byte is not 0: the engines unit's part filled (weak names: away, the count is 0),
+// `fresh` said, the wave called on a copy of the block, timed and held to its cost as an effect is (a Budget and
+// account, the effects unit's rule), each written value held to its range, and the engines unit told. A switched-off
+// wave is not called; a pick of its row (any place) re-arms it, R16's way, and so does a start. The frame says the
+// lines: the switch-off, and the period line behind a quiet gate. The mark op1f_wave_1 is here.
 //
 // A place is 0 to 7 for a synth sound (its slot), 8 to 15 for a drum sound (8 + its slot), the drum's only for a layer
 // with OP1F_LFO_DRUM (step R13). The drum's list shows every layer's row (the unit builds it from the same rows): a pick
@@ -42,10 +54,18 @@
 // (record, id) puts the catalog row of that id onto the record (its kind and its default words) and applies it; the
 // controller switches the LFO on after the pick; the kind word is 0 to 5 in the order tremolo, value, random, element,
 // midi, velocity (6 for a name the firmware does not know), the catalog's ids 1 to 6. The catalog's rows are jsoncpp
-// values of twelve bytes, the kind byte at +4. Nothing is divided, nothing waits. Compiled for the PC with OP1F_HOST
+// values of twelve bytes, the kind byte at +4. Nothing waits; the period line's average is divided by shifts. Compiled for the PC with OP1F_HOST
 // defined: the stand-ins come in through a header of the PC's own (for tests this tree does not hold).
 
 #include "build_r6d_base.h"
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"     // R24: the gate's half for the power popup, which this unit does not use
+#endif
+#include "build_q_quiet.h"                             // R24: the gate of the waves' period line
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 typedef unsigned int u32;
 typedef unsigned char u8;
@@ -83,6 +103,13 @@ extern "C" u8 op1f_layer_lh_room[] OP1F_NAMED("op1f_layer_lh_room");
 #define MASK_OFF(mask) asm volatile("cli %0;" : "=d"(mask) : : "memory")
 #define MASK_ON(mask) asm volatile("sti %0;" : : "d"(mask) : "memory")
 #define BARRIER() asm volatile("" : : : "memory")
+// R24: the processor's cycle counter, read with a memory clobber, as the effects unit reads it (the PC's stand-ins
+// bring their own).
+static inline u32 cycles_now() {
+    u32 c;
+    asm volatile("%0 = CYCLES;" : "=d"(c) : : "memory");
+    return c;
+}
 #define STOCK_LFO_WORDS_DOC ((WordsDocFn)0x8d4f3c84u)
 #define STOCK_LFO_ACTIVE_DOC ((ActiveDocFn)0x8d4f3d0cu)
 #define STOCK_LFO_ON_SYNTH ((OnSetFn)0x8d504308u)
@@ -134,6 +161,14 @@ enum {
 };
 static_assert(sizeof(Op1fKindHead) == TABLE_BYTES, "an LFO layer's table is the head, 28 bytes at base 35");
 
+// R24 (base 45): a table with a wave, the most a wave declares; the budget's limits, level 6's as the effects unit
+// takes them; the period of the lines.
+enum { WAVE_TABLE_BYTES = OP1F_LFO_WAVE_BYTES, WAVE_CYCLES_MOST = OP1F_WAVE_CYCLES_MOST, WAVE_EFFECT_VALUES = 4, WAVE_ENGINE_VALUES = 8,
+       PERIOD_FRAMES = 256 };
+static_assert(sizeof(Op1fLfoWave) == WAVE_TABLE_BYTES, "an LFO layer with a wave is 36 bytes at base 45");
+static const u32 CYCLES_OFF = (u32)OP1F_STAGE_CYCLES_OFF, OVER_CALLS = (u32)OP1F_STAGE_OVER_CALLS, SPARE = (u32)OP1F_STAGE_CYCLES_SPARE;
+static const u32 SECOND = 400000000u;                  // the processor's cycles in a second
+
 static const char LOG_FILE[] = "../src/main/op1f_lfos.cpp";
 static const char KEY_LIST[] = "lfo_types";
 static const char KEY_TYPE[] = "type";
@@ -170,7 +205,24 @@ extern "C" int op1f_lfos_layer_end(const Op1fCard* card, unsigned ask, unsigned 
 extern "C" int op1f_lfos_layer_page(const Op1fCard* card, unsigned ask, unsigned which) OP1F_NAMED("op1f_lfos_layer_page");
 extern "C" unsigned op1f_lfos_riding(const Op1fCard* card, unsigned ask) OP1F_NAMED("op1f_lfos_riding");
 
+// ---- R24 (base 45): what this unit offers for the waves (module/build_r5_base.h, module/build_r6d_base.h) ----
+
+volatile unsigned op1f_lfos_waves;
+volatile unsigned char op1f_lfos_wave_ride[16];
+static_assert(sizeof(op1f_lfos_wave_ride) == (unsigned)OP1F_PLACE_DRUM * 2u, "a byte for each place, the synth's eight and the drum's eight");
+extern "C" const unsigned op1f_wave_1 OP1F_NAMED("op1f_wave_1");
+const unsigned op1f_wave_1 = 1;
+
 // ---------------------------------------------------------------- the registry
+
+// R24: a wave's budget, the effects unit's Budget: the audio thread writes it, the display thread reads it, the key
+// thread re-arms it only while `off` (R16's rule).
+struct Budget {
+    u32 window_start, window_over, window_most;
+    volatile u32 off;                                  // switched off until the layer's row is picked again, or the next start
+    volatile u32 off_cycles, off_overs;
+    u32 off_said;
+};
 
 struct Layer {
     const Op1fKindHead* head;
@@ -178,6 +230,10 @@ struct Layer {
     u32 flags;                                         // the head's, OP1F_LFO_DRUM
     volatile u32 page;                                // OP1F_LAYER_PAGE_UNIT or _OWN, the pack's choice
     char name[NAME];
+    void (*wave)(Op1fWaveBlock* now);                  // R24: the wave, 0 for none (a 28-byte table)
+    u32 cycles;                                        // R24: its cost, 1 to WAVE_CYCLES_MOST
+    Budget budget;                                     // R24
+    volatile u32 calls, sum, most, over;               // R24: this period's: the audio thread writes, the display thread reads and clears masked
 };
 static Layer layers[LAYERS];
 static volatile u32 layer_count;                       // the layers registered, written once at the catalog's first read
@@ -216,9 +272,18 @@ static volatile u32 back;                              // a switch to put back
 static volatile u32 list_open;                         // the place's list of LFO kinds is open (LH)
 static volatile u32 list_seen;                         // and the frame saw its screen asked
 
+// R24: a place's rides begun (a pick, op1f_layer_start, a load or a start found by read_member), for `fresh`.
+static volatile u32 ride_begins[PLACES];
+
+// R24: the audio thread's own words of a place's last call of a wave: the ride_begins it saw, the tick it was in.
+struct WaveSeen { u32 called, begins, tick; };
+static WaveSeen wave_seen[PLACES];
+
 static struct {
     u32 first_done;
     u32 ride_lines;
+    int countdown;                                     // R24: frames to the next period line
+    QuietGate gate;                                    // R24
 } unit;
 
 // ---------------------------------------------------------------- small helpers
@@ -286,6 +351,15 @@ static const Layer* riding(u32 place) {
     return &layers[r - 1u];
 }
 
+// R24: a place's ride written, and right behind it the place's byte for the waves: the layer's number + 1 when that
+// layer has a wave, else 0. `begins` 1 when a ride begins (counted for `fresh`). Inside the caller's mask, where it has
+// one.
+static void ride_is(u32 place, u32 r, u32 begins) {
+    places[place].ride = r;
+    op1f_lfos_wave_ride[place] = (u8)(r != 0 && r <= layer_count && layers[r - 1u].wave != 0 ? r : 0u);
+    if (begins) ++ride_begins[place];
+}
+
 static int slot_of(const Op1fCard* card) {
     op1f_cards_lists();                                                             // R20 (base 42)
     u32 seen = op1f_cards_2.count > (u32)CARDS ? (u32)CARDS : op1f_cards_2.count;
@@ -323,10 +397,12 @@ static int inside(u32 at, const Op1fCardSlot* slot, u32 bytes) {
 // Whether an ask of kind 11 is in order, by the cards unit's rules (its lfo_verdict): its table at least the head, in
 // its pack on a word, the head saying the ask's bytes; its name plain, 1 to 15 characters, none of the unit's kinds nor
 // a layer's taken before it; no flag but OP1F_LFO_DRUM; its `shown` 0 or of its pack on an even address; eight at most.
+// R24 (base 45): a table of 36 bytes or more whose wave is not 0 carries one: the wave of its pack on an even address
+// and its cost 1 to WAVE_CYCLES_MOST. Any other table of 28 or more is a plain layer, as on base 44.
 static int in_order(const Op1fAsk* ask, const Op1fCardSlot* slot) {
     const Op1fKindHead* h = (const Op1fKindHead*)ask->what;
     if (h == 0 || ask->bytes < (u32)TABLE_BYTES || ask->bytes > (u32)OP1F_ASK_BYTES_MOST) return 0;
-    if (!inside((u32)h, slot, (u32)TABLE_BYTES) || ((u32)h & 3u) != 0 || h->bytes != ask->bytes) return 0;
+    if (!inside((u32)h, slot, ask->bytes >= (u32)WAVE_TABLE_BYTES ? (u32)WAVE_TABLE_BYTES : (u32)TABLE_BYTES) || ((u32)h & 3u) != 0 || h->bytes != ask->bytes) return 0;
     if (!plain_name(h->name)) return 0;
     for (u32 k = 0; k < (u32)KINDS; ++k)
         if (same_text(h->name, KIND_NAMES[k], NAME)) return 0;
@@ -335,6 +411,12 @@ static int in_order(const Op1fAsk* ask, const Op1fCardSlot* slot) {
     if ((h->flags & ~(u32)OP1F_LFO_DRUM) != 0) return 0;
     u32 f = (u32)h->shown;
     if (f != 0 && (f < slot->first || f >= slot->end || (f & 1u) != 0)) return 0;
+    const Op1fLfoWave* w = (const Op1fLfoWave*)h;
+    if (ask->bytes >= (u32)WAVE_TABLE_BYTES && w->wave != 0) {                      // R24
+        u32 wave = (u32)w->wave;
+        if (wave < slot->first || wave >= slot->end || (wave & 1u) != 0) return 0;
+        if (w->cycles < 1u || w->cycles > (u32)WAVE_CYCLES_MOST) return 0;
+    }
     return candidate_count < (u32)LAYERS;
 }
 
@@ -383,7 +465,7 @@ static const void* source_row(const void* list) {
 // The candidates registered in order, ids 16 and on, with the row ids of the unit's kinds; none when the list holds
 // none of the unit's kinds.
 static void enrol(const void* list) {
-    u32 found = 0;
+    u32 found = 0, waves = 0;
     for (u32 k = 0; k < (u32)KINDS; ++k) {
         const void* row = row_named(list, KIND_NAMES[k]);
         const void* id = row ? STOCK_JSON_MEMBER(row, KEY_ID) : 0;
@@ -402,7 +484,14 @@ static void enrol(const void* list) {
         l->flags = l->head->flags;
         l->page = OP1F_LAYER_PAGE_UNIT;
         copy_name(l->name, l->head->name);
+        const Op1fLfoWave* w = (const Op1fLfoWave*)l->head;
+        if (l->head->bytes >= (u32)WAVE_TABLE_BYTES && w->wave != 0) {             // R24: a wave and its cost
+            l->wave = w->wave;
+            l->cycles = w->cycles;
+            ++waves;
+        }
     }
+    op1f_lfos_waves = waves;                                                        // R24: before the objects are made, and before the count
     BARRIER();                                                                      // every record whole before the word that counts them
     layer_count = candidate_count;
 }
@@ -488,6 +577,83 @@ extern "C" int op1f_lfo_start_do(void* record) {
     return (int)list_starts(place, (u32)start);
 }
 
+// ---------------------------------------------------------------- R24: the wave, on the audio thread
+
+// R16's way (the effects unit's budget_rearm): another go after a switch-off, the counters first, `off` last. Called
+// only while `off` is set, when the audio thread leaves the budget alone (op1f_lfos_wave_run calls no wave then).
+static __attribute__((noinline)) void budget_rearm(Budget* b) {
+    b->window_start = b->window_over = b->window_most = 0;
+    b->off_cycles = b->off_overs = 0;
+    b->off_said = 0;
+    BARRIER();
+    b->off = 0;
+}
+
+// A call timed and counted, as the effects unit's account: off at once over CYCLES_OFF; off after OVER_CALLS calls in
+// one second over twice the cost and over the cost and SPARE.
+static void account(Layer* l, u32 began, u32 took) {
+    Budget* b = &l->budget;
+    u32 sum = l->sum + took;
+    l->sum = sum < took ? 0xffffffffu : sum;
+    ++l->calls;
+    if (took > l->most) l->most = took;
+    if (took > l->cycles) ++l->over;
+    if (began - b->window_start >= SECOND) {
+        b->window_start = began;
+        b->window_over = 0;
+        b->window_most = 0;
+    }
+    if (took > CYCLES_OFF) {
+        b->off_overs = 0;
+        b->off_cycles = took;
+        b->off = 1;
+        return;
+    }
+    if (took > (l->cycles << 1) && took - l->cycles > SPARE) {
+        if (took > b->window_most) b->window_most = took;
+        if (++b->window_over >= OVER_CALLS) {
+            b->off_overs = b->window_over;
+            b->off_cycles = b->window_most;
+            b->off = 1;
+        }
+    }
+}
+
+static int held(int v, int low, int high) {
+    return v < low ? low : v > high ? high : v;
+}
+
+// The effects unit's call, once a block for a played place, the block's effect part filled. 0, and the block as
+// handed, when the place rides no wave or the wave is switched off; else the wave called on a copy of the block, each
+// value it wrote held to the range handed, the engines unit told, and 1.
+extern "C" int op1f_lfos_wave_run(Op1fWaveBlock* b) {
+    u32 place = b->place;
+    if (place >= (u32)PLACES) return 0;
+    u32 r = op1f_lfos_wave_ride[place];
+    if (r == 0 || r > layer_count) return 0;
+    Layer* l = &layers[r - 1u];
+    if (l->wave == 0 || l->budget.off) return 0;
+    WaveSeen* seen = &wave_seen[place];
+    u32 begins = ride_begins[place];
+    b->fresh = !seen->called || seen->begins != begins || seen->tick + 1u != b->blocks ? 1u : 0u;
+    seen->called = 1;
+    seen->begins = begins;
+    seen->tick = b->blocks;
+    int engines = place < (u32)SLOTS && &op1f_engines_wave_in != 0 && &op1f_engines_wave_out != 0;
+    if (engines) op1f_engines_wave_in(place, b);
+    else b->engine_count = 0;
+    Op1fWaveBlock now = *b;                                                         // the pack writes the copy: the counts and ranges stay ours
+    u32 began = cycles_now();
+    l->wave(&now);
+    account(l, began, cycles_now() - began);
+    u32 effects = b->effect_count > (u32)WAVE_EFFECT_VALUES ? (u32)WAVE_EFFECT_VALUES : b->effect_count;
+    for (u32 i = 0; i < effects; ++i) b->effect_values[i] = held(now.effect_values[i], b->effect_low[i], b->effect_high[i]);
+    u32 values = b->engine_count > (u32)WAVE_ENGINE_VALUES ? (u32)WAVE_ENGINE_VALUES : b->engine_count;
+    for (u32 i = 0; i < values; ++i) b->engine_values[i] = held(now.engine_values[i], b->engine_low[i], b->engine_high[i]);
+    if (engines) op1f_engines_wave_out(place, b);
+    return 1;
+}
+
 // ---------------------------------------------------------------- LG: the LFO pick
 
 // A pick of another row ends the place's ride, while its list is open. Inside no mask.
@@ -495,7 +661,7 @@ static void end_by_pick(u32 place) {
     u32 bit = 1u << place, mask;
     MASK_OFF(mask);
     if (places[place].ride != 0 && (list_open & bit) != 0) {
-        places[place].ride = 0;
+        ride_is(place, 0, 0);
         ended |= bit;
         picked &= ~bit;
         back &= ~bit;
@@ -522,6 +688,7 @@ extern "C" void op1f_lfo_pick_do(unsigned record, unsigned id) {
         return;
     }
     u32 k = id - (u32)ID_FIRST, bit = 1u << place, mask;
+    if (layers[k].budget.off) budget_rearm(&layers[k].budget);                    // R24: a wave switched off gets another go (R16's rule)
     if (!may_ride(&layers[k], place)) {                                             // a layer the drum does not take: no ride, nothing handed on
         end_by_pick(place);                                                         // the cursor left the row the place rode
         return;
@@ -531,7 +698,7 @@ extern "C" void op1f_lfo_pick_do(unsigned record, unsigned id) {
     u32 open = list_open & bit;
     u32 was = p->ride;
     u32 again = was == k + 1u && open && place_kind(place) == p->snap_kind;          // the list's own pick of the row it opened on
-    p->ride = k + 1u;
+    ride_is(place, k + 1u, was != k + 1u ? 1u : 0u);
     if (was != k + 1u) {
         picked |= bit;
         ended &= ~bit;
@@ -663,7 +830,7 @@ static void read_member(u32 place) {
     }
     u32 was = places[place].ride, mask;
     MASK_OFF(mask);
-    places[place].ride = found;
+    ride_is(place, found, found != 0 ? 1u : 0u);                                  // R24: a load or a start that finds a ride begins it
     if (found != was) back &= ~(1u << place);
     MASK_ON(mask);
     if (found == 0) {
@@ -681,12 +848,82 @@ static void read_member(u32 place) {
 static void first_frame() {
     u32 n = layer_count;
     if (list_state) op1f_log(2, LOG_FILE, 5, "lfo: the unit's list of LFOs could not be read (%u): no LFO layer is registered", list_state);
-    for (u32 k = 0; k < n; ++k)
-        op1f_log(3, LOG_FILE, 1, "lfo: '%s' of '%s' is a layer of the lists of LFOs, entry %u%s", layers[k].name, op1f_cards_2.slots[layers[k].slot].card->name,
-                 (u32)ID_FIRST + k, (layers[k].flags & (u32)OP1F_LFO_DRUM) ? ", the drum's too" : "");
+    for (u32 k = 0; k < n; ++k) {
+        const char* drum = (layers[k].flags & (u32)OP1F_LFO_DRUM) ? ", the drum's too" : "";
+        if (layers[k].wave)                                                         // R24: the wave's cost said too
+            op1f_log(3, LOG_FILE, 1, "lfo: '%s' of '%s' is a layer of the lists of LFOs, entry %u%s, a wave of %u cycles a block declared", layers[k].name,
+                     op1f_cards_2.slots[layers[k].slot].card->name, (u32)ID_FIRST + k, drum, layers[k].cycles);
+        else
+            op1f_log(3, LOG_FILE, 1, "lfo: '%s' of '%s' is a layer of the lists of LFOs, entry %u%s", layers[k].name, op1f_cards_2.slots[layers[k].slot].card->name,
+                     (u32)ID_FIRST + k, drum);
+    }
+    unit.countdown = PERIOD_FRAMES;                                                 // R24
     if (n == 0) return;
     for (u32 k = 0; k < (u32)KINDS; ++k) kind_screens[k] = STOCK_LFO_SCREEN_OF(k);
     for (u32 p = 0; p < (u32)PLACES; ++p) read_member(p);
+}
+
+// R24: n / d by shifts and subtractions, d not 0 (the module links no runtime).
+static u32 divided(u32 n, u32 d) {
+    u32 q = 0, r = 0;
+    for (int bit = 31; bit >= 0; --bit) {
+        r = (r << 1) | ((n >> bit) & 1u);
+        if (r >= d) {
+            r -= d;
+            q |= 1u << bit;
+        }
+    }
+    return q;
+}
+
+// R24: a wave switched off, said once a switch-off, as the effects unit's say_off words it.
+static void say_off(Layer* l) {
+    Budget* b = &l->budget;
+    if (!b->off || b->off_said) return;
+    b->off_said = 1;
+    if (b->off_overs == 0)
+        op1f_log(1, LOG_FILE, 6, "lfo: the wave of '%s' is switched off until its row is picked again: %u cycles in one call, %u declared", l->name, b->off_cycles, l->cycles);
+    else
+        op1f_log(1, LOG_FILE, 7, "lfo: the wave of '%s' is switched off until its row is picked again: %u calls in one second over twice its cost and its allowance, the most %u cycles, %u declared",
+                 l->name, b->off_overs, b->off_cycles, l->cycles);
+}
+
+// R24: the lines of the waves at a frame: a switch-off, and every PERIOD_FRAMES frames the period's calls, behind the
+// quiet gate as the effects unit's period line.
+static void waves_frame() {
+    u32 n = layer_count;
+    for (u32 k = 0; k < n; ++k)
+        if (layers[k].wave) say_off(&layers[k]);
+    if (--unit.countdown > 0) return;
+    unit.countdown = PERIOD_FRAMES;
+    u32 calls[LAYERS], sum[LAYERS], most[LAYERS], over[LAYERS];
+    u32 signature = quiet_mix(quiet_start(), n);
+    int activity = 0;
+    for (u32 k = 0; k < n; ++k) {                                                   // read and cleared, whatever the gate says
+        Layer* l = &layers[k];
+        u32 mask;
+        MASK_OFF(mask);
+        calls[k] = l->calls;
+        sum[k] = l->sum;
+        most[k] = l->most;
+        over[k] = l->over;
+        l->calls = 0;
+        l->sum = 0;
+        l->most = 0;
+        l->over = 0;
+        MASK_ON(mask);
+        signature = quiet_mix(signature, calls[k] != 0 ? 1u : 0u);
+        signature = quiet_mix(signature, over[k] != 0 ? 1u : 0u);
+        signature = quiet_mix(signature, l->budget.off);
+        if (over[k] != 0) activity = 1;
+    }
+    for (u32 p = 0; p < (u32)PLACES; ++p) signature = quiet_mix(signature, op1f_lfos_wave_ride[p]);
+    if (!quiet_period(&unit.gate, signature, activity)) return;
+    for (u32 k = 0; k < n; ++k) {
+        if (calls[k] == 0) continue;
+        op1f_log(3, LOG_FILE, 8, "lfo: the wave of '%s' this period: %u call(s), %u cycles at most, %u on average, %u over", layers[k].name, calls[k], most[k],
+                 divided(sum[k], calls[k]), over[k]);
+    }
 }
 
 extern "C" void op1f_lfos_frame() {
@@ -696,6 +933,7 @@ extern "C" void op1f_lfos_frame() {
         return;
     }
     if (layer_count == 0) return;
+    if (op1f_lfos_waves != 0) waves_frame();                                        // R24
     for (u32 p = 0; p < (u32)PLACES; ++p)                                           // a member refused with OP1F_NOT_NOW at an earlier frame
         if (places[p].member_dirty) write_member(p);
     u32 mask;
@@ -793,7 +1031,7 @@ extern "C" int op1f_lfos_layer_start(const Op1fCard* card, unsigned ask, unsigne
     if (places[place].ride == (u32)k + 1u) return 0;
     u32 mask;
     MASK_OFF(mask);
-    places[place].ride = (u32)k + 1u;
+    ride_is(place, (u32)k + 1u, 1);
     back &= ~(1u << place);
     MASK_ON(mask);
     say_ride(place, layers[k].name, 0);
@@ -810,7 +1048,7 @@ extern "C" int op1f_lfos_layer_end(const Op1fCard* card, unsigned ask, unsigned 
     if (places[place].ride != (u32)k + 1u) return OP1F_NOT_HERE;
     u32 mask;
     MASK_OFF(mask);
-    places[place].ride = 0;
+    ride_is(place, 0, 0);
     back &= ~(1u << place);
     MASK_ON(mask);
     say_ride(place, 0, "its pack ended the ride");

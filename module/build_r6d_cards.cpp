@@ -794,6 +794,9 @@ extern "C" void op1f_sample_frame() OP1F_NAMED("op1f_sample_frame") __attribute_
 enum { OP1F_ASK_LFO = 11, OP1F_LFO_DRUM = 1, OP1F_LFOS_MOST = 8 };
 #endif
 enum { LFO_BYTES = 28, STAND_LFO = 3, LFO_KINDS = 6 };
+// R24 (base 45): an LFO layer's table with a wave (module/build_r6e_card.h, "Base 45": OP1F_LFO_WAVE_BYTES), and the
+// most its wave may declare (OP1F_WAVE_CYCLES_MOST), named here for the same reason.
+enum { LFO_WAVE_BYTES = 36, LFO_WAVE_CYCLES_MOST = 8000 };
 enum { BY_EFFECTS = 0, BY_ENGINES = 1, BY_LFOS = 2, BY_DRUM = 3 };
 
 // R21 (base 43): the drum engine's page. One ask of kind OP1F_ASK_DRUM_ENGINE (module/build_r6e_card.h), on a card of
@@ -1423,7 +1426,9 @@ static OP1F_APART int lfo_taken(u32 slot, const char* name) {
 // Its table (the check held it to lie in its pack on a word with its bytes) at least an Op1fLfo, 28 bytes, its head
 // saying the ask's bytes; its name 1 to 15 characters of a-z, 0-9, ' ', '-' and '_', none of the unit's LFO kinds nor an
 // LFO layer's taken before it; no flag but OP1F_LFO_DRUM; its `shown` 0 or a function of its pack on an even address; and
-// no more than OP1F_LFOS_MOST in all.
+// no more than OP1F_LFOS_MOST in all. R24 (base 45): a table of 36 bytes or more whose word at +28 is not 0 carries a
+// wave: the wave a function of its pack on an even address and its cost, at +32, 1 to 8000 cycles a call. Any other
+// table of 28 or more is a plain layer, as on base 44 (a wave word of 0 says no wave; its cost is not read).
 static OP1F_APART const char* lfo_verdict(u32 slot, const Op1fAsk* ask) {
     const Op1fCardSlot* in = &op1f_cards_2.slots[slot];
     const Op1fKindHead* head = (const Op1fKindHead*)ask->what;
@@ -1439,6 +1444,12 @@ static OP1F_APART const char* lfo_verdict(u32 slot, const Op1fAsk* ask) {
     if ((head->flags & ~(u32)OP1F_LFO_DRUM) != 0) return "it has a flag this base does not know";
     u32 shown = (u32)head->shown;
     if (shown != 0 && (shown < in->first || shown >= in->end || (shown & 1u) != 0)) return "its shown does not lie in its pack on an even address";
+    const u32* tail = (const u32*)(head + 1);
+    if (ask->bytes >= (u32)LFO_WAVE_BYTES && tail[0] != 0) {                       // R24: the wave's address at +28, its cost at +32
+        u32 wave = tail[0], cycles = tail[1];
+        if (wave < in->first || wave >= in->end || (wave & 1u) != 0) return "its wave does not lie in its pack on an even address";
+        if (cycles < 1u || cycles > (u32)LFO_WAVE_CYCLES_MOST) return "its wave's cost is not between 1 and 8000 cycles a call";
+    }
     if (lfos.count >= (u32)OP1F_LFOS_MOST) return "the packs ask for more LFO layers than the base takes";
     return 0;
 }
