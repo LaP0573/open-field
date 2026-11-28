@@ -4,7 +4,7 @@ Every place where the loader and the base of open-field change OS 1.7.3+0 of the
 
 It holds addresses and our own words. It quotes no instruction of the firmware and gives none of its bytes. For each place the profile keeps a checksum of the firmware's own bytes there, so that the loader can tell the place before it changes it; a unit with another firmware is left as it is.
 
-There are 71 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 69 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
+There are 72 places. 2 of them are changed in the firmware file, by the builder, on the owner's own computer. The others are changed in the running firmware, in memory, at every start: 70 changes in 3 tables. A pack's places are not on this page: it names them in a profile of its own (for `8 tracks`, `fx train`, `lfo` and `sidechain`, `profile.json` in each one's folder in [open-field-packs](https://github.com/LaP0573/open-field-packs)).
 
 ## In the firmware file, by the builder
 
@@ -27,7 +27,7 @@ The loader's own three changes: the loader is our small piece inside the firmwar
 | `0x8fcafc0a` | a call | `op1f_base_populate_stub` | In the function that builds the disk mode's folder tree: the call that makes the last of the firmware's own folders, with the step behind it. | A call to our stub, which makes the firmware's folder as before, then the folder `packs` with the pack files in it, then the folders a pack has of its own. |
 | `0x8c0b43e4` | a call | `op1f_base_text_stub` | In the start-up, where the version text is drawn on the start screen: the load of the frame buffer's address. | A call to our stub, which does the load and puts words behind the version text: open-field and the release base.pack offers, or that the unit starts as stock. |
 
-### The base, `base.pack` (66)
+### The base, `base.pack` (67)
 
 The pack `base`, the file base.pack: the shared pack every other pack relies on. Every unit with open-field needs it. Its last five changes hand keys, knobs and a screen to a pack's page (level 2).
 
@@ -78,6 +78,7 @@ The pack `base`, the file base.pack: the shared pack every other pack relies on.
 | `0x8c0babc6` | a call | `op1f_fx_master_saved` | In the saving of the mixer's settings: the call that asks whether the master's effect is switched on. | A call to ours, which answers off while the master rides a pack's effect and makes the firmware's call otherwise. |
 | `0x8f0112e8` | a jump, with a trampoline of 8 bytes | `op1f_engine_factory_entry` | The entry of the function that makes the objects of a synth engine, by the engine's type. | A jump to ours, which lets the firmware's function make the objects (through a trampoline) and then tells the base of them, so that a sound on a pack's engine plays it. |
 | `0x8d4eb3e8` | a jump, with a trampoline of 8 bytes | `op1f_engine_pick_entry` | The entry of the function that puts an engine picked in the unit's list on a synth sound. | A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline). |
+| `0x8c0d625e` | a call | `op1f_engine_cursor_at` | In the opening of the engine list of a synth sound: the call that asks where the list's cursor stands (the catalog id of the sound's engine). | A call to ours, which makes the firmware's call and, for a sound that rides a pack's engine, answers that engine's id, so that the list opens on its row and not on dsynth's. |
 | `0x8fc2688e` | a call | `op1f_popups_place` | In the display thread's drawing of the screens: the call of a screen's own drawing. | A call to ours, which makes the firmware's call and, while a pack's page is shown, lets the unit's own popups stand over it. |
 | `0x8d4ecb42` | a call | `op1f_keeps_read_list_synth_stub` | In the loading of a synth sound picked in the unit's list: the call that reads the sound's file. | A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file. |
 | `0x8d4ecc2c` | a call | `op1f_keeps_put_synth_at` | In the loading of a synth sound picked in the unit's list: the call that puts the sound on its slot. | A call to ours, which makes the firmware's call and then tells the packs that another sound is on the slot. |

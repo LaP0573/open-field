@@ -55,6 +55,7 @@ op1f_boot_table:
     .long 0x00000012, 0x8c0babc6, op1f_fx_master_saved, 0x79fa658e, 0    /* A call to ours, which answers off while the master rides a pack's effect and makes the firmware's call otherwise. */
     .long 0x00080014, 0x8f0112e8, op1f_engine_factory_entry, 0x8341c8af, op1f_engine_factory_room    /* A jump to ours, which lets the firmware's function make the objects (through a trampoline) and then tells the base of them, so that a sound on a pack's engine plays it. */
     .long 0x00080014, 0x8d4eb3e8, op1f_engine_pick_entry, 0x8e2c6a48, op1f_engine_pick_room    /* A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline). */
+    .long 0x00000012, 0x8c0d625e, op1f_engine_cursor_at, 0x365292ea, 0    /* A call to ours, which makes the firmware's call and, for a sound that rides a pack's engine, answers that engine's id, so that the list opens on its row and not on dsynth's. */
     .long 0x00000012, 0x8fc2688e, op1f_popups_place, 0xa15b2423, 0    /* A call to ours, which makes the firmware's call and, while a pack's page is shown, lets the unit's own popups stand over it. */
     .long 0x00000012, 0x8d4ecb42, op1f_keeps_read_list_synth_stub, 0xbf339f84, 0    /* A call to our stub, which makes the firmware's call and keeps the values packs keep in the sound's file. */
     .long 0x00000012, 0x8d4ecc2c, op1f_keeps_put_synth_at, 0x99097ebb, 0    /* A call to ours, which makes the firmware's call and then tells the packs that another sound is on the slot. */

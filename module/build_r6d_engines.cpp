@@ -82,6 +82,7 @@ typedef unsigned short u16;
 typedef unsigned char u8;
 
 typedef void (*PickFn)(u32 id, u32 slot);
+typedef u32 (*CursorFn)(u32 slot, u8* found);         // the engine list's cursor: the catalog id of a slot's engine
 typedef void (*KnobSetFn)(u32 record, const u32* words);
 typedef u32 (*ScreenOfFn)(u32 type);
 typedef const void* (*JsonMemberFn)(const void* value, const char* key);
@@ -131,6 +132,7 @@ static inline u32 cycles_now() {
 }
 #define STOCK_KNOB_SET ((KnobSetFn)0x8d4f689cu)
 #define STOCK_ENGINE_SCREEN ((ScreenOfFn)0x8fc274acu)
+#define STOCK_ENGINE_CURSOR ((CursorFn)0x8d4f7b82u)       // (slot, the byte it sets when the catalog holds the slot's type)
 #define STOCK_JSON_MEMBER ((JsonMemberFn)0x8c084f74u)
 #define STOCK_JSON_SIZE ((JsonSizeFn)0x8c084c22u)
 #define STOCK_JSON_ELEMENT ((JsonElementFn)0x8c084ee0u)
@@ -684,6 +686,22 @@ extern "C" void op1f_engine_pick_do(unsigned id, unsigned slot) {
         MASK_ON(mask);
     }
     ROOM_PICK(id, slot);
+}
+
+// ---------------------------------------------------------------- the engine list's cursor
+
+// The opening of the engine list of a synth sound (shift + T1) asks where the cursor stands: the catalog id of the
+// slot's engine type, the row of the list that holds that id (an id no row holds: the first row). A sound that rides a
+// pack's engine is dsynth to the firmware, so the list opened on dsynth's row. Its call (0x8c0d625e) comes here: the
+// firmware's answer, then, while the slot rides a registered engine and its type word still reads dsynth, that
+// engine's id, the id of its row. The key thread; `rides` is read as one word.
+extern "C" u32 op1f_engine_cursor_at(u32 slot, u8* found) OP1F_NAMED("op1f_engine_cursor_at");
+extern "C" u32 op1f_engine_cursor_at(u32 slot, u8* found) {
+    u32 id = STOCK_ENGINE_CURSOR(slot, found);
+    if (slot >= (u32)SLOTS) return id;
+    u32 r = rides[slot], n = op1f_engines_registered;
+    if (r == 0 || r > n || slot_type(slot) != (u32)DSYNTH) return id;              // no ride, an engine away, or no longer dsynth
+    return (u32)ID_FIRST + r - 1u;
 }
 
 // ---------------------------------------------------------------- a sound put on a slot (F4)

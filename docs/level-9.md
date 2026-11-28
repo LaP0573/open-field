@@ -55,7 +55,7 @@ The table the tool writes is an `Op1fEngine`:
 
 **The name.** Not one of the unit's own engines (`amp`, `cluster`, `digital`, `dimension`, `dna`, `dr.wave`, `drwave`, `dsynth`, `fm`, `phase`, `pulse`, `string`, `vocoder`, `voltage`), nor `sampler` or `fazer`. **Where two packs ask for the same name, the earlier file keeps it**, and the later ask is left aside with a line. Eight engines of packs in all. The ninth is left aside.
 
-**Where it shows.** The unit sorts its engine list by name, so your engine stands among the unit's own where its name falls, not at the end. In that list your engine's row has no sounds under it (its sounds are in the sound list, below). A walk that steps from sound to sound goes straight past any such row, the unit's own `fm` and `phase` as well as yours, so look for it by its name. Picked, the sound takes your engine's name, as it would take `fm`'s.
+**Where it shows.** The unit sorts its engine list by name, so your engine stands among the unit's own where its name falls, not at the end. In that list your engine's row has no sounds under it (its sounds are in the sound list, below). A walk that steps from sound to sound goes straight past any such row, the unit's own `fm` and `phase` as well as yours, so look for it by its name. Picked, the sound takes your engine's name, as it would take `fm`'s. Opened again on that sound, the list stands on your engine's row.
 
 **Level 9 is the synth's.** The drum's sounds are made another way, and no engine of this level reaches them. From base 43 a pack can add a [drum engine](drum-engine.md) to the drum's own list instead: it rides the drum sampler and has a page, not a sound of its own.
 
