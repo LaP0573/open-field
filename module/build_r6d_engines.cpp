@@ -1186,8 +1186,7 @@ static void give_memory(Engine* e) {
     e->handle = op1f_memory_more((u32)VOICES * e->stride, e->voice_align, whose);
     if (e->handle <= 0) {
         e->memory = REFUSED;
-        op1f_log(1, LOG_FILE, 10, "engine: '%s' has no room for its six voices: %s", e->name,
-                 e->handle == OP1F_TOO_LARGE ? "the packs would take more than 16 MiB" : "the heap has no such room, or less than 8 MiB would stay free");
+        op1f_log(1, LOG_FILE, 10, "engine: '%s' has no room for its six voices: %s", e->name, op1f_memory_refusal());   // R23: the memory unit's reason
         return;
     }
     e->memory = CLEARING;

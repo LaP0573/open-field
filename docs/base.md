@@ -80,6 +80,7 @@ From base 33 the base grows without a new level. A part adds helpers, a kind of 
 | 41 | [More working memory](level-6.md#working-memory): the unit's spare memory first, then its heap as before; up to 32 MiB an ask and 64 asks in all | `op1f_memory_2`, for a pack that cannot do without these limits |
 | 42 | N2's longer list of cards: the base serves up to 128 of them ([below](#base-40-and-the-next-loader)). Under N1 a unit runs as on base 41. Nothing for a pack to ask | none |
 | 43 | [A drum engine](drum-engine.md): a pack's engine in the drum's engine list, riding the drum sampler; picked, its page stands on T1 with the keys and knobs offered to it first, and the drum sound's file keeps its name; one pack holds it | `op1f_drum_engine_1` |
+| 45 | [An effect's working memory is given back](level-8.md#working-memory) once nothing plays the effect there, and handed out again: browsing the unit's lists no longer uses it up. The base may hold 104 blocks for the packs' effects and engines at once, where it could take 16 a session. Nothing for a pack to ask | none |
 
 A pack with a card needs no entry for the base in its recipe's `works_with`: the mark says it. Faust's four packs in [open-field-packs](https://github.com/LaP0573/open-field-packs) name only each other there (`8 tracks` and `sidechain`, `fx train` and `lfo`), for the names they offer one another.
 

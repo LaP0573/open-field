@@ -144,7 +144,24 @@ extern "C" void op1f_effects_changed(unsigned where, unsigned which, unsigned ho
 extern "C" int op1f_memory_more(unsigned bytes, unsigned align, const char* whose) OP1F_NAMED("op1f_memory_more");
 
 // The block of a handle op1f_memory_more answered: 0 while it is being cleared (a quarter of a megabyte a frame),
-// then the cleared block, always the same. From any thread.
+// then the cleared block, always the same until it is given back. From any thread.
 extern "C" void* op1f_memory_block(int handle) OP1F_NAMED("op1f_memory_block");
+
+// R23 (base 45): a block of the base's own given back, from the display thread, once nothing reads or writes it any
+// more and no other thread can (the caller's to know). The handle is no longer the caller's: op1f_memory_block
+// answers 0 for it, and a later op1f_memory_more may hand the same block out again, cleared, under the same handle.
+// `whose` names it on the log. Answers 0, or OP1F_FAILED for a handle that is not a block of the base's own.
+extern "C" int op1f_memory_less(int handle, const char* whose) OP1F_NAMED("op1f_memory_less");
+
+// R23: why op1f_memory_more refused its last ask, the end of its line, for the line of the unit that asked. From the
+// display thread, right after the refusal.
+extern "C" const char* op1f_memory_refusal() OP1F_NAMED("op1f_memory_refusal");
+
+// R23: how many blocks the base may hold for its own use at once: what the units that ask can hold together. The
+// engines unit holds one block an engine (OP1F_ENGINES_MOST, 8); the effects unit one an effect at the instrument and
+// one at the master (2 x OP1F_EFFECTS_MOST, 32) and one a run inside a pack (its 64 records). Each unit gives a
+// block back before it asks another for the same holder, so the count of blocks held never passes 104. A block given
+// back is handed out again; so the memory unit refuses for the count only when 104 are held.
+enum { OP1F_MEMORY_MORE = 104 };
 
 #endif
