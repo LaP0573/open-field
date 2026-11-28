@@ -5,7 +5,7 @@
   "categories": [
     "effects"
   ],
-  "description": "A chain of effects on every sound, with its presets kept as files.",
+  "description": "A chain of effects on every sound and on the master, with its presets kept as files.",
   "repository": "https://github.com/LaP0573/open-field-packs",
   "follow": "main",
   "path": "fx train.pack",
