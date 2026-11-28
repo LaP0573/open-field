@@ -2128,8 +2128,9 @@ extern "C" int op1f_rack_kept(const Op1fCard* card, unsigned which, char* out, u
 // from the pack's frame function). While the page is up, a knob's turn, click or press that no pack took is not handed to the unit (it would
 // move the unit's effect under the layer): a turn moves the instance's word, a click or a press is dropped.
 // OP1F_HOSTED_PAGE_READY comes with the mask while the page stands now at the place on the screen (its type's screen
-// asked there), up or lying under another page of the host's: a host that draws its own page over the unit's closes
-// that page then, and the page comes up (a base before this bit never sets it).
+// asked there), up or lying under another page (the host's own, the base's top page or another pack's): a host that
+// draws its own page over the unit's closes that page then, and the page comes up (a base before this bit never sets
+// it).
 enum { OP1F_HOSTED_PAGE_UP = 256, OP1F_HOSTED_PAGE_READY = 512 };
 extern "C" int op1f_rack_page(const Op1fCard* card, unsigned ask, unsigned which, int* words) OP1F_NAMED("op1f_rack_page");
 

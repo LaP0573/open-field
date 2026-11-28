@@ -287,6 +287,8 @@ The pack tool then writes the ask's table 188 bytes long: the picture's word at 
 
 **A train of your own** calls three helpers from its frame function, and names the mark `op1f_hosted_1`: `op1f_rack_place` says which sound a wagon plays for and hands it its kept settings, before `op1f_rack_ready`; `op1f_rack_kept` gives back what the effect's pack wrote, to save with the wagon; `op1f_rack_page` asks for the effect's page for one wagon, once a frame, and hands the knob words that page changed.
 
+Since base 45 (release 0.27) that page comes up whatever page your layer chose with `op1f_layer_page`, the unit's or your own. If your train draws a page of its own over the unit's (as `fx train` does on the master, over the mixer), the page you asked for lies under yours. `op1f_rack_page`'s answer then carries `OP1F_HOSTED_PAGE_READY` (512): close your page, and the effect's page comes up. A base before 45 never sets that bit, so a train that waits for it shows nothing new there.
+
 ## Two packs, and your pack's own places
 
 - **Two effects of two packs** play together at two places: one on a sound and one on the master, or each on different sounds. At one place there's one effect, as on the unit.
