@@ -372,6 +372,13 @@
    "name": "The entry of the function that puts an engine picked in the unit's list on a synth sound."
   },
   {
+   "address": "0x8c0d625e",
+   "length": 8,
+   "sum": "0x365292ea",
+   "group": "base",
+   "name": "In the opening of the engine list of a synth sound: the call that asks where the list's cursor stands (the catalog id of the sound's engine)."
+  },
+  {
    "address": "0x8fc2688e",
    "length": 8,
    "sum": "0xa15b2423",
@@ -886,6 +893,12 @@
      "room": "op1f_engine_pick_room",
      "copies": 8,
      "does": "A jump to ours, which puts a pack's engine on the sound or takes it off, and lets the firmware's function run (through a trampoline)."
+    },
+    {
+     "address": "0x8c0d625e",
+     "form": "call",
+     "target": "op1f_engine_cursor_at",
+     "does": "A call to ours, which makes the firmware's call and, for a sound that rides a pack's engine, answers that engine's id, so that the list opens on its row and not on dsynth's."
     },
     {
      "address": "0x8fc2688e",

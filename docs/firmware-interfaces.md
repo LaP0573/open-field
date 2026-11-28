@@ -17,7 +17,7 @@ typedef int (*FileSizeFn)(const char* path);
 
 **The threads.** *The main thread* runs the start-up. *The display thread* draws a frame some sixty times a second; the shared part calls our frame functions from it. *The key thread* hands key presses and knob turns to the mode that is shown. *The audio thread* makes the sound, a block of 64 samples at a time, and must never wait: no log line, no file, no memory asked for there. Where the last column says "ours", it names the threads our code calls the function on today; that it is safe on another thread has not been shown.
 
-There are 120 functions bound in the sources. 120 are described below, by subject. The other 0 are listed at the end with their type and the files that bind them: their words are still to be written.
+There are 121 functions bound in the sources. 120 are described below, by subject. The other 1 are listed at the end with their type and the files that bind them: their words are still to be written.
 
 ## The log
 
@@ -220,3 +220,4 @@ Each of these is called by the files named. The type is what our code hands over
 
 | Address | The call | Bound in |
 | --- | --- | --- |
+| `0x8d4f7b82` | `u32 engine_cursor(u32 slot, u8* found)` | `build_r6d_engines.cpp` |
