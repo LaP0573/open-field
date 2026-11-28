@@ -3685,12 +3685,42 @@ static OP1F_APART void input_seen() {
     for (u32 i = 0; i < state.seen; ++i) state.seen_took[i] = input.took_down[i] + input.took_up[i] + input.took_turn[i];
 }
 
+// Issue #62: a card's document that has left screen 77 gives back the rasterizers of its shapes, as the firmware's own
+// documents do at every change of screen. The firmware's display loop, at a change of screen, asks the document of each
+// registered screen to release what its shapes hold (the virtual at +0x30 of the document, whose first word is its
+// table), and the cells are made again at the document's next draw. A card's document is under 77 only while its page
+// is up; once another document takes 77 (another pack's page, a hosted page, the base's own), no screen holds it, so
+// that walk never reaches it, and the shapes it was drawn with in its last frame stay held, about 2.4 KiB a shape, until
+// the same document is under 77 again at a later change of screen. So once a frame, on the display thread and before
+// anything draws, the document that was under 77 at the frame before and is no longer is asked to release, when a card
+// made it (op1f_cards_document): the base's own pages are passed by. Its nodes stay; only the cells go.
+typedef void (*ReleaseFn)(void* document);
+enum { DOCUMENT_RELEASE = 0x30 / 4, RELEASES_SAID = 64 };
+static void* under_77;                                      // the document under 77 at the frame before
+static u32 releases;                                        // documents asked to release since the start
+static OP1F_APART void release_left_77() {
+    u32* screens = STOCK_SCREENS();
+    u32* s77 = screens != 0 ? (u32*)screens[PAGE_SCREEN] : 0;
+    void* now = s77 != 0 ? (void*)s77[SCREEN_DOCUMENT] : 0;
+    if (now == under_77) return;
+    void* left = under_77;
+    under_77 = now;
+    int slot = left != 0 ? op1f_cards_document(left) : -1;
+    if (slot < 0) return;
+    u32* table = *(u32**)left;
+    ((ReleaseFn)table[DOCUMENT_RELEASE])(left);
+    ++releases;
+    if (releases <= (u32)RELEASES_SAID)
+        STOCK_LOG(3, LOG_FILE, 53, "page: the shapes of a document that left screen %u released (%u), of slot %u", (u32)PAGE_SCREEN, releases, (u32)slot);
+}
+
 // From the measuring unit's frame function, once a frame, after our own features' frame work and before the shared
 // screens are dressed: the clock, the page, then each used card's frame function in the list's order.
 extern "C" void op1f_cards_frame() OP1F_NAMED("op1f_cards_frame");
 static inline void places_ready();                          // R4: pictures that take a place, below
 static OP1F_APART void said_passed();
 extern "C" void op1f_cards_frame() {
+    release_left_77();                                      // issue #62: the shapes of a document that left 77 given back
     places_ready();                                         // R4: the check, and the places after it
     u32 cycles = stamp();
     if (state.started) {
